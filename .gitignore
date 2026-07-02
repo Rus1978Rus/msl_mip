@@ -1,0 +1,7 @@
+# Python кэш
+__pycache__/
+*.pyc
+*.pyo
+
+# Кэш Public Suffix List и IANA TLD
+cache/
