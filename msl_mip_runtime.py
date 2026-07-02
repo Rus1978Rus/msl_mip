@@ -78,12 +78,12 @@ def load_all_cards() -> list:
     for fname in CARD_FILENAMES:
         path = _find_card_file(fname)
         if path is None:
-            print(f"[WARNING] Карточка не найдена: {fname} — знак не будет распознан")
+            print(f"[WARNING] Card not found: {fname} — sign will not be recognized")
             continue
         try:
             cards.append(load_card(path))
         except Exception as e:
-            print(f"[WARNING] Не удалось загрузить {fname}: {e}")
+            print(f"[WARNING] Failed to load {fname}: {e}")
     return cards
 
 
@@ -97,7 +97,7 @@ def scan_signs(text: str, cards: list) -> list:
             try:
                 statuses.append(process_sign(sign_chars[ch], text, i))
             except Exception as e:
-                print(f"[WARNING] Ошибка обработки знака {ch!r} на позиции {i}: {e}")
+                print(f"[WARNING] Error processing sign {ch!r} at position {i}: {e}")
     return statuses
 
 
@@ -142,12 +142,12 @@ def analyze(text: str, cards: list) -> dict:
 def print_report(report: dict) -> None:
     text = report["text"]
     print("=" * 60)
-    print(f"ТЕКСТ: {text!r}")
+    print(f"TEXT: {text!r}")
     print("=" * 60)
 
-    print("\n--- ОДИНОЧНЫЕ ЗНАКИ ---")
+    print("\n--- SINGLE SIGNS ---")
     if not report["single_sign_results"]:
-        print("  (знаков из загруженных карточек не найдено)")
+        print("  (no signs from loaded cards found)")
     for st, decision in report["single_sign_results"]:
         print(f"  [{st.sign_offset_start}] {st.sign_codepoint} "
               f"interp={st.interpretation} risk={st.risk_level.value} "
@@ -157,10 +157,10 @@ def print_report(report: dict) -> None:
         for w in st.output_warnings:
             print(f"        [!] {w}")
 
-    print("\n--- ПОСЛЕДОВАТЕЛЬНОСТИ ---")
+    print("\n--- SEQUENCES ---")
     seq_out = report["sequence_output"]
     if not seq_out.matches:
-        print("  (последовательностей не найдено)")
+        print("  (no sequences found)")
     for m in seq_out.matches:
         rl = m.risk_level.value if hasattr(m.risk_level, "value") else m.risk_level
         print(f"  [{m.match_start}:{m.match_end}] {m.sc_id} {m.sequence!r} "
@@ -171,42 +171,42 @@ def print_report(report: dict) -> None:
         print(f"  [!] {w}")
 
     print("\n" + "=" * 60)
-    print(f"ИТОГОВЫЙ ВЕРДИКТ: {report['final_action'].upper()}")
+    print(f"FINAL VERDICT: {report['final_action'].upper()}")
     print("=" * 60)
 
 
 def main():
     cards = load_all_cards()
     if not cards:
-        print("[ERROR] Ни одна карточка не загрузилась — анализ невозможен.")
+        print("[ERROR] No cards loaded — analysis impossible.")
         sys.exit(1)
-    print(f"Загружено карточек: {len(cards)} ({', '.join(c.codepoint for c in cards)})")
+    print(f"Cards loaded: {len(cards)} ({', '.join(c.codepoint for c in cards)})")
 
     suffix_source = dot_matcher.get_compound_suffix_source()
     if suffix_source == "LIVE_FETCH":
-        print("Список составных доменных окончаний: актуальный (скачан только что)")
+        print("Compound suffix list (PSL): up to date (just fetched)")
     elif suffix_source.startswith("CACHE_FROM_"):
         cached_at = suffix_source.replace("CACHE_FROM_", "")
-        print(f"[!] Список составных доменных окончаний: не удалось обновить, "
-              f"использую сохранённую копию от {cached_at}")
+        print(f"[!] Compound suffix list (PSL): could not update, "
+              f"using cached copy from {cached_at}")
     else:
-        print("[!] Список составных доменных окончаний: нет сети и нет сохранённой "
-              "копии — использую встроенный минимальный список (может не знать "
-              "о редких составных зонах)")
+        print("[!] Compound suffix list (PSL): no network and no cached copy — "
+              "using built-in minimal list (may not know "
+              "about rare compound zones)")
 
     # ИСПРАВЛЕНО (MAJOR, найдено GPT-5.5, 2026-06-29): раньше источник
     # одиночных TLD (реестр IANA) не раскрывался вообще
     tld_source = dot_matcher.get_single_tld_source()
     if tld_source == "LIVE_FETCH":
-        print("Список одиночных TLD (IANA): актуальный (скачан только что)")
+        print("Single TLD list (IANA): up to date (just fetched)")
     elif tld_source.startswith("CACHE_FROM_"):
         cached_at = tld_source.replace("CACHE_FROM_", "")
-        print(f"[!] Список одиночных TLD (IANA): не удалось обновить, "
-              f"использую сохранённую копию от {cached_at}")
+        print(f"[!] Single TLD list (IANA): could not update, "
+              f"using cached copy from {cached_at}")
     else:
-        print("[!] Список одиночных TLD (IANA): нет сети и нет сохранённой "
-              "копии — использую встроенный минимальный список (может не знать "
-              "о редких TLD)")
+        print("[!] Single TLD list (IANA): no network and no cached copy — "
+              "using built-in minimal list (may not know "
+              "about rare TLDs)")
     print()
 
     if len(sys.argv) > 1:
@@ -214,12 +214,12 @@ def main():
         report = analyze(text, cards)
         print_report(report)
     else:
-        print("Введите текст для анализа (Ctrl+C для выхода):")
+        print("Enter text to analyze (Ctrl+C to exit):")
         while True:
             try:
                 text = input("> ")
             except (EOFError, KeyboardInterrupt):
-                print("\nВыход.")
+                print("\nExiting.")
                 break
             if not text.strip():
                 continue
