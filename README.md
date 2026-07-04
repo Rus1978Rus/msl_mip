@@ -119,6 +119,40 @@ To submit a change for review, use the packet template: `templates/CONVEYOR_RUN_
 - Card `☠` (U+2620) is a **test card** (WORKING_DRAFT), created to validate cross-card sequence logic. The other three cards are confirmed.
 - Sign cards are written in Russian (the project's authoritative language). Code output is in English.
 
+## Standards Alignment
+
+MSL/MIP was designed independently, but its architecture lines up with
+several established security frameworks. These are **structural
+correspondences in spirit**, not certified mappings — framework
+crosswalks are rarely one-to-one, and none of the below has been
+formally audited by a standards body.
+
+- **NIST SP 800-53 Rev 5 — SI-10 (Information Input Validation).**
+  SI-10 calls for checking the syntax and semantics of inputs to
+  prevent injection and cross-site-scripting attacks. MSL/MIP's three
+  layers (single-sign validation → sequence anchoring → contradiction
+  guards) are a structural input-validation pipeline in this spirit.
+- **NIST SP 800-53 Rev 5 — AU (Audit and Accountability) family.**
+  Every verdict carries an `action_rationale` (e.g.
+  `risk_level=HIGH; risk_cases=RISK_CASE_002; guards=CG3`), giving an
+  auditable, traceable record of why each decision was made rather
+  than an opaque score.
+- **OWASP Top 10:2025 / CVE-grounded roadmap.** The Sign Priority
+  Registry ranks candidate signs against documented attack classes
+  (XSS, SQL injection, Trojan Source / CVE-2021-42574 bidi controls),
+  keeping development tied to the real-world threat landscape.
+- **MITRE ATT&CK / ATLAS (potential, not claimed).** The runtime emits
+  structured, RISK_CASE-tagged output that could in principle feed an
+  ATT&CK-mapping or ATLAS (AI-threat) workflow. We deliberately do
+  **not** assert specific technique IDs here: an external analysis
+  proposed some (e.g. T1592 for the solidus PHAGO case), but T1592 is a
+  reconnaissance technique ("Gather Victim Host Information") and does
+  not match brand-impersonation — a reminder that technique-level
+  mappings need per-case verification before being claimed.
+
+This section is descriptive, for readers placing MSL/MIP in a broader
+context. It is not a compliance claim.
+
 ---
 ---
 
@@ -242,3 +276,39 @@ templates/              Шаблоны для расширения систем�
 - **Домены-двойники брендов с одной точкой** (например `paypai.com`) сейчас проходят — для них нужен отдельный слой репутации/детекции typosquatting, это будущая работа.
 - Карточка `☠` (U+2620) — **тестовая** (WORKING_DRAFT), создана для проверки межкарточной последовательной логики. Остальные три карточки подтверждены.
 - Карточки знаков написаны на русском (авторитетный язык проекта). Вывод программы — на английском.
+
+## Соответствие стандартам
+
+MSL/MIP разрабатывался независимо, но его архитектура совпадает с
+несколькими признанными фреймворками безопасности. Это **структурные
+соответствия по духу**, а не сертифицированные маппинги — кросс-связи
+между фреймворками редко бывают один-к-одному, и ничто из
+нижеперечисленного не проходило формального аудита органом
+стандартизации.
+
+- **NIST SP 800-53 Rev 5 — SI-10 (Information Input Validation).**
+  SI-10 требует проверки синтаксиса и семантики входных данных для
+  предотвращения инъекций и XSS. Три слоя MSL/MIP (проверка одиночного
+  знака → якорение последовательностей → contradiction guards) — это
+  конвейер валидации входа в том же духе.
+- **NIST SP 800-53 Rev 5 — семейство AU (Audit and Accountability).**
+  Каждый вердикт несёт `action_rationale` (например
+  `risk_level=HIGH; risk_cases=RISK_CASE_002; guards=CG3`), давая
+  аудируемую, трассируемую запись причины каждого решения вместо
+  непрозрачной оценки.
+- **OWASP Top 10:2025 / привязка к CVE.** Реестр приоритетов знаков
+  ранжирует знаки-кандидаты относительно документированных классов
+  атак (XSS, SQL-инъекции, Trojan Source / bidi-контролы
+  CVE-2021-42574), удерживая разработку привязанной к реальному
+  ландшафту угроз.
+- **MITRE ATT&CK / ATLAS (потенциально, не заявляется).** Runtime
+  выдаёт структурированный вывод с тегами RISK_CASE, который в принципе
+  мог бы питать ATT&CK-маппинг или ATLAS (угрозы ИИ). Мы намеренно
+  **не** указываем конкретные ID техник: внешний анализ предложил
+  некоторые (например, T1592 для PHAGO-случая солидуса), но T1592 —
+  техника разведки («Gather Victim Host Information») и не соответствует
+  имитации бренда — напоминание, что маппинги на уровне техник требуют
+  покейсовой проверки, прежде чем их заявлять.
+
+Этот раздел — описательный, для читателей, помещающих MSL/MIP в более
+широкий контекст. Это не заявление о соответствии требованиям.

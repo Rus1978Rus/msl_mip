@@ -30,6 +30,36 @@ RU: Этот реестр ранжирует знаки-кандидаты дл�
 - **INJ** = Injection / technical attacks (обман машин)
 - **LLM** = LLM bypass / prompt injection (обман ИИ)
 
+## PHAGO dimension / Измерение PHAGO
+
+PHAGO_ENTITY_MIMICRY is a **separate, orthogonal dimension** from the
+PH/INJ/LLM category. A sign can belong to any category AND still carry
+(or not carry) PHAGO potential. PHAGO measures whether a sign is used
+to mimic the *existence of a verified entity* (a brand, an organization,
+an official account/subproject) — not merely to obfuscate structure.
+
+PHAGO_ENTITY_MIMICRY — это **отдельное, ортогональное измерение**
+относительно категории PH/INJ/LLM. Знак может принадлежать любой
+категории И при этом нести (или не нести) PHAGO-потенциал. PHAGO
+измеряет, используется ли знак для имитации *существования проверенной
+сущности* (бренда, организации, официального аккаунта/подпроекта), а не
+просто для маскировки структуры.
+
+PHAGO flag values / Значения флага PHAGO:
+- **●** = strong PHAGO carrier (direct entity-existence mimicry) /
+  сильный носитель PHAGO (прямая имитация существования сущности)
+- **○** = partial / adapted PHAGO (domain-specific, e.g. emoji
+  astroturfing) / частичный / адаптированный PHAGO
+- **—** = not a PHAGO carrier (structure masking only, no entity
+  mimicry) / не носитель PHAGO (только маскировка структуры)
+
+This dimension is confirmed at the card level (SOLIDUS = ●,
+DOT = —, SKULL = ○) and is flagged here so that the roadmap can
+prioritize signs strong in brand/entity mimicry, which commercial
+defenses often miss. Это измерение подтверждается на уровне карточки и
+отмечается здесь, чтобы дорожная карта могла приоритизировать знаки,
+сильные в имитации бренда/сущности.
+
 ## Status values / Значения статуса
 
 - **DONE** — card confirmed (ARTIFACT_CONFIRMED)
@@ -166,5 +196,42 @@ RU:
   инъекции, и современным атакам на LLM/имена файлов.
 - Этот реестр — ЧЕРНОВИК. Приоритеты и категории требуют
   конвейерного ревью, прежде чем считаться авторитетными.
+
+============================================================
+## PHAGO-RELEVANT SIGNS — SUMMARY / СВОДКА ПО PHAGO
+============================================================
+
+Signs flagged for PHAGO_ENTITY_MIMICRY potential (the orthogonal
+dimension defined above). CONFIRMED = verified at the card level;
+HYPOTHESIS = flagged for review, not yet card-confirmed.
+
+Знаки с PHAGO-потенциалом (ортогональное измерение, определённое выше).
+CONFIRMED = подтверждено на уровне карточки; HYPOTHESIS = помечено для
+ревью, ещё не подтверждено карточкой.
+
+| Sign | Codepoint | PHAGO | Basis (EN / RU) | Source |
+|------|-----------|-------|-----------------|--------|
+| `/` | U+002F | ● | Brand path mimicry (OpenAI/VerifiedProjectX) / имитация принадлежности бренду | CONFIRMED (SOLIDUS card, RISK_CASE_007) |
+| 💀 | U+1F480 | ○ | Emoji astroturfing, quasi-entity edginess / эмодзи-астротурфинг | CONFIRMED (SKULL card, PE_001/002) |
+| `.` | U+002E | — | Domain masking only, no entity mimicry / только маскировка домена | CONFIRMED (DOT card, NOT_APPLICABLE) |
+| `@` | U+0040 | ● | userinfo spoofing implies a verified account (paypal.com@evil.ru) / подмена аккаунта | HYPOTHESIS (TIER 1) |
+| `-` | U+002D | ● | Fake compound brand (paypal-secure.com) implies affiliated entity / фейковый составной бренд | HYPOTHESIS (TIER 1) |
+| `а` | U+0430 | ● | Cyrillic homoglyph mimics the real brand name itself (аpple.com) / гомоглиф имитирует само имя бренда | HYPOTHESIS (TIER 2) |
+| `ο` | U+03BF | ● | Greek homoglyph, same brand-name mimicry / греческий гомоглиф, та же имитация | HYPOTHESIS (TIER 2) |
+| `_` | U+005F | ○ | Fake subdomains may imply an official sub-entity / фейковые поддомены | HYPOTHESIS (TIER 2) |
+
+NOTE: The `@`, `-`, and homoglyph signs are strong PHAGO candidates
+because they mimic not just structure but the *identity of a specific
+verified brand*. This is a priority signal for the roadmap: PHAGO
+carriers are exactly the class that commercial reputation/lookalike
+defenses most often miss. To be confirmed per-card during each sign's
+own conveyor pass.
+
+ПРИМЕЧАНИЕ: знаки `@`, `-` и гомоглифы — сильные кандидаты в PHAGO,
+потому что имитируют не просто структуру, а *идентичность конкретного
+проверенного бренда*. Это приоритетный сигнал для дорожной карты:
+носители PHAGO — именно тот класс, который коммерческие защиты от
+подделок чаще всего пропускают. Подтверждается покарточно во время
+конвейерного прохода каждого знака.
 
 END_OF_DOCUMENT
