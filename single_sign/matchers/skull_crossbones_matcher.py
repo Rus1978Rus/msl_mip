@@ -30,6 +30,32 @@ EPOCH_3_KEYWORDS = (
 
 _THREAT_PHRASES = (
     "я тебя отравлю", "я тебя убью", "ты умрёшь", "ты умрешь",
+    # MATCHER_PATCH_01: расширение покрытия RISK_CASE_001 по
+    # ADVERSARIAL_COVERAGE полной карточки (A2, A3)
+    "не доживёшь", "не доживешь", "тебе конец",
+)
+
+# MATCHER_PATCH_01: RISK_CASE_002 FALSE_HAZARD_AUTHORITY_MIMICRY —
+# слова-заявки на официальность/сертификацию рядом со знаком опасности
+# (карточка: знак не подтверждает регуляторный авторитет)
+_FALSE_AUTHORITY_KEYWORDS = (
+    "сертифицировано", "сертифицирован", "официально", "официальное",
+    "официальный", "гост", "одобрено", "лицензировано",
+    "от администрации", "администрация",
+)
+
+# MATCHER_PATCH_01: RISK_CASE_003 MEDICAL_INSTRUCTION_OBFUSCATION —
+# императив приёма/смешивания + вещество. Структурный паттерн
+# потенциально вредной инструкции; ироническая рамка НЕ снижает риск
+# (GUARD карточки: неоднозначность эскалирует, default НЕ "это ирония")
+_HARM_INSTRUCTION_VERBS = (
+    "прими", "примите", "выпей", "выпейте", "проглоти", "проглотите",
+    "смешай", "смешайте", "вдохни", "вдохните",
+)
+_HARM_SUBSTANCE_WORDS = (
+    "таблетки", "таблетку", "таблеток", "лекарства", "лекарство",
+    "отбеливатель", "аммиак", "хлорку", "хлорка", "уксус",
+    "растворитель", "антифриз",
 )
 
 
@@ -66,10 +92,27 @@ def match(text: str, offset: int, metadata: dict = None):
     metadata = metadata or {}
     t = text.lower()
 
+    # Приоритет проверок (MATCHER_PATCH_01): RC1 угроза → RC3 вредная
+    # инструкция → RC2 ложный авторитет → SAFE по эпохам. Угроза и
+    # инструкция вреда — HIGH (важнее эпохи); ложный авторитет — MEDIUM.
     if any(_contains_word(t, p) for p in _THREAT_PHRASES):
         risk.append("RISK_CASE_001")
         epoch = detect_epoch(text)
         interp = "threat_obfuscated_as_hazard_warning"
+    elif (any(_contains_word(t, v) for v in _HARM_INSTRUCTION_VERBS)
+          and any(_contains_word(t, s) for s in _HARM_SUBSTANCE_WORDS)):
+        # RC3: императив + вещество = потенциально вредная инструкция.
+        # Ироническая рамка ("лол", "будет весело") риск НЕ снижает —
+        # по GUARD карточки неоднозначность эскалирует.
+        risk.append("RISK_CASE_003")
+        epoch = detect_epoch(text)
+        interp = "medical_instruction_obfuscation"
+    elif any(_contains_word(t, kw) for kw in _FALSE_AUTHORITY_KEYWORDS):
+        # RC2: заявка на официальность/сертификацию рядом со знаком
+        # опасности — имитация регуляторного авторитета (MEDIUM).
+        risk.append("RISK_CASE_002")
+        epoch = detect_epoch(text)
+        interp = "false_hazard_authority"
     else:
         epoch = detect_epoch(text)
         interp = _EPOCH_INTERPRETATION[epoch]
