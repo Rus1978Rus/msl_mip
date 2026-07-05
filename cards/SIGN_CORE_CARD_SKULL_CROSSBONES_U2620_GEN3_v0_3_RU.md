@@ -37,7 +37,17 @@ STATUS_PROGRESSION_TRACKER:
   MATCHER_PATCH_REVIEW: PASS (Kimi/Grok/Qwen/Gemini APPROVE, GPT-5.5
     APPROVE_WITH_FIXES — фиксы внесены PATCH_02; одно Gemini-ревью
     отклонено как галлюцинация — описывало несуществующие словари)
-  ARTIFACT_CONFIRMED: PENDING (готов к финальному AUTHOR_DECISION)
+  MATCHER_PATCH_03_DECISION: AUTHOR_DECISION 2026-07-05 — окно
+    предложения засчитано как узкая шлифовка в рамках одобренного
+    MATCHER_PATCH_01/02 (GPT-5.5 сам требовал offset/window-фикс;
+    окно предложения — точное уточнение того же требования, не новая
+    логика). Отдельный конвейер не требуется. Живой прогон на машине
+    автора подтвердил: 12/12, ложное межпредложенческое срабатывание
+    устранено.
+  ARTIFACT_CONFIRMED: YES (2026-07-05, AUTHOR_DECISION Руслана
+    Малявского — полный цикл пройден: конвейер 7/7, WORKINGLY_CLOSED,
+    SIMULATION_GATE TIER_3 PASS 12/12, code-patch review, живой прогон
+    на машине автора)
 
 ============================================================
 2. META
@@ -48,13 +58,15 @@ CODEPOINT: U+2620
 VISIBLE_FORM: ☠
 UNICODE_NAME: SKULL_AND_CROSSBONES
 ZONE: ZONE_3
-DOCUMENT_STATUS: WORKINGLY_CLOSED
+DOCUMENT_STATUS: ARTIFACT_CONFIRMED
 TEMPLATE_LINE: GEN3_v0_3
 SOURCE_TEMPLATE: SIGN_CORE_CARD_TEMPLATE_GEN3_v0_3_RU
 AUTHOR: Руслан Малявский
 CREATED_AT: 2026-07-04
 VERSION: v0_1
-AUTHOR_DECISION_REFERENCE: AUTHOR_DECISION_20260705_SKULL_CROSSBONES_U2620_WORKINGLY_CLOSED_RU
+AUTHOR_DECISION_REFERENCE: AUTHOR_DECISION_20260705_SKULL_CROSSBONES_U2620_ARTIFACT_CONFIRMED_RU
+RUN_CARD_REFERENCE: SIMULATION_ARTIFACT_SKULL_CROSSBONES_U2620_TIER3_v0_1_RU
+RUN_CARD_STATUS: COMPLETED (TIER_3)
 RUN_CARD_REFERENCE: PENDING
 RUN_CARD_STATUS: NOT_STARTED
 
@@ -601,10 +613,10 @@ WORKINGLY_CLOSED ≠ ARTIFACT_CONFIRMED.
 REVIEW ≠ VALIDATION.
 
 Эта карточка наращена от тестового артефакта до полного стандарта
-GEN3_v0_3. Независимое ревью пройдено (волна 1: 5/5 семейств, волна 2:
-2/2 deep-research), статус WORKINGLY_CLOSED присвоен решением автора
-2026-07-05. До прохождения SIMULATION_GATE (TIER_3) карточка НЕ
-является ARTIFACT_CONFIRMED.
+GEN3_v0_3. Полный цикл пройден: независимое ревью (волна 1: 5/5
+семейств, волна 2: 2/2 deep-research), WORKINGLY_CLOSED, SIMULATION_GATE
+TIER_3 (честный провал 5/14 → патч матчера → PASS 12/12), code-patch
+review. Статус ARTIFACT_CONFIRMED присвоен решением автора 2026-07-05.
 
 Главное ограничение по существу знака: буквальной/иронической
 границы (EPOCH_1 vs EPOCH_3) без контекста однозначно не существует
