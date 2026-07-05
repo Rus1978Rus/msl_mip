@@ -67,8 +67,8 @@ VERSION: v0_1
 AUTHOR_DECISION_REFERENCE: AUTHOR_DECISION_20260705_SKULL_CROSSBONES_U2620_ARTIFACT_CONFIRMED_RU
 RUN_CARD_REFERENCE: SIMULATION_ARTIFACT_SKULL_CROSSBONES_U2620_TIER3_v0_1_RU
 RUN_CARD_STATUS: COMPLETED (TIER_3)
-RUN_CARD_REFERENCE: PENDING
-RUN_CARD_STATUS: NOT_STARTED
+RUN_CARD_REFERENCE: SIMULATION_ARTIFACT_SKULL_CROSSBONES_U2620_TIER3_v0_1_RU
+RUN_CARD_STATUS: COMPLETED (TIER_3)
 
 ОБОСНОВАНИЕ ДИЗАЙНА (Foundation Layer):
   FO-099 SIGN_OUTLIVES_FUNCTION (основное) — ☠ исторически и
@@ -172,9 +172,12 @@ CAPTURE_HISTORY:
     EVIDENCE: Unicode Standard U+2620 annotation (Poison, Danger),
       ISO 7010 hazard pictograms, GHS (Globally Harmonized System)
       acute toxicity pictogram precedent, Jolly Roger historical
-      documentation; закон штата Нью-Йорк 1829 года обязал маркировать
-      ёмкости с ядами знаком череп-и-кости (источник: NY Academy of
-      Medicine, подтверждено deep-research факт-аудитом 2026-07-05)
+      documentation; закон штата Нью-Йорк 1829 года потребовал
+      маркировать ёмкости с ядами словом «Poison» (сам знак череп-и-
+      кости закон предлагал, но не предписывал; стандартным символом
+      яда он стал к 1850-м годам — источники: Wikipedia «Skull and
+      crossbones (poison)», PMC/NCBI «Poison Politics», проверено
+      2026-07-05)
     STATUS: ACTIVE
     NOTE: КЛЮЧЕВОЕ ОТЛИЧИЕ от 💀 — эта эпоха НЕ дормантна. Знак
       физически используется на реальных предупреждающих
@@ -578,7 +581,7 @@ PATCH_01:
     (INTEGRATION_INTERFACE_STATUS). Расширены SAFE_CASES (3→6),
     RISK_CASES (1→3), добавлены CONFUSABLES (5) и
     CONTRADICTION_GUARDS (4).
-  VERIFIED_BY: PENDING (ожидает CONVEYOR_REVIEW)
+  VERIFIED_BY: конвейер волна 1 (5 семейств)
 
 PATCH_02:
   DATE: 2026-07-04
@@ -602,8 +605,25 @@ PATCH_03:
     год закона о ЯДАХ, что позволило вернуть дату уже с источником.
   VERIFIED_BY: координатор (сверка с отчётом Alibaba deep research)
 
-PATCHES_APPLIED: 3
-PATCHES_VERIFIED: 2/3
+PATCH_04:
+  DATE: 2026-07-05
+  CHANGE: коррекция факта 1829 после независимой верификации по
+    надёжным источникам (Wikipedia, PMC/NCBI). Уточнено: закон 1829
+    требовал слова «Poison», а САМ знак череп-и-кости закон предлагал,
+    но не предписывал — стандартным символом яда он стал к 1850-м. Ранее
+    (PATCH_03) знаку ошибочно приписывалась обязательность с 1829.
+    ОТКЛОНЕНО: «Закон Гилберта 1927 / Йонкерс / Анна Моретти» из
+    deep-research отчёта Alibaba — двойная ошибка: (1) история про
+    маркировку ядов встречается только в соцсетях (Facebook, Quora),
+    не подтверждается ни одним авторитетным источником; (2) само
+    название занято другим законом — реальный «Закон Гилберта 1927»
+    это британский Trade Disputes and Trade Unions Act о забастовках,
+    не связанный с ядами. Классическая конфабуляция: реальное название
+    + выдуманное содержание. В карточку НЕ внесено.
+  VERIFIED_BY: координатор (web-поиск по Wikipedia + PMC/NCBI 2026-07-05)
+
+PATCHES_APPLIED: 4
+PATCHES_VERIFIED: 4/4
 
 ============================================================
 12. LIMITATION_STATEMENT
@@ -633,7 +653,8 @@ MODULE_INTERFACE: READY (ZONE_3 routing → STAGE_3b context processing)
 INTEGRATOR_INTERFACE: READY (risk → action mapping via runtime policy)
 SEQUENCE_INTERFACE: READY (SC1 intensity, SC2 cross-card with U+1F480)
 MATCHER_REFERENCE: single_sign/matchers/skull_crossbones_matcher.py
+MATCHER_STATUS: IMPLEMENTED (SIMULATION_GATE TIER_3 PASS 12/12)
 EPOCH_DETECTION: context-dependent (no global dominant epoch)
-RUNTIME_STATUS: NOT_PRODUCTION (awaiting conveyor + simulation)
+RUNTIME_STATUS: ARTIFACT_CONFIRMED
 
 END_OF_DOCUMENT
