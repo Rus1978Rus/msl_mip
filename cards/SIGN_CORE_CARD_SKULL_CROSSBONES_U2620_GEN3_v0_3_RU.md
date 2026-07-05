@@ -27,10 +27,12 @@ STATUS_PROGRESSION_TRACKER:
   CONVEYOR_REVIEW_PASS: PASS (2026-07-04, 5/5 reviewers:
     Grok/Gemini/Kimi APPROVE, GPT-5.5 APPROVE_WITH_FIXES; fixes
     closed by PATCH_02)
-  WORKINGLY_CLOSED: PENDING (awaiting AUTHOR_DECISION)
-  SIMULATION_GATE_TIER: TIER_3 (planned)
+  WORKINGLY_CLOSED: YES (2026-07-05, AUTHOR_DECISION Руслана Малявского
+    после полного конвейера: волна 1 — 5/5 семейств, волна 2 — 2/2
+    deep-research факт-аудита)
+  SIMULATION_GATE_TIER: TIER_3 (следующий гейт)
   SIMULATION_GATE_PASSED: NOT_STARTED
-  ARTIFACT_CONFIRMED: NOT_STARTED
+  ARTIFACT_CONFIRMED: NOT_STARTED (требует SIMULATION_GATE)
 
 ============================================================
 2. META
@@ -41,13 +43,13 @@ CODEPOINT: U+2620
 VISIBLE_FORM: ☠
 UNICODE_NAME: SKULL_AND_CROSSBONES
 ZONE: ZONE_3
-DOCUMENT_STATUS: WORKING_DRAFT
+DOCUMENT_STATUS: WORKINGLY_CLOSED
 TEMPLATE_LINE: GEN3_v0_3
 SOURCE_TEMPLATE: SIGN_CORE_CARD_TEMPLATE_GEN3_v0_3_RU
 AUTHOR: Руслан Малявский
 CREATED_AT: 2026-07-04
 VERSION: v0_1
-AUTHOR_DECISION_REFERENCE: PENDING
+AUTHOR_DECISION_REFERENCE: AUTHOR_DECISION_20260705_SKULL_CROSSBONES_U2620_WORKINGLY_CLOSED_RU
 RUN_CARD_REFERENCE: PENDING
 RUN_CARD_STATUS: NOT_STARTED
 
@@ -594,8 +596,10 @@ WORKINGLY_CLOSED ≠ ARTIFACT_CONFIRMED.
 REVIEW ≠ VALIDATION.
 
 Эта карточка наращена от тестового артефакта до полного стандарта
-GEN3_v0_3 и ожидает полного CONVEYOR_DISCIPLINE (независимое ревью,
-SIMULATION_GATE). До прохождения — WORKING_DRAFT.
+GEN3_v0_3. Независимое ревью пройдено (волна 1: 5/5 семейств, волна 2:
+2/2 deep-research), статус WORKINGLY_CLOSED присвоен решением автора
+2026-07-05. До прохождения SIMULATION_GATE (TIER_3) карточка НЕ
+является ARTIFACT_CONFIRMED.
 
 Главное ограничение по существу знака: буквальной/иронической
 границы (EPOCH_1 vs EPOCH_3) без контекста однозначно не существует
