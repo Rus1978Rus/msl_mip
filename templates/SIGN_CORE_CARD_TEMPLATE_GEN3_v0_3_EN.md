@@ -70,6 +70,15 @@ MUTATION_CHECK_REQUIRED: YES
 LIMITATION_STATEMENT_REQUIRED: YES
 AFTER_RUN_RESIDUE: FORBIDDEN
 
+GUIDED_TRAVERSAL_RISK_CHECK: MANDATORY
+  # Guide (from FO-100 TRAVERSAL_NOT_EQUAL_STRUCTURE): when handling a
+  # reviewer's finding, always check whether it refers to STRUCTURE
+  # (a verifiable fact in the file/code) or to TRAVERSAL (the reviewer's
+  # interpretation / another report). Do not mistake TRAVERSAL for
+  # STRUCTURE. Practice: grep / run the actual artifact BEFORE accepting
+  # a finding. When reviewers disagree on a fact, resolve by primary
+  # source, not majority vote. Convergence is not proof.
+
 STATUS_PROGRESSION_TRACKER (filled as the card passes through the
   v0_3 conveyor — see ruleset section 1):
   WORKING_DRAFT: YES

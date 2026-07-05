@@ -65,6 +65,15 @@ MUTATION_CHECK_REQUIRED: YES
 LIMITATION_STATEMENT_REQUIRED: YES
 AFTER_RUN_RESIDUE: FORBIDDEN
 
+GUIDED_TRAVERSAL_RISK_CHECK: MANDATORY
+  # Гайд (из FO-100 TRAVERSAL_NOT_EQUAL_STRUCTURE): при обработке
+  # находки ревьюера всегда проверяй — ссылается ли он на STRUCTURE
+  # (проверяемый факт в файле/коде) или на TRAVERSAL (свою
+  # интерпретацию / чужой отчёт). Не принимай TRAVERSAL за STRUCTURE.
+  # Практика: grep/запуск реального артефакта ПЕРЕД принятием находки.
+  # При расхождении ревьюеров по факту — разрешай первоисточником,
+  # не голосованием большинства. Конвергенция ≠ доказательство.
+
 STATUS_PROGRESSION_TRACKER (заполняется по ходу прохождения
   карточки через конвейер v0_3 — см. раздел 1 ruleset):
   WORKING_DRAFT: YES
