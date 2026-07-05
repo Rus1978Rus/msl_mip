@@ -2,8 +2,9 @@
 Матчер для ☠ (U+2620, SKULL_AND_CROSSBONES).
 
 Структура аналогична matchers/skull_matcher.py (тот же ZONE_3,
-epoch-зависимая интерпретация). Тестовый знак — карточка помечена
-WORKING_DRAFT, не прошла полный конвейер (см. SIGN_CORE_CARD).
+epoch-зависимая интерпретация). Карточка WORKINGLY_CLOSED; matcher
+NOT_PRODUCTION — ожидает финального прогона SIMULATION_GATE и решения
+автора об ARTIFACT_CONFIRMED (см. SIGN_CORE_CARD).
 """
 
 import re
@@ -90,7 +91,14 @@ def match(text: str, offset: int, metadata: dict = None):
     интерпретацию рядом с RISK_CASE_001 — угроза важнее)."""
     safe, risk = [], []
     metadata = metadata or {}
-    t = text.lower()
+    # MATCHER_PATCH_02 (GPT-5.5 fix): проверяем риск-паттерны в ОКНЕ
+    # вокруг знака, а не по всему тексту — иначе далёкое слово
+    # ("официально" в начале письма) ложно связывалось бы с ☠ в конце.
+    # detect_epoch по-прежнему смотрит шире (эпоха — свойство контекста).
+    RADIUS = 80
+    w_start = max(0, offset - RADIUS)
+    w_end = min(len(text), offset + RADIUS)
+    t = text[w_start:w_end].lower()
 
     # Приоритет проверок (MATCHER_PATCH_01): RC1 угроза → RC3 вредная
     # инструкция → RC2 ложный авторитет → SAFE по эпохам. Угроза и
@@ -124,3 +132,18 @@ def match(text: str, offset: int, metadata: dict = None):
             safe.append("SAFE_CASE_003")
 
     return safe, risk, epoch, interp
+
+# MATCHER_PATCH_HISTORY:
+#   MATCHER_PATCH_01 (2026-07-05): добавлены RC2 (ложный авторитет) и
+#     RC3 (вредная инструкция), расширено покрытие RC1. Закрыл gate-fail
+#     5/14 → локально 14/14.
+#   MATCHER_PATCH_02 (2026-07-05): фиксы по CODE_PATCH_REVIEW (GPT-5.5
+#     APPROVE_WITH_FIXES): (1) offset-окно ±80 для риск-паттернов вместо
+#     сканирования всего текста (сужение ложных срабатываний); (2)
+#     обновлён устаревший docstring (WORKING_DRAFT → WORKINGLY_CLOSED);
+#     карточный ADV_C1 выровнен под структурное правило (императив+вещество).
+#     FINDING_03 (default epoch EPOCH_3) оставлен как известное
+#     ограничение: риск-кейсы его перекрывают, граница EPOCH_1/3 намеренно
+#     открыта (Q1 карточки, non-blocking).
+#   Отклонена галлюцинация Gemini-ревью: описанные им словари _PIRACY_WORDS/
+#     _SATIRE_WORDS/_MEDICAL_WORDS в коде отсутствуют (проверено grep).

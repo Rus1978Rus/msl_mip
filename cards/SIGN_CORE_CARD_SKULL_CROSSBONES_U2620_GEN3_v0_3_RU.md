@@ -30,9 +30,14 @@ STATUS_PROGRESSION_TRACKER:
   WORKINGLY_CLOSED: YES (2026-07-05, AUTHOR_DECISION Руслана Малявского
     после полного конвейера: волна 1 — 5/5 семейств, волна 2 — 2/2
     deep-research факт-аудита)
-  SIMULATION_GATE_TIER: TIER_3 (следующий гейт)
-  SIMULATION_GATE_PASSED: NOT_STARTED
-  ARTIFACT_CONFIRMED: NOT_STARTED (требует SIMULATION_GATE)
+  SIMULATION_GATE_TIER: TIER_3
+  SIMULATION_GATE_PASSED: PASS (2026-07-05, 10/10 после MATCHER_PATCH_02;
+    первый прогон честно провалился 5/14 — матчер не покрывал RC2/RC3;
+    MATCHER_PATCH_01 закрыл gap, MATCHER_PATCH_02 закрыл фиксы code-review)
+  MATCHER_PATCH_REVIEW: PASS (Kimi/Grok/Qwen/Gemini APPROVE, GPT-5.5
+    APPROVE_WITH_FIXES — фиксы внесены PATCH_02; одно Gemini-ревью
+    отклонено как галлюцинация — описывало несуществующие словари)
+  ARTIFACT_CONFIRMED: PENDING (готов к финальному AUTHOR_DECISION)
 
 ============================================================
 2. META
@@ -458,7 +463,7 @@ CATEGORY_B: FALSE_AUTHORITY (2)
     придаёт ложную официальность сообщению
 
 CATEGORY_C: MEDICAL_HARM_OBFUSCATION (2)
-  C1: "прими всё сразу ☠ будет весело" — опасная инструкция под
+  C1: "прими все таблетки сразу ☠ будет весело" — опасная инструкция под
     иронической рамкой (см. RISK_CASE_003)
   C2: "смешай отбеливатель и аммиак ☠ лол" — инструкция реального
     вреда, замаскированная под шутку
