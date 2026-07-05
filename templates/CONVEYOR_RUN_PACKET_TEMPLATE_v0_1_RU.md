@@ -287,6 +287,55 @@ REVIEW_RESULT:
   VERDICT: <ACCEPT / ACCEPT_WITH_PATCHES / REJECT>
   READY_FOR_<NEXT_STEP>: <YES / NO / YES_AFTER_PATCHES>
 
+FINDING_STATUS_RULE (обязательно для каждой находки в issues выше):
+  Каждая находка ревьюера несёт трёхзначный статус проверки:
+    VERIFIED     — находка подтверждена конкретной проверкой
+                   (grep/diff/запуск/цитата с локатором — указать ЧЕМ)
+    REJECTED     — находка опровергнута проверкой (указать ЧЕМ)
+    UNVERIFIABLE — структура цела, но содержательное соответствие
+                   машинно непроверяемо → AUTHOR_DECISION обязателен
+  ЗАПРЕТЫ (симметричны):
+    - UNVERIFIABLE → VERIFIED без арбитража = ЗАПРЕЩЕНО (элизия:
+      «не знаем» выдано за «знаем»)
+    - UNVERIFIABLE → REJECTED без арбитража = ЗАПРЕЩЕНО (гильотина:
+      «не знаем» выдано за «опровергнуто»)
+  ПРАВИЛА-СЛЕДСТВИЯ:
+    1. REVIEWER_CLAIM без FINDING_STATUS = НЕ ПРИНИМАЕТСЯ К АРБИТРАЖУ
+    2. FINDING_STATUS без ОСНОВАНИЯ = ОТСУТСТВИЕ FINDING_STATUS
+       (голое «VERIFIED» без предъявленной проверки — та же элизия;
+       поле заполнено декоративно)
+  СВЯЗЬ: операционализирует VERIFY_BEFORE_TRUST и GUIDED_TRAVERSAL_RISK
+    — координатор проверяет ОСНОВАНИЕ каждой находки перед принятием.
+    Несанкционированный переход UNVERIFIABLE→VERIFIED = нарушение
+    AUTHOR_DECISION_STATUS_AUTHORITY, фиксируется в пакете.
+  ИСТОЧНИК: ACK_GAP_TRIVALENT_v0_2, Блок A (AUTHOR_DECISION 2026-07-05).
+  CONVEYOR_STATUS: WORKINGLY_CLOSED (2026-07-05) — прошёл конвейер:
+    6 ревьюеров, единогласный ACCEPT; 3 патча внесены (BASIS_MINIMUM,
+    UNIVERSAL_SCOPE, FINDING_STATUS≠ISSUE_SEVERITY); AUTHOR_DECISION
+    Руслана Малявского.
+
+  BASIS_MINIMUM (патч после 6-ревьюерного конвейера 2026-07-05):
+    Валидное ОСНОВАНИЕ обязано называть:
+      METHOD  — чем проверено (grep / diff / запуск / цитата / сверка)
+      TARGET  — где (файл / секция / строка / поле)
+      OBSERVED — что реально найдено
+    EXPECTED и LOCATOR (номер строки / путь / команда / test id) —
+    настоятельно рекомендуются; для VERIFIED и REJECTED LOCATOR или
+    воспроизводимая команда обязательны, где это возможно. Для
+    UNVERIFIABLE основание обязано объяснить, ПОЧЕМУ проверка не
+    может быть завершена машинно.
+  DECORATIVE_BASIS_GUARD:
+    Голые «проверил» / «очевидно» / «просмотрел» без METHOD+TARGET+
+    OBSERVED — НЕ основание. Такая находка = отсутствие FINDING_STATUS.
+  FINDING_STATUS ≠ ISSUE_SEVERITY:
+    Статус проверки (VERIFIED/REJECTED/UNVERIFIABLE) ортогонален
+    серьёзности (CRITICAL/MAJOR/MINOR). Находка может быть VERIFIED
+    и MINOR; или UNVERIFIABLE и критически важной (→ AUTHOR_DECISION).
+  UNIVERSAL_SCOPE:
+    FINDING_STATUS_RULE применяется к КАЖДОЙ находке во ВСЕХ форматах
+    поставки (REVIEW_RESULT, AUDIT_RESULT, SIMULATION_RESULT), если
+    пакет явно не объявил обратное.
+
 [ДЛЯ ПАКЕТОВ AUDIT — отдельный формат, не REVIEW_RESULT: сравнение
   нескольких артефактов лучше выражается матрицей расхождений, не
   ответами на отдельные вопросы. Добавлено по итогам повторного

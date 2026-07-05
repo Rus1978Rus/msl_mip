@@ -288,6 +288,54 @@ REVIEW_RESULT:
   VERDICT: <ACCEPT / ACCEPT_WITH_PATCHES / REJECT>
   READY_FOR_<NEXT_STEP>: <YES / NO / YES_AFTER_PATCHES>
 
+FINDING_STATUS_RULE (mandatory for every finding in the issues above):
+  Each reviewer finding carries a trivalent verification status:
+    VERIFIED     — finding confirmed by a concrete check
+                   (grep/diff/run/quote-with-locator — state WHAT)
+    REJECTED     — finding refuted by a check (state WHAT)
+    UNVERIFIABLE — structure intact, but content correspondence is not
+                   machine-checkable → AUTHOR_DECISION required
+  PROHIBITIONS (symmetric):
+    - UNVERIFIABLE → VERIFIED without arbitration = FORBIDDEN (elision:
+      "we don't know" passed off as "we know")
+    - UNVERIFIABLE → REJECTED without arbitration = FORBIDDEN (guillotine:
+      "we don't know" passed off as "refuted")
+  DERIVED RULES:
+    1. REVIEWER_CLAIM without FINDING_STATUS = NOT ADMITTED TO ARBITRATION
+    2. FINDING_STATUS without a BASIS = ABSENCE OF FINDING_STATUS
+       (a bare "VERIFIED" with no check shown is the same elision;
+       the field is filled decoratively)
+  LINK: operationalizes VERIFY_BEFORE_TRUST and GUIDED_TRAVERSAL_RISK —
+    the coordinator checks the BASIS of every finding before accepting.
+    An unauthorized UNVERIFIABLE→VERIFIED transition violates
+    AUTHOR_DECISION_STATUS_AUTHORITY and is recorded in the packet.
+  SOURCE: ACK_GAP_TRIVALENT_v0_2, Block A (AUTHOR_DECISION 2026-07-05).
+  CONVEYOR_STATUS: WORKINGLY_CLOSED (2026-07-05) — passed conveyor:
+    6 reviewers, unanimous ACCEPT; 3 patches applied (BASIS_MINIMUM,
+    UNIVERSAL_SCOPE, FINDING_STATUS≠ISSUE_SEVERITY); AUTHOR_DECISION
+    by Ruslan Malyavsky.
+
+  BASIS_MINIMUM (patch after 6-reviewer conveyor 2026-07-05):
+    A valid BASIS must name:
+      METHOD   — how it was checked (grep / diff / run / quote / compare)
+      TARGET   — where (file / section / line / field)
+      OBSERVED — what was actually found
+    EXPECTED and LOCATOR (line / path / command / test id) are strongly
+    recommended; for VERIFIED and REJECTED a LOCATOR or reproducible
+    command is mandatory where possible. For UNVERIFIABLE the basis
+    must explain WHY the check cannot be completed mechanically.
+  DECORATIVE_BASIS_GUARD:
+    Bare "checked" / "obvious" / "reviewed" without METHOD+TARGET+
+    OBSERVED is not a basis. Such a finding = absence of FINDING_STATUS.
+  FINDING_STATUS ≠ ISSUE_SEVERITY:
+    Verification status (VERIFIED/REJECTED/UNVERIFIABLE) is orthogonal
+    to severity (CRITICAL/MAJOR/MINOR). A finding can be VERIFIED and
+    MINOR; or UNVERIFIABLE and critically important (→ AUTHOR_DECISION).
+  UNIVERSAL_SCOPE:
+    FINDING_STATUS_RULE applies to EVERY finding in ALL deliverable
+    formats (REVIEW_RESULT, AUDIT_RESULT, SIMULATION_RESULT) unless a
+    packet explicitly declares otherwise.
+
 [FOR AUDIT PACKETS — a separate format, not REVIEW_RESULT: comparing
   several artifacts is better expressed by a discrepancy matrix, not
   by answers to individual questions. Added following a repeat external
