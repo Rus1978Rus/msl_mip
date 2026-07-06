@@ -29,6 +29,13 @@ else:
     # файла действительно нет — легитимный, осознанный fallback
     _HAS_SKULL_CROSSBONES = False
 
+_at_path = _importlib_util.find_spec("matchers.at_matcher")
+if _at_path is not None:
+    from matchers import at_matcher
+    _HAS_AT = True
+else:
+    _HAS_AT = False
+
 # ИСПРАВЛЕНО (2026-06-29, добавление второго ZONE_3-знака ☠️):
 # раньше диспетчеризация шла ПО ЗОНЕ (ZONE_3 -> только skull_matcher
 # жёстко). Это работало, пока в ZONE_3 был один знак. С появлением
@@ -45,6 +52,8 @@ _MATCHER_REGISTRY = {
 }
 if _HAS_SKULL_CROSSBONES:
     _MATCHER_REGISTRY["U+2620"] = (skull_crossbones_matcher, True)
+if _HAS_AT:
+    _MATCHER_REGISTRY["U+0040"] = (at_matcher, False)
 
 
 # STAGE_1: допустимые статусы карточки для загрузки.
