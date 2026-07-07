@@ -33,6 +33,11 @@ class SequenceMatch:
     match_start: int                # позиция начала совпадения в тексте
     match_end: int                  # позиция конца (эксклюзивно)
     source_sign_offsets: list = field(default_factory=list)  # PATCH_25
+    url_context_flag: bool = False  # SOLIDUS_SCHEME_PATCH: "://" помечает URL-режим.
+                                    # Флаг только ПОВЫШАЕТ scrutiny downstream,
+                                    # НИКОГДА не понижает риск (CLARIFICATION_1).
+    scheme_neutralized: bool = False  # True если "//" был частью "://" схемы и
+                                      # риск понижен до NONE как легитимная связка
 
     @property
     def risk_is_enum(self) -> bool:
@@ -50,6 +55,8 @@ class SequenceMatch:
             "MATCH_START": self.match_start,
             "MATCH_END": self.match_end,
             "SOURCE_SIGN_OFFSETS": list(self.source_sign_offsets),
+            "URL_CONTEXT_FLAG": "YES" if self.url_context_flag else "NO",
+            "SCHEME_NEUTRALIZED": "YES" if self.scheme_neutralized else "NO",
         }
 
 

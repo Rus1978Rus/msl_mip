@@ -40,6 +40,22 @@ def _build_candidate_pool(cards: list) -> list:
     return pool
 
 
+def _valid_scheme_before(text: str, colon_idx: int) -> bool:
+    """SOLIDUS_SCHEME_PATCH (CODE_REVIEW Q1 fix, 2026-07-07): проверяет,
+    что перед двоеточием на позиции colon_idx стоит ВАЛИДНАЯ схема URL по
+    RFC 3986 §3.1: scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." ).
+    То есть последовательность начинается с буквы и состоит из
+    букв/цифр/+/-/.  Отсекает ложное понижение "//" в псевдосхемах
+    (":://", где перед ":" нет буквы) — найдено code-review 6 ревьюерами.
+    Различитель "://" срабатывает только для настоящих схем."""
+    i = colon_idx - 1
+    end = colon_idx
+    while i >= 0 and (text[i].isalnum() or text[i] in "+-."):
+        i -= 1
+    scheme = text[i + 1:end]
+    return len(scheme) >= 1 and scheme[0].isalpha()
+
+
 def _find_literal_matches(text: str, pool: list,
                           validated_offsets: set = None,
                           card_signs: set = None,
@@ -120,14 +136,34 @@ def _find_literal_matches(text: str, pool: list,
             end = idx + len(seq)
             covered = any(c_start <= idx and end <= c_end for c_start, c_end in claimed)
             if not covered and _candidate_validated(sc, idx, end):
+                # ── SOLIDUS_SCHEME_PATCH (вариант «б», AUTHOR_DECISION 2026-07-07) ──
+                # Если "//" непосредственно предшествует ":" → это связка схемы
+                # URL ("://"), легитимная. CLARIFICATION_2: только "://" (с
+                # двоеточием) нейтрализуется; "//" без ":" остаётся под анализом
+                # с риском из карточки. CLARIFICATION_1: схема выставляет
+                # url_context_flag, который downstream может использовать ТОЛЬКО
+                # для повышения scrutiny, никогда для понижения риска.
+                eff_risk = sc.risk_level
+                url_ctx = False
+                scheme_neut = False
+                if seq == "//" and idx >= 2 and text[idx - 1] == ":" \
+                        and _valid_scheme_before(text, idx - 1):
+                    eff_risk = RiskLevel.NONE  # enum, НЕ строка "NONE" —
+                    # RiskLevel.max()/order.index() требует член enum;
+                    # строка упала бы с ValueError при агрегации нескольких
+                    # sequence-матчей (CODE_REVIEW Q4, найдено 6 ревьюерами)
+                    url_ctx = True             # помечает URL-режим для @/точки
+                    scheme_neut = True
                 matches.append(SequenceMatch(
                     sc_id=sc.sc_id,
                     sequence=seq,
-                    name=sc.name,
-                    risk_level=sc.risk_level,
+                    name=("url_scheme_authority_separator" if scheme_neut else sc.name),
+                    risk_level=eff_risk,
                     candidate_source_card=card.codepoint,
                     match_start=idx,
                     match_end=end,
+                    url_context_flag=url_ctx,
+                    scheme_neutralized=scheme_neut,
                 ))
                 claimed.append((idx, end))
             start = idx + 1

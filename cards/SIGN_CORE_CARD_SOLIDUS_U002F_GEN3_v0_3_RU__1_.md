@@ -615,6 +615,26 @@ SEQUENCE_LAYER_BOUNDARY:
         маркер комментария в некоторых языках программирования,
         путь-подобный паттерн
       REQUIRES_SEQUENCE_INTEGRATOR: YES
+      ADJACENT_CONFUSABLE_NOTE_FF0F: Unicode-слэш ／ (U+FF0F FULLWIDTH
+        SOLIDUS) — НЕ ловится SC1 (матчит только ASCII // U+002F). Вскрыто
+        SIMULATION_GATE_REVIEW 2026-07-07. Это НЕ баг scheme-патча, а
+        смежный confusable — кандидат на отдельную карточку (аналог ＠/﹫
+        для @). Не блокирует SOLIDUS-патч, вынесено в бэклог.
+      SCHEME_CONTEXT_RULE: SOLIDUS_SCHEME_PATCH (2026-07-07, вариант «б»,
+        AUTHOR_DECISION после design-review 6/6). Если "//" непосредственно
+        следует за ":" (т.е. это связка схемы "://") — риск понижается до
+        NONE (interp=url_scheme_authority_separator) как легитимная схема,
+        и выставляется URL_CONTEXT_FLAG. Флаг ТОЛЬКО повышает scrutiny
+        нижестоящих знаков (@, точка), НИКОГДА не понижает (CLARIFICATION_1).
+        "//" БЕЗ предшествующего ":" остаётся HIGH под анализом
+        (path-traversal, CLARIFICATION_2). Различитель — один символ ":".
+      SCHEME_PATCH_STATUS: WORKINGLY_CLOSED (AUTHOR_DECISION Руслана
+        Малявского 2026-07-07). Полный цикл: design-review 6/6 +
+        AUTHOR_DECISION → code-review 6/6 (2 фикса: Q4 enum-баг, Q1
+        валидация схемы RFC 3986) → SIMULATION_GATE_REVIEW 6/6 (новая
+        дисциплина «симуляции через все ИИ») → gate 28/28 в контейнере
+        и на живой машине. Первая правка ЯДРА sequence-движка, прошедшая
+        полный цикл. Тесты: tests/gate_solidus_scheme.py.
 
     SC2:
       SEQUENCE: "./" (точка-солидус)
