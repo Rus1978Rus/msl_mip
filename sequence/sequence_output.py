@@ -70,6 +70,7 @@ class SequenceOutput:
     source_occurrence_list: str = "NOT_AVAILABLE"        # PATCH_25 (честный стаб)
     check_unavailable: bool = False                      # PATCH_24 CHECK_UNAVAILABLE
     warnings: list = field(default_factory=list)
+    relation_verdicts: list = field(default_factory=list)  # step 4 of the relation axis: mask verdicts (D-REL-4/6)
 
     def aggregate_risk(self):
         """Агрегированный риск sequence-слоя.

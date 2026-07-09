@@ -37,6 +37,8 @@ class OutputStatus:
     effect_fields_status: str = "VALID"
     layer_anomaly_flag: bool = False
     output_warnings: list = field(default_factory=list)
+    relation_candidates: list = field(default_factory=list)  # relation axis (D-REL-4/5): ALL candidates (incl. disabled) — for debug/audit
+    active_relation_candidates: list = field(default_factory=list)  # barrier N3: ONLY active — the sequence layer takes the verdict from here, never sees disabled ones
     sign_offset_start: int = 0
     sign_offset_end: int = 0
 

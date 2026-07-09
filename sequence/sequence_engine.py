@@ -183,6 +183,90 @@ def _attach_source_offsets(matches: list, sign_statuses: list) -> None:
         m.source_sign_offsets.sort()
 
 
+def _detect_context_at(text: str, offset: int) -> str:
+    """Rough context detector around the mask position (step 4, D2).
+    First pass: URL / HOST / PATH. Returns a scope name or FREE_TEXT.
+    HOST = between 'scheme://' and the next '/' (main gοοgle.com case).
+    Cheap, string-based; full URL parsing is a separate pass."""
+    before = text[:offset]
+    scheme_pos = before.rfind("://")
+    if scheme_pos != -1:
+        after_scheme = text[scheme_pos + 3:]
+        rel = offset - (scheme_pos + 3)  # mask position inside after_scheme
+        next_slash = after_scheme.find("/")
+        # host separators: '/', '?', '#' — end of the host part
+        host_end = len(after_scheme)
+        for sep in ("/", "?", "#"):
+            p = after_scheme.find(sep)
+            if p != -1:
+                host_end = min(host_end, p)
+        if 0 <= rel < host_end:
+            return "HOST"
+        if next_slash != -1 and rel >= next_slash:
+            return "PATH"
+        return "URL"
+    # no scheme: is there a url-like structure a.b/c nearby
+    window = text[max(0, offset - 20):offset + 20]
+    if "/" in window and "." in window:
+        return "URL"
+    return "FREE_TEXT"
+
+
+_SCOPE_RISK = {
+    "HOST": RiskLevel.HIGH,     # host-подмена — главный кейс
+    "URL": RiskLevel.MEDIUM,
+    "PATH": RiskLevel.MEDIUM,
+    "FREE_TEXT": RiskLevel.NONE,
+}
+
+
+def _downgrade(level: RiskLevel) -> RiskLevel:
+    """A CANDIDATE edge downgrades risk by one step (D1): an
+    unverified relation must not hit as hard as VERIFIED."""
+    order = [RiskLevel.NONE, RiskLevel.LOW, RiskLevel.MEDIUM,
+             RiskLevel.HIGH, RiskLevel.CRITICAL]
+    i = order.index(level)
+    return order[max(0, i - 1)]
+
+
+def _assess_relation_risk(text: str, sign_statuses: list) -> list:
+    """STAGE_6b: verdict per active mask (D-REL-4/6).
+    Barrier N3: read ONLY active_relation_candidates."""
+    verdicts = []
+    for st in sign_statuses:
+        for cand in getattr(st, "active_relation_candidates", []):
+            offset = cand.get("at_offset", 0)
+            scope_of_edge = set(cand.get("context_scope", []))
+            ctx = _detect_context_at(text, offset)
+
+            # PROTECTED_CONTEXT: the real context is in the edge scope
+            # (or the edge is ANY). Otherwise the mask is out of scope.
+            protected = ("ANY" in scope_of_edge) or (ctx in scope_of_edge)
+            if protected and ctx != "FREE_TEXT":
+                risk = _SCOPE_RISK.get(ctx, RiskLevel.MEDIUM)
+                # OBFUSCATION (D-REL-6): substituting a canon with a
+                # mask in protected context — already in the risk level.
+            else:
+                risk = RiskLevel.NONE  # RELATION_FOUND != THREAT
+
+            # verification_status of the edge as a modifier (D1)
+            if cand.get("verification_status", "").upper() == "CANDIDATE" \
+                    and risk != RiskLevel.NONE:
+                risk = _downgrade(risk)
+
+            verdicts.append({
+                "visible_form": cand.get("visible_form", ""),
+                "target": cand.get("target", ""),
+                "at_offset": offset,
+                "detected_context": ctx,
+                "protected": protected,
+                "risk_level": risk.value,
+                "canon_hypothesis": None,  # probe deferred (D3)
+                "relation_id": cand.get("relation_id", ""),
+            })
+    return verdicts
+
+
 def process_sequence(text: str, cards: list,
                      sign_statuses: list = None,
                      known_signs: set = None) -> SequenceOutput:
@@ -240,11 +324,17 @@ def process_sequence(text: str, cards: list,
         for c in draft_cards
     ]
 
+    # --- STAGE_6b: RELATION_RISK (step 4, D-REL-4/6) — BEFORE the pool ---
+    # The mask verdict does not depend on the normal candidate pool: a
+    # mask is itself a reason to analyse. Barrier N3: only active ones.
+    relation_verdicts = _assess_relation_risk(text, sign_statuses)
+
     # --- STAGE_2a: CANDIDATE_POOL (PATCH_26) ---
     pool = _build_candidate_pool(cards)
     if not pool:
         return SequenceOutput(card_set=card_set, check_unavailable=True,
-                              warnings=["EMPTY_CANDIDATE_POOL"])
+                              warnings=["EMPTY_CANDIDATE_POOL"],
+                              relation_verdicts=relation_verdicts)
 
     # Множество позиций, реально прошедших single-sign валидацию.
     # Каждый OutputStatus покрывает [sign_offset_start, sign_offset_end).
@@ -295,6 +385,7 @@ def process_sequence(text: str, cards: list,
         )
 
     # --- STAGE_7: OUTPUT_ASSEMBLY ---
+    # relation_verdicts computed above (STAGE_6b, before the pool).
     return SequenceOutput(
         card_set=card_set,
         matches=matches,
@@ -303,4 +394,5 @@ def process_sequence(text: str, cards: list,
         source_occurrence_list="NOT_AVAILABLE",  # честный стаб (PATCH_25)
         check_unavailable=False,
         warnings=draft_warnings,
+        relation_verdicts=relation_verdicts,
     )

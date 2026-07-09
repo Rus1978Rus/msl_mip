@@ -137,6 +137,62 @@ def process_sign(card: SignCoreCard, text: str, offset: int,
     # --- STAGE_3: диспетчеризация по CODEPOINT (не по ZONE) ---
     entry = _MATCHER_REGISTRY.get(card.codepoint)
     if entry is None:
+        # Relation axis (D-REL-1/4/5): the sign has no own matcher.
+        # If the card has relations, it is a mask sign. single-sign
+        # does NOT decide risk: it emits risk=NONE + RELATION CANDIDATES,
+        # the verdict is the sequence layer's job (RELATION_FOUND !=
+        # THREAT). If there are no relations, the sign is unknown to the
+        # system, prior behaviour (error).
+        if card.relations:
+            # Mask sign: a card with relations. Even if ALL edges are
+            # disabled (is_active=False) it is a known mask with no
+            # active relations, NOT an unknown sign. Passes silently:
+            # risk=NONE. Candidates carry ALL edges with the is_active
+            # flag (disabled ones for debug/audit; the sequence layer
+            # IGNORES is_active=False edges when deciding the verdict).
+            active_relations = [r for r in card.relations if r.is_active]
+            relation_candidates = [
+                {
+                    "relation_id": r.relation_id,
+                    "relation_type": r.relation_type,
+                    "target": r.target,
+                    "context_scope": list(r.context_scope),
+                    "verification_status": r.verification_status,
+                    "runtime_effect": r.runtime_effect,
+                    "is_active": r.is_active,   # sequence ignores False when deciding
+                    "at_offset": offset,
+                    "visible_form": card.visible_form,
+                    "canon_hypothesis": None,   # channel for the canon probe (D-REL-5); filled in the sequence layer where context exists. The fragile canon matcher is not called blindly.
+                }
+                for r in card.relations
+            ]
+            mask_warnings = [draft_warning] if draft_warning else []
+            if not active_relations:
+                # All edges disabled — the mask is silent. Not a risk,
+                # but a suspicious config state: a soft trace for audit
+                # (risk stays NONE, no candidates for the verdict).
+                mask_warnings.append("ALL_RELATIONS_INACTIVE")
+            return OutputStatus(
+                sign_codepoint=card.codepoint,
+                card_version=card.card_uid,
+                active_epoch="NOT_APPLICABLE",
+                interpretation="relation_candidate",   # NOT a verdict
+                risk_level=RiskLevel.NONE,              # D-REL-5: mask in single-sign = NONE
+                risk_cases_triggered=[],
+                guards_triggered=[],
+                effect_fields_status="VALID",
+                sign_offset_start=offset,
+                sign_offset_end=offset + 1,
+                output_warnings=mask_warnings,
+                relation_candidates=relation_candidates,
+                # Barrier N3 (a technical guarantee, not a comment):
+                # the sequence layer takes ONLY this list. Disabled edges
+                # physically never reach it -> cannot leak into the
+                # verdict. Full relation_candidates stays for debugging.
+                active_relation_candidates=[
+                    c for c in relation_candidates if c["is_active"]
+                ],
+            )
         raise ModuleError("MATCHER_NOT_FOUND",
                            f"Нет зарегистрированного матчера для {card.codepoint}")
     matcher, has_epoch = entry

@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 
 from sign_core_card import (
-    SignCoreCard, SafeCase, RiskCase, Confusable, ContradictionGuard,
+    SignCoreCard, SafeCase, RiskCase, Confusable, SignRelation, ContradictionGuard,
     SequenceCandidate, EpochDefinition, RiskLevel, Zone,
 )
 from tree_parser import parse_indented_tree, Node
@@ -96,6 +96,53 @@ def _extract_confusables(root: Node) -> list:
             name=cf.child("NAME").text() if cf.child("NAME") else "",
             risk=_parse_risk(cf.child("RISK").text() if cf.child("RISK") else "NONE"),
             rule=cf.child("RULE").text() if cf.child("RULE") else "",
+        ))
+    return out
+
+
+def _extract_relations(root: Node) -> list:
+    """SIGN_RELATIONS block — runtime SOURCE OF TRUTH for relations
+    (relation axis, D-REL-2). Absence of the block = empty list
+    (legacy/standalone sign, D1 via non-intervention).
+    CONFUSABLES is NOT read here — it is documentation/provenance."""
+    section = root.child("SIGN_RELATIONS")
+    if not section:
+        return []
+    _VALID_SCOPE = {"URL", "HOST", "PORT", "PATH", "EMAIL", "IDENTIFIER",
+                    "IDN", "CODE", "FREE_TEXT", "ANY"}
+    _VALID_TYPE = {"CONFUSABLE_OF", "NFKC_MAPS_TO", "VISUAL_MIMIC_OF"}
+    out = []
+    for rel in section.children_with_prefix("RELATION_"):
+        scope_raw = rel.child("CONTEXT_SCOPE").text() if rel.child("CONTEXT_SCOPE") else ""
+        scope = [s.strip() for s in scope_raw.replace(",", " ").split() if s.strip()]
+        rtype = rel.child("RELATION_TYPE").text() if rel.child("RELATION_TYPE") else ""
+        reffect = (rel.child("RUNTIME_EFFECT").text()
+                   if rel.child("RUNTIME_EFFECT") else "RELATION_ONLY")
+        active_raw = (rel.child("IS_ACTIVE").text() if rel.child("IS_ACTIVE") else "")
+        is_active = active_raw.strip().upper() not in ("FALSE", "NO", "0", "OFF")
+        # Edge field validation — bad values are flagged but do NOT
+        # break loading (the card stays readable; warning visible on
+        # inspection). Invariant RUNTIME_EFFECT=RELATION_ONLY.
+        warnings = []
+        if not scope:
+            warnings.append("RELATION_WITHOUT_SCOPE: edge has no CONTEXT_SCOPE — will not match any context (except ANY) and silently yields no verdict; check whether scope was omitted")
+        bad_scope = [s for s in scope if s not in _VALID_SCOPE]
+        if bad_scope:
+            warnings.append(f"UNKNOWN_CONTEXT_SCOPE: {bad_scope}")
+        if rtype and rtype not in _VALID_TYPE:
+            warnings.append(f"UNKNOWN_RELATION_TYPE: {rtype!r}")
+        if reffect != "RELATION_ONLY":
+            warnings.append(f"RUNTIME_EFFECT_MUST_BE_RELATION_ONLY: got {reffect!r}")
+        out.append(SignRelation(
+            relation_id=rel.key,
+            relation_type=rtype,
+            target=rel.child("TARGET").text() if rel.child("TARGET") else "",
+            context_scope=scope,
+            verification_status=(rel.child("VERIFICATION_STATUS").text()
+                                 if rel.child("VERIFICATION_STATUS") else ""),
+            runtime_effect=reffect,
+            is_active=is_active,
+            validation_warnings=warnings,
         ))
     return out
 
@@ -200,6 +247,7 @@ def load_card(path: str) -> SignCoreCard:
         safe_cases=_extract_safe_cases(root),
         risk_cases=_extract_risk_cases(root),
         confusables=_extract_confusables(root),
+        relations=_extract_relations(root),
         contradiction_guards=_extract_contradiction_guards(root),
         sequence_candidates=_extract_sequence_candidates(root),
         epochs=_extract_epochs(root),

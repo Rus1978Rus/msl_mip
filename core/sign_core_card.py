@@ -92,6 +92,22 @@ class Confusable:
 
 
 @dataclass
+class SignRelation:
+    """Relation edge between signs (relation axis,
+    AUTHOR_DECISION_20260708, D-REL-2). SOURCE OF TRUTH for the runtime.
+    An edge by itself is NOT risk: RUNTIME_EFFECT=RELATION_ONLY,
+    RELATION_FOUND != THREAT. Mask risk is decided by the sequence layer."""
+    relation_id: str
+    relation_type: str = ""          # CONFUSABLE_OF / NFKC_MAPS_TO / VISUAL_MIMIC_OF
+    target: str = ""                 # canon codepoint/sequence
+    context_scope: list = field(default_factory=list)  # URL/HOST/PORT/PATH/EMAIL/IDENTIFIER/IDN/CODE/FREE_TEXT/ANY
+    verification_status: str = ""    # VERIFIED / CANDIDATE / MANUAL_OVERRIDE
+    runtime_effect: str = "RELATION_ONLY"  # hard invariant
+    is_active: bool = True                  # edge can be disabled without deletion (experiments with "disabled" masks)
+    validation_warnings: list = field(default_factory=list)  # bad edge fields (unknown scope/type, effect != RELATION_ONLY)
+
+
+@dataclass
 class ContradictionGuard:
     guard_id: str
     trigger: str
@@ -149,6 +165,7 @@ class SignCoreCard:
     safe_cases: list = field(default_factory=list)
     risk_cases: list = field(default_factory=list)
     confusables: list = field(default_factory=list)
+    relations: list = field(default_factory=list)  # SignRelation, relation axis (D-REL-2); empty = no active relations (legacy/D1)
     contradiction_guards: list = field(default_factory=list)
     sequence_candidates: list = field(default_factory=list)
 
