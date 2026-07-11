@@ -1,41 +1,41 @@
 """
-Матчер для SKULL (U+1F480, ZONE_3).
+Matcher for SKULL (U+1F480, ZONE_3).
 
-Ключевые слова для detect_epoch взяты из реальных полей FUNCTION
-карточки (EPOCH_1: "маркер смерти, яда, опасности, Хэллоуина";
-EPOCH_2: "я устал/я мёртв внутри/переутомление/поражение";
-EPOCH_3: замена LOL/LMAO/ROFL — истерический смех/абсурдистский
-юмор) — НЕ изобретённые отдельно категории (см. урок предыдущего
-runtime, который придумал отдельные EPOCH_HALLOWEEN/EPOCH_GAMING,
-не существующие в реальной карточке: Halloween — это часть FUNCTION
-EPOCH_1, не отдельная эпоха).
+Keywords for detect_epoch are taken from the card's real FUNCTION
+fields (EPOCH_1: "marker of death, poison, danger, Halloween";
+EPOCH_2: "i am tired/dead inside/burnout/defeat";
+EPOCH_3: LOL/LMAO/ROFL replacement — hysterical laughter/absurdist
+humour) — NOT separately invented categories (see the lesson of the
+previous runtime, which invented EPOCH_HALLOWEEN/EPOCH_GAMING
+that do not exist in the real card: Halloween is part of FUNCTION
+EPOCH_1, not a separate epoch).
 
-ЧЕСТНО ЧАСТИЧНО МЕТАДАННЫЕ-ЗАВИСИМО: RISK_CASE_003
+HONESTLY PARTIALLY METADATA-DEPENDENT: RISK_CASE_003
 (GENERATIONAL_MISINTERPRETATION), RISK_CASE_006 (MEDICAL_MISREAD),
-RISK_CASE_008 (CROSS_PLATFORM_EPOCH_MISMATCH) принципиально требуют
-INPUT_METADATA (SENDER_COHORT/DOMAIN/PLATFORM) — это не текстовый
-паттерн, это явно предусмотрено самой архитектурой MODULE_TEMPLATE
-(раздел INPUT_METADATA). Без метаданных эти кейсы не детектируются —
-это не пробел реализации, а честное отражение того, что искать в
-тексте то, чего там нет, было бы тем же классом ошибки, что уже
-ловили раньше.
+RISK_CASE_008 (CROSS_PLATFORM_EPOCH_MISMATCH) fundamentally require
+INPUT_METADATA (SENDER_COHORT/DOMAIN/PLATFORM) — not a text
+pattern; explicitly provided for by the MODULE_TEMPLATE architecture
+(the INPUT_METADATA section). Without metadata these cases are not
+detected — not an implementation gap but an honest reflection that
+searching the text for what is not there would be the same error
+class caught before.
 RISK_CASE_001 (ALGORITHMIC_FALSE_POSITIVE_BAN), RISK_CASE_005
-(SECOND_HAND_EMBARRASSMENT_DRIFT) — не реализованы: первый описывает
-поведение ВНЕШНЕЙ системы модерации (мета-уровень, не свойство
-текста), второй — размытая культурная тенденция без чёткого сигнала.
-RISK_CASE_007 (EMOJI_SEQUENCE_INJECTION) — относится к SEQUENCE_MODULE
-(несколько черепов подряд), не к одиночному знаку, обрабатывается
-sequence_engine.py, не здесь.
+(SECOND_HAND_EMBARRASSMENT_DRIFT) — not implemented: the first
+describes EXTERNAL moderation behaviour (meta-level, not a text
+property), the second a fuzzy cultural drift with no clear signal.
+RISK_CASE_007 (EMOJI_SEQUENCE_INJECTION) belongs to SEQUENCE_MODULE
+(several skulls in a row), not to a single sign; handled by
+sequence_engine.py, not here.
 """
 
 import re
 
 
 def _contains_word(text_lower: str, phrase: str) -> bool:
-    """Поиск ЦЕЛОГО слова/фразы по границам слов, не подстроки.
-    ИСПРАВЛЕНО по итогам код-ревью (Gemini, 2026-06-28): простой
-    `phrase in text` ловил 'kill' внутри 'skill', 'die' внутри
-    'diet' — ложные EPOCH_1 срабатывания на безобидных словах."""
+    """WHOLE word/phrase search by word boundaries, not substring.
+    FIXED after code review (Gemini, 2026-06-28): a plain
+    `phrase in text` caught 'kill' inside 'skill', 'die' inside
+    'diet' — false EPOCH_1 hits on innocent words."""
     pattern = r"\b" + re.escape(phrase) + r"\b"
     return re.search(pattern, text_lower) is not None
 
@@ -58,22 +58,22 @@ EPOCH_3_KEYWORDS = (
     "funny", "hilarious", "laugh", "joke", "cringe", "lit", "based",
 )
 
-# RISK_CASE_002: REAL_THREAT_OBFUSCATION — явная угрозная фраза рядом
+# RISK_CASE_002: REAL_THREAT_OBFUSCATION — an explicit threat phrase nearby
 _THREAT_PHRASES = (
     "найду тебя", "i will find you", "убью", "kill you", "i'll kill",
 )
 
-# RISK_CASE_004: CANCEL_CULTURE_OSTRACISM — фраза социального "вычёркивания"
+# RISK_CASE_004: CANCEL_CULTURE_OSTRACISM — a social "erasure" phrase
 _CANCEL_PHRASES = (
     "мёртв для нас", "dead to us", "he is dead to us",
 )
 
 
 def detect_epoch(text: str) -> str:
-    """ACTIVE_EPOCH (GLOBAL) — доминирует EPOCH_3, но реактивируется
-    EPOCH_1/EPOCH_2 при явном текстовом сигнале (DORMANT_EPOCHS
-    reactivation, см. карточку). Использует поиск по границам слов
-    (см. _contains_word) — substring-поиск ловил 'kill' в 'skill'."""
+    """ACTIVE_EPOCH (GLOBAL) — EPOCH_3 dominates but EPOCH_1/EPOCH_2
+    reactivate on an explicit textual signal (DORMANT_EPOCHS
+    reactivation, see the card). Uses word-boundary search
+    (see _contains_word) — substring search caught 'kill' in 'skill'."""
     t = text.lower()
     if any(_contains_word(t, kw) for kw in EPOCH_1_KEYWORDS):
         return "EPOCH_1"
@@ -81,7 +81,7 @@ def detect_epoch(text: str) -> str:
         return "EPOCH_2"
     if any(_contains_word(t, kw) for kw in EPOCH_3_KEYWORDS):
         return "EPOCH_3"
-    return "EPOCH_3"  # ACTIVE_EPOCH по умолчанию (GLOBAL, доминирует у Gen Z)
+    return "EPOCH_3"  # default ACTIVE_EPOCH (GLOBAL, dominant for Gen Z)
 
 
 _EPOCH_INTERPRETATION = {
@@ -96,19 +96,19 @@ _MEDICAL_KEYWORDS = ("анатоми", "медицин", "лекция", "сла
 
 
 def _safe_case_for_epoch(text_lower: str, epoch: str) -> list:
-    """ИСПРАВЛЕНО по итогам код-ревью (2026-06-28, находка независимого
-    анализа карточки): прежний код слепо назначал SAFE_CASE_003 любому
-    не-EPOCH_3 случаю. По реальной карточке SAFE_CASE_003 —
-    ИМЕННО Halloween (holiday greetings, seasonal decoration), не
-    "усталость" и не "смерть в целом". Теперь сопоставление точное:
+    """FIXED after code review (2026-06-28, a finding of independent
+    card analysis): the old code blindly assigned SAFE_CASE_003 to any
+    non-EPOCH_3 case. Per the real card SAFE_CASE_003 is
+    SPECIFICALLY Halloween (holiday greetings, seasonal decoration),
+    not "tiredness" nor "death in general". Matching is now exact:
       SAFE_CASE_001 = EPOCH_3 humor (Gen Z social media)
       SAFE_CASE_002 = EPOCH_2 exhaustion (student messaging)
-      SAFE_CASE_003 = явный Halloween-контекст (любая эпоха)
-      SAFE_CASE_006 = явный медицинский/академический контекст
-    Если EPOCH_1 без Halloween/медицинского контекста — честно
-    оставляем без SAFE_CASE (нет точного соответствия в карточке для
-    обобщённого "смерть/опасность без уточнения контекста"), не
-    подменяем приблизительной меткой."""
+      SAFE_CASE_003 = explicit Halloween context (any epoch)
+      SAFE_CASE_006 = explicit medical/academic context
+    If EPOCH_1 without Halloween/medical context — honestly left
+    without a SAFE_CASE (the card has no exact match for generic
+    "death/danger without context refinement"); no approximate
+    label substitution."""
     if any(kw in text_lower for kw in _HALLOWEEN_KEYWORDS):
         return ["SAFE_CASE_003"]
     if any(kw in text_lower for kw in _MEDICAL_KEYWORDS):
@@ -121,29 +121,29 @@ def _safe_case_for_epoch(text_lower: str, epoch: str) -> list:
 
 
 def match(text: str, offset: int, metadata: dict = None):
-    """Возвращает (safe_ids, risk_ids, active_epoch, interpretation).
+    """Returns (safe_ids, risk_ids, active_epoch, interpretation).
 
-    ИСПРАВЛЕНО по итогам код-ревью (CONVEYOR_RUN_PACKET_MSL_MIP_CODE_
-    SINGLE_SIGN_v0_1, 2026-06-28): "He is dead to us 💀" раньше давал
-    interpretation="literal_death" ОДНОВРЕМЕННО с risk=RISK_CASE_004
-    (CANCEL_CULTURE_OSTRACISM) — большинство ревьюеров (Kimi, Grok,
-    GPT-5.5, Qwen) сочли это реальным конфликтом меток, не просто
-    "наложением сигналов" (минority: Gemini/Copilot сочли это
-    приемлемой синергией). Принято решение большинства: если
-    сработала фраза-риск (cancel/threat), её интерпретация
-    ЗАМЕЩАЕТ epoch-based интерпретацию, не сосуществует с ней —
-    downstream-потребитель INTERPRETATION не должен получать
-    "literal_death" для текста, который на деле про социальное
-    вычёркивание, а не буквальную смерть."""
+    FIXED after code review (CONVEYOR_RUN_PACKET_MSL_MIP_CODE_
+    SINGLE_SIGN_v0_1, 2026-06-28): "He is dead to us 💀" used to give
+    interpretation="literal_death" SIMULTANEOUSLY with risk=RISK_CASE_004
+    (CANCEL_CULTURE_OSTRACISM) — most reviewers (Kimi, Grok,
+    GPT-5.5, Qwen) deemed it a real label conflict, not just
+    "signal overlap" (minority: Gemini/Copilot saw acceptable
+    synergy). Majority decision adopted: when a risk phrase
+    (cancel/threat) fires, its interpretation REPLACES the
+    epoch-based one, not coexists — the downstream INTERPRETATION
+    consumer must not receive "literal_death" for text that is
+    actually about social erasure rather than literal death."""
+    
     safe, risk = [], []
     metadata = metadata or {}
     t = text.lower()
 
-    # Фразы-риски проверяются ПЕРВЫМИ — они переопределяют epoch-based
-    # интерпретацию, если сработали (см. docstring)
+    # Risk phrases are checked FIRST — they override the epoch-based
+    # interpretation when fired (see docstring)
     if any(_contains_word(t, p) for p in _THREAT_PHRASES):
         risk.append("RISK_CASE_002")
-        epoch = detect_epoch(text)  # эпоха всё равно вычисляется для аудита
+        epoch = detect_epoch(text)  # the epoch is still computed for audit
         interp = "threat_obfuscated_as_humor"
     elif any(_contains_word(t, p) for p in _CANCEL_PHRASES):
         risk.append("RISK_CASE_004")
@@ -154,8 +154,8 @@ def match(text: str, offset: int, metadata: dict = None):
         interp = _EPOCH_INTERPRETATION[epoch]
         safe.extend(_safe_case_for_epoch(t, epoch))
 
-    # Метаданные-зависимые кейсы — детектируются ТОЛЬКО если метаданные
-    # реально переданы (не угадываются из текста)
+    # Metadata-dependent cases — detected ONLY when metadata is
+    # actually provided (never guessed from text)
     sender_cohort = metadata.get("SENDER_COHORT")
     if sender_cohort in ("Boomer", "Millennial") and epoch == "EPOCH_3":
         risk.append("RISK_CASE_003")  # GENERATIONAL_MISINTERPRETATION

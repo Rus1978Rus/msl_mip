@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
 """
-msl_mip_runtime.py — рабочая программа MSL/MIP.
+msl_mip_runtime.py — the MSL/MIP working program.
 
-Принимает текст (аргументом командной строки или интерактивно),
-прогоняет его через весь конвейер:
+Takes text (as a CLI argument or interactively) and runs it
+through the whole pipeline:
 
-  1. сканирует текст, находит позиции знаков, для которых есть
-     загруженная SIGN_CORE_CARD (сейчас: DOT, SOLIDUS, SKULL)
-  2. для каждого знака — module_engine.process_sign (single-sign слой)
-  3. для каждого результата — integrator_engine.process_output
-     (решение по одиночному знаку)
-  4. sequence_engine.process_sequence по всему тексту с полным
-     known_signs реестром (CARD_SET_COMPLETENESS — см. код-ревью)
-  5. sequence_integrator_engine.process_sequence_output (решение по
-     найденным последовательностям)
-  6. итоговый вердикт = самое строгое действие среди всех уровней
+  1. scans the text, finds positions of signs that have a loaded
+     SIGN_CORE_CARD (currently: DOT, SOLIDUS, SKULL)
+  2. per sign — module_engine.process_sign (the single-sign layer)
+  3. per result — integrator_engine.process_output
+     (the single-sign decision)
+  4. sequence_engine.process_sequence over the whole text with the
+     full known_signs registry (CARD_SET_COMPLETENESS — see review)
+  5. sequence_integrator_engine.process_sequence_output (the
+     decision on found sequences)
+  6. final verdict = the strictest action across all levels
 
-ЗАПУСК:
-    python3 msl_mip_runtime.py "текст для анализа"
-    python3 msl_mip_runtime.py        (без аргумента — спросит текст)
+RUN:
+    python3 msl_mip_runtime.py "text to analyse"
+    python3 msl_mip_runtime.py        (no argument — prompts for text)
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ from sequence_integrator_engine import process_sequence_output
 from matchers import dot_matcher
 
 
-# Порядок строгости действий — общий для single-sign и sequence решений
+# Action strictness order — shared by single-sign and sequence decisions
 _SEVERITY = {
     "pass": 0,
     "log_only": 1,
@@ -52,9 +52,9 @@ CARDS_DIR_CANDIDATES = [
     "/mnt/user-data/uploads",
 ]
 
-# Реальные имена файлов карточек (ARTIFACT_CONFIRMED), как они лежат
-# в проекте. Если файл не найден — карточка просто не загрузится,
-# рантайм продолжит работать с тем, что есть (явный warning).
+# Real card file names (ARTIFACT_CONFIRMED) as they sit in the
+# project. A missing file just means the card does not load; the
+# runtime keeps going with what it has (an explicit warning).
 CARD_FILENAMES = [
     "SIGN_CORE_CARD_DOT_U002E_GEN3_v0_3_RU__2_.md",
     "SIGN_CORE_CARD_SOLIDUS_U002F_GEN3_v0_3_RU__1_.md",
@@ -73,8 +73,8 @@ def _find_card_file(filename: str) -> str:
 
 
 def load_all_cards() -> list:
-    """Загружает все доступные карточки. Печатает предупреждение,
-    если какая-то не найдена, но не падает."""
+    """Loads all available cards. Prints a warning when one is
+    missing, but does not crash."""
     cards = []
     for fname in CARD_FILENAMES:
         path = _find_card_file(fname)
@@ -89,8 +89,8 @@ def load_all_cards() -> list:
 
 
 def scan_signs(text: str, cards: list) -> list:
-    """STAGE: находит в тексте все позиции знаков, для которых есть
-    загруженная карточка, и прогоняет каждую через module_engine."""
+    """STAGE: finds all text positions of signs that have a loaded
+    card, and runs each through module_engine."""
     sign_chars = {c.visible_form: c for c in cards}
     statuses = []
     for i, ch in enumerate(text):
@@ -109,11 +109,11 @@ def most_severe(actions: list) -> str:
 
 
 def analyze(text: str, cards: list) -> dict:
-    """Полный прогон текста через все слои. Возвращает структуру
-    отчёта для печати (и для возможного программного использования)."""
+    """Full text run through all layers. Returns a report structure
+    for printing (and possible programmatic use)."""
     known_signs = {c.visible_form for c in cards}
 
-    # --- Single-sign слой ---
+    # --- Single-sign layer ---
     sign_statuses = scan_signs(text, cards)
     single_sign_results = []
     single_actions = []
@@ -122,12 +122,12 @@ def analyze(text: str, cards: list) -> dict:
         single_sign_results.append((st, decision))
         single_actions.append(decision.runtime_action)
 
-    # --- Sequence слой ---
+    # --- Sequence layer ---
     seq_out = process_sequence(text, cards, sign_statuses=sign_statuses,
                                known_signs=known_signs)
     seq_decision = process_sequence_output(seq_out)
 
-    # --- Итоговый вердикт ---
+    # --- Final verdict ---
     final_action = most_severe(single_actions + [seq_decision.runtime_action])
 
     return {
@@ -195,8 +195,8 @@ def main():
               "using built-in minimal list (may not know "
               "about rare compound zones)")
 
-    # ИСПРАВЛЕНО (MAJOR, найдено GPT-5.5, 2026-06-29): раньше источник
-    # одиночных TLD (реестр IANA) не раскрывался вообще
+    # FIXED (MAJOR, found by GPT-5.5, 2026-06-29): the single-TLD
+    # source (IANA registry) used not to be surfaced at all
     tld_source = dot_matcher.get_single_tld_source()
     if tld_source == "LIVE_FETCH":
         print("Single TLD list (IANA): up to date (just fetched)")

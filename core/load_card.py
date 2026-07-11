@@ -1,13 +1,13 @@
 """
-Загрузка SignCoreCard из markdown-файла карточки знака.
+Loads a SignCoreCard from a sign-card markdown file.
 
 load_card(path) -> SignCoreCard
 
-Использует tree_parser (структурный парсер по отступам), не регулярки
-под конкретный формат карты — устойчив к расхождениям между картами
-(подтверждено на практике: SKULL хранит SEQUENCE_CANDIDATES прямо под
-SEQUENCE_LAYER_BOUNDARY, без промежуточного узла, в отличие от DOT и
-SOLIDUS; эпохи SOLIDUS не имеют поля NAME, у SKULL — есть).
+Uses tree_parser (an indent-based structural parser), not regexes
+tied to a specific card format — robust to per-card format drift
+(confirmed in practice: SKULL keeps SEQUENCE_CANDIDATES directly under
+SEQUENCE_LAYER_BOUNDARY with no intermediate node, unlike DOT and
+SOLIDUS; SOLIDUS epochs have no NAME field while SKULL's do).
 """
 
 from __future__ import annotations
@@ -22,14 +22,17 @@ from tree_parser import parse_indented_tree, Node
 
 
 def _parse_risk(raw: str):
-    """Возвращает RiskLevel, если raw — точное перечислимое значение
-    или начинается с него (например, 'LOW / CONTEXT_DEPENDENT' из
-    SKULL.SAFE_CASE_004 → RiskLevel.LOW). Если первый токен не входит
-    в RiskLevel (например, SEQUENCE_CANDIDATE 'intensity-dependent',
-    'combined idiom', 'epoch_mismatch', 'seasonal_context',
-    'spam-like') — возвращает исходную строку как есть (ENUM_GUARD
-    в sequence_module.py обязан явно проверять это разграничение,
-    не считать такие значения сравнимыми с enum)."""
+    """Returns a RiskLevel if raw is an exact enum value or starts
+    with one (e.g. 'LOW / CONTEXT_DEPENDENT' from SKULL.SAFE_CASE_004
+    -> RiskLevel.LOW).
+
+    If the first token is not a RiskLevel member (e.g.
+    SEQUENCE_CANDIDATE values such as 'intensity-dependent',
+    'spam-like', 'combined idiom', 'epoch_mismatch', or
+    'seasonal_context'), the original string is returned as is.
+
+    ENUM_GUARD in sequence_module.py must explicitly check this
+    distinction and never compare such string values with the enum."""
 
     raw = raw.strip()
     if not raw:
@@ -37,7 +40,7 @@ def _parse_risk(raw: str):
     first_token = re.split(r"[\s/(]", raw, maxsplit=1)[0]
     if RiskLevel.is_enum_value(first_token):
         return RiskLevel(first_token)
-    return raw  # не-перечислимое значение — оставляем строкой
+    return raw  # non-enum value — kept as a string
 
 
 def _parse_zone(raw: str) -> Zone:
@@ -166,11 +169,11 @@ def _extract_sequence_candidates(root: Node) -> list:
     seq = root.child("SEQUENCE_LAYER_BOUNDARY")
     if not seq:
         return []
-    # DOT/SOLIDUS: вложенный узел SEQUENCE_CANDIDATES
+    # DOT/SOLIDUS: nested SEQUENCE_CANDIDATES node
     sc_container = seq.child("SEQUENCE_CANDIDATES")
     sc_nodes = sc_container.children_with_prefix("SC") if sc_container else []
-    # SKULL: SC-узлы прямо под SEQUENCE_LAYER_BOUNDARY (расхождение
-    # формата, подтверждено структурным парсером — см. docstring модуля)
+    # SKULL: SC nodes directly under SEQUENCE_LAYER_BOUNDARY (format
+    # drift, confirmed by the structural parser — see module docstring)
     if not sc_nodes:
         sc_nodes = seq.children_with_prefix("SC")
 
@@ -192,8 +195,8 @@ def _extract_sequence_candidates(root: Node) -> list:
 
 
 def _strip_quotes(s: str) -> str:
-    """SEQUENCE-поле в карточках записано как '"../" (комментарий)' —
-    достаём только буквальную строку в кавычках."""
+    """The SEQUENCE field in cards is written as '"../" (comment)' —
+    extract only the literal quoted string."""
     m = re.match(r'^"([^"]*)"', s.strip())
     return m.group(1) if m else s.strip()
 

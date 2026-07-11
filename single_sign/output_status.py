@@ -1,10 +1,10 @@
 """
-Структуры результата MODULE_TEMPLATE_SINGLE_SIGN.
+Result structures of MODULE_TEMPLATE_SINGLE_SIGN.
 
-Поля OutputStatus соответствуют OUTPUT_INTERFACE.OUTPUT_STATUS из
-MODULE_TEMPLATE_SINGLE_SIGN_GEN3_v0_2_PLUS_EPOCH_v0_1, включая
-SIGN_OFFSET_START/END, добавленные патчем v0_1_PATCH_23 (закрытие
-QUESTION_6 — пробрасывание позиции знака для SEQUENCE_MODULE).
+OutputStatus fields match OUTPUT_INTERFACE.OUTPUT_STATUS from
+MODULE_TEMPLATE_SINGLE_SIGN_GEN3_v0_2_PLUS_EPOCH_v0_1, including
+SIGN_OFFSET_START/END added by patch v0_1_PATCH_23 (closing
+QUESTION_6 — forwarding the sign position for SEQUENCE_MODULE).
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from sign_core_card import RiskLevel
 
 
-# RECOMMENDED_ACTION mapping — из OUTPUT_INTERFACE MODULE_TEMPLATE
+# RECOMMENDED_ACTION mapping — from OUTPUT_INTERFACE MODULE_TEMPLATE
 _ACTION_MAP = {
     RiskLevel.NONE: "INFO",
     RiskLevel.LOW: "MONITOR",
@@ -27,7 +27,7 @@ _ACTION_MAP = {
 class OutputStatus:
     sign_codepoint: str
     card_version: str
-    active_epoch: str  # значение эпохи или "NOT_APPLICABLE"
+    active_epoch: str  # epoch value or "NOT_APPLICABLE"
     interpretation: str
     risk_level: RiskLevel
     risk_cases_triggered: list = field(default_factory=list)
@@ -77,7 +77,7 @@ class ErrorStatus:
 
 
 class ModuleError(Exception):
-    """Исключение, оборачивающее ERROR_INTERFACE ERROR_TYPE."""
+    """Exception wrapping ERROR_INTERFACE ERROR_TYPE."""
 
     def __init__(self, error_type: str, detail: str = ""):
         super().__init__(f"{error_type}: {detail}")

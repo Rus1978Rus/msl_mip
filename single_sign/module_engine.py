@@ -1,11 +1,11 @@
 """
-Движок MODULE_TEMPLATE_SINGLE_SIGN — реализация STAGE_1-8 из
-MODULE_TEMPLATE_SINGLE_SIGN_GEN3_v0_2_PLUS_EPOCH_v0_1 (с учётом
-PATCH_22 — ZONE_1 обязан сверять RISK_CASES, и PATCH_23 —
-SIGN_OFFSET_START/END в OUTPUT_STATUS).
+MODULE_TEMPLATE_SINGLE_SIGN engine — STAGE_1-8 implementation of
+MODULE_TEMPLATE_SINGLE_SIGN_GEN3_v0_2_PLUS_EPOCH_v0_1 (with
+PATCH_22 — ZONE_1 must check RISK_CASES, and PATCH_23 —
+SIGN_OFFSET_START/END in OUTPUT_STATUS).
 
-Этот модуль НЕ содержит знако-специфичной логики — она в matchers/.
-Здесь только структурный pipeline, общий для любого знака любой ZONE.
+This module holds NO sign-specific logic — that lives in matchers/.
+Only the structural pipeline common to any sign of any ZONE.
 """
 
 from __future__ import annotations
@@ -18,15 +18,15 @@ import importlib.util as _importlib_util
 
 _skull_crossbones_path = _importlib_util.find_spec("matchers.skull_crossbones_matcher")
 if _skull_crossbones_path is not None:
-    # файл существует — импортируем без try/except: если внутри него
-    # сломан собственный импорт или другая ошибка, она должна упасть
-    # ГРОМКО, не маскироваться как "файла нет" (найдено по итогам
-    # код-ревью, 2026-06-29: широкий except ImportError скрывал бы
-    # реальные баги внутри нового матчера)
+    # the file exists — import without try/except: if its own import
+    # is broken or another error occurs, it must fail LOUDLY, not
+    # masquerade as "file missing" (found in code review, 2026-06-29:
+    # a broad except ImportError would hide real bugs inside a new
+    # matcher)
     from matchers import skull_crossbones_matcher
     _HAS_SKULL_CROSSBONES = True
 else:
-    # файла действительно нет — легитимный, осознанный fallback
+    # the file is really missing — a legitimate, deliberate fallback
     _HAS_SKULL_CROSSBONES = False
 
 _at_path = _importlib_util.find_spec("matchers.at_matcher")
@@ -36,15 +36,15 @@ if _at_path is not None:
 else:
     _HAS_AT = False
 
-# ИСПРАВЛЕНО (2026-06-29, добавление второго ZONE_3-знака ☠️):
-# раньше диспетчеризация шла ПО ЗОНЕ (ZONE_3 -> только skull_matcher
-# жёстко). Это работало, пока в ZONE_3 был один знак. С появлением
-# ☠️ (тоже ZONE_3, тоже эпохальный) жёсткий if/elif по зоне не может
-# выбрать между двумя матчерами одной зоны. Теперь диспетчеризация —
-# по CODEPOINT, через явный реестр. has_epoch=True означает, что
-# матчер принимает metadata и возвращает 4-tuple (как skull_matcher),
-# False — обычный 3-tuple (как dot/solidus_matcher). Новый знак
-# добавляется одной строкой в реестр, без изменения логики ниже.
+# FIXED (2026-06-29, adding the second ZONE_3 sign ☠️):
+# dispatch used to go BY ZONE (ZONE_3 -> skull_matcher only,
+# hard-coded). That worked while ZONE_3 had one sign. With
+# ☠️ (also ZONE_3, also epochal) a hard if/elif by zone cannot
+# choose between two matchers of one zone. Dispatch is now
+# by CODEPOINT via an explicit registry. has_epoch=True means the
+# matcher takes metadata and returns a 4-tuple (like skull_matcher),
+# False — a plain 3-tuple (like dot/solidus_matcher). A new sign
+# is added with one registry line, no changes to the logic below.
 _MATCHER_REGISTRY = {
     "U+002E": (dot_matcher, False),
     "U+002F": (solidus_matcher, False),
@@ -56,21 +56,21 @@ if _HAS_AT:
     _MATCHER_REGISTRY["U+0040"] = (at_matcher, False)
 
 
-# STAGE_1: допустимые статусы карточки для загрузки.
-# WORKINGLY_CLOSED / ARTIFACT_CONFIRMED — прошли STRUCTURAL_PREFLIGHT_
-# PASS + CONVEYOR_REVIEW_PASS (минимум несколько независимых
-# ревьюеров) и AUTHOR_DECISION. WORKING_DRAFT — НЕ прошли конвейер;
-# допускается к загрузке ТОЛЬКО с явным громким предупреждением (см.
-# ниже) — система не имеет права молча путать непроверенный черновик
-# с конвейерно подтверждённой карточкой. ИСПРАВЛЕНО (2026-06-29): до
-# этого координатор присваивал WORKINGLY_CLOSED карточкам без
-# реального прогона конвейера, просто чтобы карточка технически
-# загрузилась — это нарушение AUTHOR_DECISION_STATUS_AUTHORITY.
+# STAGE_1: card statuses allowed for loading.
+# WORKINGLY_CLOSED / ARTIFACT_CONFIRMED passed STRUCTURAL_PREFLIGHT_
+# PASS + CONVEYOR_REVIEW_PASS (at least several independent
+# reviewers) and AUTHOR_DECISION. WORKING_DRAFT did NOT pass the
+# conveyor; allowed to load ONLY with an explicit loud warning (see
+# below) — the system must not silently confuse an unreviewed draft
+# with a conveyor-confirmed card. FIXED (2026-06-29): before that
+# the coordinator assigned WORKINGLY_CLOSED to cards without an
+# actual conveyor run, just so the card would technically load —
+# a violation of AUTHOR_DECISION_STATUS_AUTHORITY.
 _VALID_STATUSES = {"WORKINGLY_CLOSED", "ARTIFACT_CONFIRMED"}
 _DRAFT_STATUSES = {"WORKING_DRAFT"}
 
 def _find_case(card: SignCoreCard, case_id: str):
-    """Ищет SAFE_CASE или RISK_CASE по id в карточке."""
+    """Finds a SAFE_CASE or RISK_CASE by id in the card."""
     for c in card.safe_cases:
         if c.case_id == case_id:
             return c
@@ -81,9 +81,9 @@ def _find_case(card: SignCoreCard, case_id: str):
 
 
 def _guards_for_risk_ids(card: SignCoreCard, risk_ids: list) -> list:
-    """STAGE_4: GUARD_EVALUATION — какие CONTRADICTION_GUARDS
-    логически связаны с сработавшими RISK_CASE (через текст GUARD
-    самого risk_case, сопоставленный с RESPONSE guard'а)."""
+    """STAGE_4: GUARD_EVALUATION — which CONTRADICTION_GUARDS are
+    logically tied to the fired RISK_CASEs (via the risk_case GUARD
+    text matched against the guard RESPONSE)."""
     guards_triggered = []
     for rid in risk_ids:
         rc = _find_case(card, rid)
@@ -107,7 +107,7 @@ def _risk_level_for_ids(card: SignCoreCard, risk_ids: list) -> RiskLevel:
 
 def process_sign(card: SignCoreCard, text: str, offset: int,
                   metadata: dict = None) -> OutputStatus:
-    """STAGE_1-8 целиком. text[offset] должен совпадать с
+    """The whole STAGE_1-8. text[offset] must match the card
     card.visible_form (STAGE_2 CONFUSABLE_CHECK)."""
 
     # --- STAGE_1: CARD_LOADING ---
@@ -115,18 +115,18 @@ def process_sign(card: SignCoreCard, text: str, offset: int,
     if card.document_status in _DRAFT_STATUSES:
         draft_warning = (
             f"CARD_NOT_CONVEYOR_REVIEWED: {card.card_uid or card.codepoint} "
-            f"имеет статус WORKING_DRAFT — не прошла STRUCTURAL_PREFLIGHT_PASS/"
-            f"CONVEYOR_REVIEW_PASS. Результат для этого знака НЕ ДОЛЖЕН "
-            f"считаться надёжным."
+            f"has WORKING_DRAFT status — did not pass STRUCTURAL_PREFLIGHT_PASS/"
+            f"CONVEYOR_REVIEW_PASS. The result for this sign MUST NOT "
+            f"be considered reliable."
         )
         print(f"[CARD_WARNING] {draft_warning}")
     elif card.document_status not in _VALID_STATUSES:
         raise ModuleError("CARD_INVALID",
-                           f"DOCUMENT_STATUS={card.document_status} недопустим")
+                           f"DOCUMENT_STATUS={card.document_status} is not allowed")
 
     # --- STAGE_2: ZONE_DETECTION + CONFUSABLE_CHECK ---
     if offset < 0 or offset >= len(text):
-        raise ModuleError("CONTEXT_INSUFFICIENT", "offset вне текста")
+        raise ModuleError("CONTEXT_INSUFFICIENT", "offset outside the text")
     if text[offset] != card.visible_form:
         raise ModuleError("CONFUSABLE_DETECTED_REJECTED",
                            f"text[{offset}]={text[offset]!r} != {card.visible_form!r}")
@@ -134,7 +134,7 @@ def process_sign(card: SignCoreCard, text: str, offset: int,
     ambiguity = False
     active_epoch = "NOT_APPLICABLE"
 
-    # --- STAGE_3: диспетчеризация по CODEPOINT (не по ZONE) ---
+    # --- STAGE_3: dispatch by CODEPOINT (not by ZONE) ---
     entry = _MATCHER_REGISTRY.get(card.codepoint)
     if entry is None:
         # Relation axis (D-REL-1/4/5): the sign has no own matcher.
@@ -194,15 +194,15 @@ def process_sign(card: SignCoreCard, text: str, offset: int,
                 ],
             )
         raise ModuleError("MATCHER_NOT_FOUND",
-                           f"Нет зарегистрированного матчера для {card.codepoint}")
+                           f"No registered matcher for {card.codepoint}")
     matcher, has_epoch = entry
 
     if has_epoch:
         safe_ids, risk_ids, active_epoch, interp = matcher.match(text, offset, metadata)
     else:
         safe_ids, risk_ids, interp = matcher.match(text, offset)
-        # ambiguity-флаг специфичен для SOLIDUS.RISK_CASE_008 —
-        # остаётся точечной проверкой, не общим правилом ZONE_2
+        # the ambiguity flag is specific to SOLIDUS.RISK_CASE_008 —
+        # stays a targeted check, not a general ZONE_2 rule
         if card.zone == Zone.ZONE_2 and "RISK_CASE_008" in risk_ids:
             ambiguity = True
 
@@ -213,7 +213,7 @@ def process_sign(card: SignCoreCard, text: str, offset: int,
     risk_level = _risk_level_for_ids(card, risk_ids)
 
     # --- STAGE_6: EFFECT_VALIDATION ---
-    # все три карточки имеют EFFECT_FIELDS_ALL_NONE: YES / CLOSED_SCHEMA: YES
+    # all three cards have EFFECT_FIELDS_ALL_NONE: YES / CLOSED_SCHEMA: YES
     effect_status = "VALID"
 
     # --- STAGE_7: OUTPUT_ASSEMBLY ---
@@ -232,5 +232,5 @@ def process_sign(card: SignCoreCard, text: str, offset: int,
         output_warnings=[draft_warning] if draft_warning else [],
     )
 
-    # --- STAGE_8: CLEANUP --- (stateless, не требуется реальная очистка)
+    # --- STAGE_8: CLEANUP --- (stateless, no real cleanup needed)
     return out

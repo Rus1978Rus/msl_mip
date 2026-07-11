@@ -1,16 +1,16 @@
 """
-Матчер для SOLIDUS (U+002F, ZONE_2).
+Matcher for SOLIDUS (U+002F, ZONE_2).
 
-CONTEXT_GATE: солидус не имеет единой активной эпохи — какой
-SUBSTRATE активен, определяется контекстом (см. карточку:
+CONTEXT_GATE: the solidus has no single active epoch — which
+SUBSTRATE is active is decided by context (see the card:
 ACTIVE_EPOCH_RESOLUTION.PRIMARY_ACTIVE_EPOCH = NONE_GLOBAL).
 
-ЧЕСТНО НЕ РЕАЛИЗОВАНО (семантические, не структурные паттерны,
-см. dot_matcher.py docstring для того же класса оговорки):
+HONESTLY NOT IMPLEMENTED (semantic, not structural patterns,
+see the dot_matcher.py docstring for the same class of caveat):
   RISK_CASE_005 STATUS_CHAIN_MIMICRY, RISK_CASE_006 ROLE_BINDING_
-  MIMICRY, RISK_CASE_007 PHAGO_ENTITY_PATH_MIMICRY — требуют
-  распознавания "похоже на известный бренд/организацию" или
-  "похоже на цепочку статусов", это не структурный признак.
+  MIMICRY, RISK_CASE_007 PHAGO_ENTITY_PATH_MIMICRY — they require
+  recognising "looks like a known brand/organisation" or
+  "looks like a status chain", which is not a structural feature.
 """
 
 
@@ -32,12 +32,12 @@ def _word_at(text: str, start: int, direction: int) -> str:
 _ADMIN_WORDS = {"admin", "root", "execute", "permission", "sudo", "superuser"}
 _API_WORDS = {"api", "v1", "v2", "v3"}
 
-# ИСПРАВЛЕНО по итогам код-ревью (CONVEYOR_RUN_PACKET_MSL_MIP_CODE_
-# SINGLE_SIGN_v0_1, 2026-06-28, найдено ВСЕМИ 7 ревьюерами): домен-
-# подобный сегмент перед солидусом ("trusted.com/verified") должен
-# определяться явным regex-поиском по тексту ПЕРЕД offset, а не
-# через _word_at (который останавливается на "." и поэтому никогда
-# не видит точку — корень бага).
+# FIXED after code review (CONVEYOR_RUN_PACKET_MSL_MIP_CODE_
+# SINGLE_SIGN_v0_1, 2026-06-28, found by ALL 7 reviewers): a domain-
+# like segment before the solidus ("trusted.com/verified") must be
+# detected by an explicit regex over the text BEFORE the offset, not
+# via _word_at (which stops at "." and therefore never sees the
+# dot — the root of the bug).
 _DOMAIN_BEFORE_SLASH_RE = re.compile(r"[\w-]+\.[A-Za-z]{2,}$")
 
 _INTERPRETATION_NAMES = {
@@ -51,8 +51,8 @@ _INTERPRETATION_NAMES = {
 
 
 def detect_substrate(text: str, offset: int) -> str:
-    """CONTEXT_GATE: определяет активный субстрат для конкретного
-    вхождения солидуса. Возвращает один из:
+    """CONTEXT_GATE: decides the active substrate for a specific
+    solidus occurrence. Returns one of:
     MATH / FILESYSTEM / URL / URL_AUTHORITY / DATE / AMBIGUOUS."""
 
     left = text[offset - 1] if offset > 0 else ""
@@ -74,22 +74,22 @@ def detect_substrate(text: str, offset: int) -> str:
     if text[max(0, offset - 1):offset + 2] == "://" or "://" in text[max(0, offset - 8):offset + 8]:
         return "URL"
 
-    # ИСПРАВЛЕНО (BUG_B, GPT-5.5, 2026-06-28): Windows-путь вида
-    # "C:/Users" с ОДНИМ слешем не подхватывался ни одним правилом
-    # FILESYSTEM (требовалось 2+ слеша или ведущий "./"/".."),
-    # оставался AMBIGUOUS. Явный паттерн "<буква>:/" — диск Windows.
+    # FIXED (BUG_B, GPT-5.5, 2026-06-28): a Windows path like
+    # "C:/Users" with a SINGLE slash was caught by no FILESYSTEM
+    # rule (2+ slashes or a leading "./"/".." were required),
+    # staying AMBIGUOUS. Explicit pattern "<letter>:/" — a Windows drive.
     if offset >= 2 and text[offset - 2].isalpha() and text[offset - 1] == ":":
         return "FILESYSTEM"
 
-    # ИСПРАВЛЕНО: обратный слеш перед солидусом — сигнал escape-
-    # последовательности (RISK_CASE_001), без этого ветка FILESYSTEM
-    # никогда не достигалась бы для таких входов, и проверка
-    # RISK_CASE_001 в match() была бы недостижимым кодом
+    # FIXED: a backslash before the solidus signals an escape
+    # sequence (RISK_CASE_001); without it the FILESYSTEM branch
+    # would never be reached for such inputs, and the RISK_CASE_001
+    # check in match() would be dead code
     if offset > 0 and text[offset - 1] == "\\":
         return "FILESYSTEM"
 
-    # ИСПРАВЛЕНО: домен-подобный сегмент непосредственно перед "/"
-    # (без требования "://") — например "trusted.com/verified"
+    # FIXED: a domain-like segment right before "/"
+    # (with no "://" required) — e.g. "trusted.com/verified"
     if _DOMAIN_BEFORE_SLASH_RE.search(text[:offset]):
         return "URL_AUTHORITY"
 
@@ -125,26 +125,26 @@ def match(text: str, offset: int):
         return safe, risk, _INTERPRETATION_NAMES["SAFE_CASE_004"]
 
     if substrate == "URL_AUTHORITY":
-        # ИСПРАВЛЕНО (AUTHOR_DECISION, 2026-06-29): ранее URL_AUTHORITY
-        # безусловно добавлял RISK_CASE_002, что делало ЛЮБУЮ ссылку
-        # с доменом источником QUEUE_FOR_REVIEW. Это архитектурно
-        # неверно: DOT-слой уже оценивает качество домена (имитация,
-        # поддомены и т.п.). Если DOT нашёл риск — финальный вердикт
-        # уже будет повышен через DOT. Если не нашёл — домен чист, и
-        # SOLIDUS не должен наказывать его повторно только за наличие
-        # пути после. SOLIDUS фиксирует ФАКТ (это граница URL-пути),
-        # но не добавляет риска самостоятельно.
-        # Подтверждено прямым прогоном: paypal.com.security-check.ru
-        # даёт HOLD_PENDING_REVIEW через DOT даже без этого риска.
+        # FIXED (AUTHOR_DECISION, 2026-06-29): URL_AUTHORITY used to
+        # unconditionally add RISK_CASE_002, making ANY link with a
+        # domain a QUEUE_FOR_REVIEW source. Architecturally wrong:
+        # the DOT layer already scores domain quality (imitation,
+        # subdomains etc.). If DOT found risk — the final verdict is
+        # already raised via DOT. If not — the domain is clean and
+        # SOLIDUS must not punish it again merely for having a path
+        # after it. SOLIDUS records the FACT (a URL path boundary)
+        # but adds no risk of its own.
+        # Confirmed by a direct run: paypal.com.security-check.ru
+        # yields HOLD_PENDING_REVIEW via DOT even without this risk.
         safe.append("SAFE_CASE_004")
         return safe, risk, _INTERPRETATION_NAMES["SAFE_CASE_004_AUTHORITY"]
 
     if substrate == "FILESYSTEM":
         safe.append("SAFE_CASE_003")
 
-        # RISK_CASE_001: ESCAPE_SEQUENCE — солидус сразу после
-        # обратного слеша (найдено по итогам код-ревью: реальная
-        # карточка содержит этот RISK_CASE, ранее не реализован)
+        # RISK_CASE_001: ESCAPE_SEQUENCE — a solidus right after a
+        # backslash (found in code review: the real card contains
+        # this RISK_CASE, previously unimplemented)
         if offset > 0 and text[offset - 1] == "\\":
             risk.append("RISK_CASE_001")
 

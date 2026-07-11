@@ -1,24 +1,24 @@
 """
-Универсальный парсер для markdown-документов проекта MSL/MIP
-(SIGN_CORE_CARD, и в перспективе MODULE_TEMPLATE/INTEGRATOR_TEMPLATE).
+Universal parser for MSL/MIP project markdown documents
+(SIGN_CORE_CARD, and later MODULE_TEMPLATE/INTEGRATOR_TEMPLATE).
 
-ПОДХОД: строим дерево по отступам (indentation tree), не пишем регулярки
-под формат конкретной карточки. Карточки DOT/SOLIDUS/SKULL расходятся в
-деталях (например, у SOLIDUS эпохи без поля NAME, у SKULL — с ним;
-RISK иногда составной: "LOW / CONTEXT_DEPENDENT") — единый
-структурный парсер устойчив к этим различиям, в отличие от
-построчных регулярок под каждую карту.
+APPROACH: build an indentation tree, no per-card regexes.
+DOT/SOLIDUS/SKULL cards diverge in details (e.g. SOLIDUS epochs
+lack the NAME field while SKULL has it; RISK is sometimes composite:
+"LOW / CONTEXT_DEPENDENT") — a single structural parser is robust
+to these differences, unlike per-card line regexes.
 
-ПРАВИЛО ПАРСИНГА:
-  - строка вида "<отступ><KEY>: <значение>" — это узел KEY с этим
-    значением (может быть пустым, если у узла есть дочерние узлы)
-  - строка без такого паттерна — это ПРОДОЛЖЕНИЕ значения последнего
-    открытого узла (перенос длинной строки на следующую строку с
-    большим отступом), независимо от точного отступа продолжения
-  - пустые строки игнорируются
-  - KEY — последовательность ЗАГЛАВНЫХ латинских букв/цифр/'_',
-    начинающаяся с буквы (так не путается с нумерованными
-    заголовками типа "5. SEMANTIC_EPOCH_TRACKER" и преамбулой)
+
+PARSING RULES:
+  - a line "<indent><KEY>: <value>" is a KEY node with that value
+    (may be empty when the node has children)
+  - a line without that pattern is a CONTINUATION of the value of the
+    last open node (a long value wrapped onto the next line with a
+    larger indent), regardless of the exact continuation indent
+  - empty lines are ignored
+  - KEY is a sequence of UPPERCASE latin letters/digits/'_' starting
+    with a letter (so it is not confused with numbered headers like
+    "5. SEMANTIC_EPOCH_TRACKER" and the preamble)
 """
 
 from __future__ import annotations
@@ -38,15 +38,15 @@ class Node:
     children: list = field(default_factory=list)
 
     def child(self, key: str) -> Optional["Node"]:
-        """Первый дочерний узел с данным key, или None."""
+        """First child node with the given key, or None."""
         for c in self.children:
             if c.key == key:
                 return c
         return None
 
     def children_with_prefix(self, prefix: str) -> list:
-        """Все дочерние узлы, чей key начинается с prefix (например,
-        все 'SAFE_CASE_001', 'SAFE_CASE_002', ... под SAFE_CASES)."""
+        """All child nodes whose key starts with prefix (e.g. all
+        'SAFE_CASE_001', 'SAFE_CASE_002', ... under SAFE_CASES)."""
         return [c for c in self.children if c.key and c.key.startswith(prefix)]
 
     def text(self) -> str:
@@ -54,19 +54,19 @@ class Node:
 
 
 def parse_indented_tree(raw_text: str) -> Node:
-    """Строит дерево узлов по отступам. Возвращает корневой узел
-    (key=None), дети которого — узлы верхнего уровня документа."""
+    """Builds the indentation node tree. Returns the root node
+    (key=None) whose children are the document top-level nodes."""
 
     root = Node(key=None)
     stack: list = [(-1, root)]  # (indent, node)
 
     for raw_line in raw_text.splitlines():
         if not raw_line.strip():
-            continue  # пустые строки не влияют на структуру
+            continue  # empty lines do not affect structure
 
         stripped = raw_line.strip()
 
-        # пропускаем чисто декоративные разделители "===...==="
+        # skip purely decorative "===...===" separators
         if re.fullmatch(r"=+", stripped):
             continue
 
@@ -75,7 +75,7 @@ def parse_indented_tree(raw_text: str) -> Node:
 
         if m:
             key, value = m.group(1), m.group(2)
-            # поднимаемся по стеку, пока вершина не имеет отступ < текущего
+            # pop the stack until the top has an indent < current
             while stack and stack[-1][0] >= indent:
                 stack.pop()
             parent = stack[-1][1]
@@ -83,17 +83,17 @@ def parse_indented_tree(raw_text: str) -> Node:
             parent.children.append(node)
             stack.append((indent, node))
         else:
-            # продолжение значения самого глубокого открытого узла,
-            # независимо от точного отступа продолжения (см. docstring)
+            # continuation of the deepest open node value,
+            # regardless of the exact continuation indent (see docstring)
             if stack[-1][1] is not root:
                 deepest = stack[-1][1]
                 deepest.value = (deepest.value + " " + stripped).strip()
-            # если stack[-1][1] is root — мусорная строка вне любого
-            # узла (преамбула документа и т.п.), молча игнорируем
+            # if stack[-1][1] is root — junk line outside any node
+            # (document preamble etc.), silently ignored
 
     return root
 
 
 def find_section(root: Node, key: str) -> Optional[Node]:
-    """Поиск узла верхнего уровня по key (например, 'SAFE_CASES')."""
+    """Finds a top-level node by key (e.g. 'SAFE_CASES')."""
     return root.child(key)

@@ -1,19 +1,19 @@
 """
-Движок SEQUENCE_INTEGRATOR_TEMPLATE.
+SEQUENCE_INTEGRATOR_TEMPLATE engine.
 
-Принимает SequenceOutput (от sequence_engine) и выдаёт runtime-решение
-по последовательностям. Реализует политику разрешения, включая
-PATCH_24 (опциональный SEQUENCE_CANDIDATE_MATCH в INPUT_INTERFACE +
-CHECK_7 — корректная обработка присутствия/отсутствия).
+Takes SequenceOutput (from sequence_engine) and produces the runtime
+decision for sequences. Implements the resolution policy, including
+PATCH_24 (optional SEQUENCE_CANDIDATE_MATCH in INPUT_INTERFACE +
+CHECK_7 — correct presence/absence handling).
 
-КЛЮЧЕВОЙ ПРИНЦИП (ENUM_GUARD / RULE_3A на уровне интегратора):
-enum-риски разрешаются по DEFAULT_ACTION_MAP (как в одиночном
-интеграторе), а НЕ-enum риски ('intensity-dependent', 'combined idiom',
-'spam-like' и т.п.) НЕ сравниваются с enum и НЕ максимизируются —
-для них отдельная таблица соответствия NON_ENUM_ACTION_MAP, потому
-что их семантика контекстная, не порядковая. Если для строки нет
-записи в таблице — честный fallback queue_for_review (не угадываем
-уровень).
+KEY PRINCIPLE (ENUM_GUARD / RULE_3A at the integrator level):
+enum risks resolve via DEFAULT_ACTION_MAP (as in the single-sign
+integrator), while NON-enum risks ('intensity-dependent', 'combined
+idiom', 'spam-like' etc.) are NEVER compared with enums nor
+maximised — they get a separate NON_ENUM_ACTION_MAP because their
+semantics are contextual, not ordinal. If a string has no table
+entry — an honest queue_for_review fallback (we do not guess the
+level).
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from sign_core_card import RiskLevel
 from sequence_output import SequenceOutput
 
 
-# enum-риски — та же демо-политика, что в одиночном интеграторе
+# enum risks — the same demo policy as the single-sign integrator
 DEFAULT_ACTION_MAP = {
     RiskLevel.NONE: "pass",
     RiskLevel.LOW: "log_only",
@@ -33,19 +33,19 @@ DEFAULT_ACTION_MAP = {
     RiskLevel.CRITICAL: "escalate_to_human",
 }
 
-# НЕ-enum риски SKULL.SC* — контекстные строки. Назначаем действие
-# по смыслу строки, НЕ выводя из неё численный уровень. Значения —
-# инженерное решение демо-политики; при наличии явных указаний в
-# карточке/INTEGRATOR_TEMPLATE их следует заменить на предписанные.
+# NON-enum SKULL.SC* risks are contextual strings. The action is
+# assigned by the string meaning, NOT by deriving a numeric level.
+# Values are a demo-policy engineering decision; replace with the
+# prescribed ones if the card/INTEGRATOR_TEMPLATE specifies them.
 NON_ENUM_ACTION_MAP = {
-    "intensity-dependent": "queue_for_review",   # 💀💀💀 — зависит от тона
-    "combined idiom": "log_only",                # 💀😭 — устойчивая идиома
-    "epoch_mismatch": "queue_for_review",        # 💀☠️ — смешение эпох
-    "seasonal_context": "pass",                  # 💀🎃 — сезонный контекст
-    "spam-like": "hold_pending_review",          # 💀💀💀💀💀 — спам-паттерн
+    "intensity-dependent": "queue_for_review",   # 💀💀💀 — tone-dependent
+    "combined idiom": "log_only",                # 💀😭 — a stable idiom
+    "epoch_mismatch": "queue_for_review",        # 💀☠️ — epoch mixing
+    "seasonal_context": "pass",                  # 💀🎃 — seasonal context
+    "spam-like": "hold_pending_review",          # 💀💀💀💀💀 — a spam pattern
 }
 
-# приоритет действий для выбора самого строгого среди нескольких
+# action priority for picking the strictest among several
 _ACTION_SEVERITY = {
     "pass": 0,
     "log_only": 1,
@@ -89,9 +89,9 @@ def process_sequence_output(seq_out: SequenceOutput,
     non_enum_map = non_enum_map or NON_ENUM_ACTION_MAP
 
     # --- STAGE_1: INPUT_VALIDATION + CHECK_7 (PATCH_24) ---
-    # CHECK_UNAVAILABLE / отсутствие совпадений обрабатывается мягко:
-    # нет SEQUENCE_CANDIDATE_MATCH — это легитимный случай (одиночные
-    # знаки без последовательностей), не ошибка.
+    # CHECK_UNAVAILABLE / no matches is handled softly:
+    # no SEQUENCE_CANDIDATE_MATCH is a legitimate case (single signs
+    # without sequences), not an error.
     if seq_out.check_unavailable:
         return SequenceRuntimeDecision(
             runtime_action="pass",
@@ -115,7 +115,7 @@ def process_sequence_output(seq_out: SequenceOutput,
     rationale_parts = [f"enum_risk={enum_risk.value}"]
 
     for ner in non_enum_risks:
-        act = non_enum_map.get(ner, "queue_for_review")  # честный fallback
+        act = non_enum_map.get(ner, "queue_for_review")  # honest fallback
         candidate_actions.append(act)
         if ner not in non_enum_map:
             rationale_parts.append(f"non_enum[{ner}]=UNKNOWN->queue_for_review")

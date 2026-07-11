@@ -1,33 +1,33 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-unicode_sources_update.py — обновление Unicode-источников для MSL/MIP.
+unicode_sources_update.py — Unicode source updater for MSL/MIP.
 
-НАЗНАЧЕНИЕ (узкое, по AUTHOR_DECISION 2026-07-07):
-  Снять операционный долг ручного обновления справочников Unicode,
-  об который споткнулись оба конвейера (невидимые + цифры).
+PURPOSE (narrow, per AUTHOR_DECISION 2026-07-07):
+  Remove the operational debt of manual Unicode reference updates,
+  which both conveyors (invisibles + digits) stumbled over.
 
-ЧТО ДЕЛАЕТ:
-  1. Качает три канонических файла Unicode.
-  2. Кладёт в sources/<UNICODE_VERSION>/ (version pinning).
-  3. Сравнивает с текущей зафиксированной версией — показывает diff.
-  4. Готовит новое рядом со старым. НЕ применяет автоматически.
+WHAT IT DOES:
+  1. Downloads the three canonical Unicode files.
+  2. Puts them under sources/<UNICODE_VERSION>/ (version pinning).
+  3. Compares with the currently pinned version — shows a diff.
+  4. Stages the new next to the old. Does NOT apply automatically.
 
-ЧЕГО НЕ ДЕЛАЕТ (честная граница):
-  - НЕ присваивает знакам risk. Только тянет справочники.
-  - НЕ решает, принять ли новую версию — это AUTHOR_DECISION.
-  - НЕ валидирует критерий шума на корпусе (это отдельная, ручная
-    задача — скрипт снимает механику, не смысловую проверку).
-  - НЕ санитайзер и не анализатор. Это вспомогательный tooling.
+WHAT IT DOES NOT DO (honest boundary):
+  - does NOT assign risk to signs. Only fetches references.
+  - does NOT decide whether to accept the new version — AUTHOR_DECISION.
+  - does NOT validate the noise criterion on a corpus (a separate,
+    manual task — the script removes mechanics, not the semantic check).
+  - is NOT a sanitiser nor an analyser. Auxiliary tooling only.
 
-ДИСЦИПЛИНА:
-  flag-only для источников: показывает ЧТО изменилось, решение —
-  за автором (VERIFY_BEFORE_TRUST применён к самим справочникам).
+DISCIPLINE:
+  flag-only for sources: shows WHAT changed; the decision is the
+  author's (VERIFY_BEFORE_TRUST applied to the references themselves).
 
-ЗАПУСК:
-  py unicode_sources_update.py            — проверить и показать diff
-  py unicode_sources_update.py --apply    — зафиксировать как current
-  py unicode_sources_update.py --only dcp — только DerivedCoreProperties
+RUN:
+  py unicode_sources_update.py            — check and show the diff
+  py unicode_sources_update.py --apply    — pin as current
+  py unicode_sources_update.py --only dcp — DerivedCoreProperties only
 """
 
 import sys
@@ -38,12 +38,12 @@ import hashlib
 import urllib.request
 from datetime import datetime, timezone
 
-# ── Источники: первоисточник unicode.org, затем офиц. зеркало на GitHub ──
-# Оба канонические (второй — репозиторий Unicode Consortium).
+# ── Sources: unicode.org primary, then the official GitHub mirror ──
+# Both canonical (the second is the Unicode Consortium repository).
 SOURCES = {
     "dcp": {
         "name": "DerivedCoreProperties.txt",
-        "purpose": "Default_Ignorable и др. свойства (невидимые знаки)",
+        "purpose": "Default_Ignorable and other properties (invisible signs)",
         "urls": [
             "https://www.unicode.org/Public/UCD/latest/ucd/DerivedCoreProperties.txt",
             "https://raw.githubusercontent.com/unicode-org/unicodetools/main/unicodetools/data/ucd/dev/DerivedCoreProperties.txt",
@@ -51,7 +51,7 @@ SOURCES = {
     },
     "udata": {
         "name": "UnicodeData.txt",
-        "purpose": "категория/bidi/имя каждого кодпоинта (паспорт знака)",
+        "purpose": "category/bidi/name of every codepoint (sign passport)",
         "urls": [
             "https://www.unicode.org/Public/UCD/latest/ucd/UnicodeData.txt",
             "https://raw.githubusercontent.com/unicode-org/unicodetools/main/unicodetools/data/ucd/dev/UnicodeData.txt",
@@ -59,7 +59,7 @@ SOURCES = {
     },
     "confusables": {
         "name": "confusables.txt",
-        "purpose": "UTS#39 skeleton — гомоглифы (похожие знаки)",
+        "purpose": "UTS#39 skeleton — homoglyphs (similar signs)",
         "urls": [
             "https://www.unicode.org/Public/security/latest/confusables.txt",
             "https://raw.githubusercontent.com/unicode-org/unicodetools/main/unicodetools/data/security/dev/confusables.txt",
@@ -75,10 +75,10 @@ UA = "Mozilla/5.0 (MSL-MIP unicode_sources_update; +local tooling)"
 
 
 def _fetch(urls):
-    """Пробует адреса по порядку. Возвращает (text, url, idx).
-    idx=0 — первоисточник (unicode.org, стабильный релиз);
-    idx>0 — запасной адрес (напр. github-зеркало /dev/, где может
-    лежать ЧЕРНОВИК следующей версии, а не стабильный релиз)."""
+    """Tries the addresses in order. Returns (text, url, idx).
+    idx=0 — the primary (unicode.org, stable release);
+    idx>0 — a fallback address (e.g. the github /dev/ mirror, which
+    may hold a DRAFT of the next version, not a stable release)."""
     last = None
     for idx, u in enumerate(urls):
         try:
@@ -89,7 +89,7 @@ def _fetch(urls):
         except Exception as e:
             last = f"{type(e).__name__}: {str(e)[:80]}"
             continue
-    raise RuntimeError(f"все адреса недоступны, последняя ошибка: {last}")
+    raise RuntimeError(f"all addresses unavailable, last error: {last}")
 
 
 def _sha(text):
@@ -97,7 +97,7 @@ def _sha(text):
 
 
 def _parse_version(dcp_text):
-    """Вытаскивает версию Unicode из шапки файла (# DerivedCoreProperties-16.0.0.txt)."""
+    """Extracts the Unicode version from the file header (# DerivedCoreProperties-16.0.0.txt)."""
     m = re.search(r"-(\d+\.\d+\.\d+)\.txt", dcp_text[:500])
     if m:
         return m.group(1)
@@ -113,7 +113,7 @@ def _load_current():
 
 
 def _di_codepoints(dcp_text):
-    """Множество кодпоинтов с Default_Ignorable_Code_Point — ядро невидимого guard."""
+    """The set of Default_Ignorable_Code_Point codepoints — the invisible guard core."""
     di = set()
     for line in dcp_text.splitlines():
         line = line.split("#", 1)[0].strip()
@@ -134,7 +134,7 @@ def main():
     only = None
     for a in list(args):
         if a == "--only":
-            # следующий токен
+            # next token
             idx = sys.argv.index("--only")
             if idx + 1 < len(sys.argv):
                 only = sys.argv[idx + 1]
@@ -143,16 +143,16 @@ def main():
 
     print("=" * 60)
     print("UNICODE SOURCES UPDATE — MSL/MIP tooling")
-    print("режим:", "APPLY (зафиксировать)" if apply else "CHECK (только diff)")
+    print("mode:", "APPLY (pin)" if apply else "CHECK (diff only)")
     print("=" * 60)
 
     os.makedirs(SOURCES_DIR, exist_ok=True)
     current = _load_current()
     cur_ver = current.get("unicode_version") if current else None
     if cur_ver:
-        print(f"текущая зафиксированная версия: {cur_ver}")
+        print(f"currently pinned version: {cur_ver}")
     else:
-        print("текущая версия: НЕТ (первая загрузка)")
+        print("current version: NONE (first download)")
 
     fetched = {}
     new_version = None
@@ -163,36 +163,36 @@ def main():
         try:
             text, used, idx = _fetch(src["urls"])
         except Exception as e:
-            print(f"  ОШИБКА: {e}")
+            print(f"  ERROR: {e}")
             continue
         sha = _sha(text)
         host = used.split('/')[2]
-        print(f"  скачано: {len(text):,} симв | sha {sha} | via {host}")
+        print(f"  downloaded: {len(text):,} chars | sha {sha} | via {host}")
         if idx > 0:
             fallback_used = True
-            print(f"  ⚠️ ВНИМАНИЕ: первоисточник недоступен, взято с ЗАПАСНОГО")
-            print(f"     адреса ({host}). Это может быть ветка разработки")
-            print(f"     (/dev/) со ЧЕРНОВИКОМ следующей версии, а НЕ")
-            print(f"     стабильным релизом. Версию перепроверь вручную.")
+            print(f"  ⚠️ WARNING: the primary is unavailable, taken from a FALLBACK")
+            print(f"     address ({host}). It may be a development branch")
+            print(f"     (/dev/) with a DRAFT of the next version, NOT a")
+            print(f"     stable release. Re-check the version manually.")
         fetched[k] = {"text": text, "sha": sha, "name": src["name"],
                       "source_url": used, "is_fallback": idx > 0}
         if k == "dcp":
             new_version = _parse_version(text)
 
     if not fetched:
-        print("\nничего не скачано. проверь сеть.")
+        print("\nnothing downloaded. check the network.")
         return 1
 
     if new_version:
-        print(f"\nверсия Unicode из скачанного DerivedCoreProperties: {new_version}")
+        print(f"\nUnicode version from the downloaded DerivedCoreProperties: {new_version}")
 
-    # ── DIFF против текущей ──
+    # ── DIFF against current ──
     print("\n" + "=" * 60)
-    print("СРАВНЕНИЕ С ТЕКУЩЕЙ")
+    print("COMPARISON WITH CURRENT")
     print("=" * 60)
     changed = False
     if current is None:
-        print("baseline отсутствует — всё новое (первая фиксация).")
+        print("no baseline — everything is new (first pin).")
         changed = True
     else:
         old_sha = current.get("files", {})
@@ -200,51 +200,51 @@ def main():
             prev = old_sha.get(info["name"], {}).get("sha")
             if prev != info["sha"]:
                 changed = True
-                print(f"  ИЗМЕНИЛОСЬ: {info['name']}  {prev} -> {info['sha']}")
+                print(f"  CHANGED: {info['name']}  {prev} -> {info['sha']}")
             else:
-                print(f"  без изменений: {info['name']}")
+                print(f"  unchanged: {info['name']}")
         if new_version and cur_ver and new_version != cur_ver:
-            print(f"  ВЕРСИЯ Unicode: {cur_ver} -> {new_version}")
+            print(f"  Unicode VERSION: {cur_ver} -> {new_version}")
 
-    # содержательный diff для DI (что важно для невидимого guard)
+    # a substantive DI diff (what matters for the invisible guard)
     if "dcp" in fetched:
         new_di = _di_codepoints(fetched["dcp"]["text"])
-        print(f"\n  Default_Ignorable кодпоинтов сейчас: {len(new_di)}")
+        print(f"\n  Default_Ignorable codepoints now: {len(new_di)}")
         if current and current.get("di_count"):
             delta = len(new_di) - current["di_count"]
             if delta:
-                print(f"  ИЗМЕНЕНИЕ числа DI-кодпоинтов: {delta:+d} "
-                      f"(было {current['di_count']})")
-                print("  ⚠️ критерий шума невидимого guard мог измениться — "
-                      "нужна ручная валидация на корпусе")
+                print(f"  DI codepoint count CHANGE: {delta:+d} "
+                      f"(was {current['di_count']})")
+                print("  ⚠️ the invisible-guard noise criterion may have changed — "
+                      "manual corpus validation required")
 
-    # ── APPLY или остановка ──
+    # ── APPLY or stop ──
     if not changed:
-        print("\nВСЁ АКТУАЛЬНО. обновление не требуется.")
+        print("\nALL UP TO DATE. no update needed.")
         return 0
 
     if not apply:
         print("\n" + "=" * 60)
-        print("НАЙДЕНЫ ИЗМЕНЕНИЯ. НИЧЕГО НЕ ЗАФИКСИРОВАНО.")
-        print("Скрипт flag-only: решение принять — за автором.")
-        print("Чтобы зафиксировать: py unicode_sources_update.py --apply")
+        print("CHANGES FOUND. NOTHING PINNED.")
+        print("The script is flag-only: acceptance is the author decision.")
+        print("To pin: py unicode_sources_update.py --apply")
         print("=" * 60)
         return 0
 
-    # ЗАЩИТА: не фиксировать молча версию с ЗАПАСНОГО адреса.
-    # Запасной может быть /dev/ веткой с черновиком — это НЕ стабильный
-    # релиз. Требуем явного согласия автора (VERIFY_BEFORE_TRUST).
+    # GUARD: never silently pin a version from a FALLBACK address.
+    # The fallback may be a /dev/ branch with a draft — NOT a stable
+    # release. Explicit author consent required (VERIFY_BEFORE_TRUST).
     if fallback_used and "--allow-fallback" not in args:
         print("\n" + "=" * 60)
-        print("ФИКСАЦИЯ ОСТАНОВЛЕНА: часть файлов взята с ЗАПАСНОГО адреса.")
-        print("Это может быть ветка разработки (черновик след. версии),")
-        print("а не стабильный релиз Unicode. Молча фиксировать нельзя.")
-        print("Если осознанно принимаешь запасной источник:")
+        print("PINNING STOPPED: some files came from a FALLBACK address.")
+        print("It may be a development branch (a draft of the next version),")
+        print("not a stable Unicode release. Silent pinning is not allowed.")
+        print("If you knowingly accept the fallback source:")
         print("  py unicode_sources_update.py --apply --allow-fallback")
         print("=" * 60)
         return 2
 
-    # APPLY: сохранить в sources/<version>/ и обновить указатель
+    # APPLY: save under sources/<version>/ and update the pointer
     ver = new_version or datetime.now(timezone.utc).strftime("snapshot-%Y%m%d")
     vdir = os.path.join(SOURCES_DIR, ver)
     os.makedirs(vdir, exist_ok=True)
@@ -265,13 +265,13 @@ def main():
             "source_url": info.get("source_url"),
             "is_fallback": info.get("is_fallback", False),
         }
-        print(f"  сохранено: {os.path.relpath(path, ROOT)}")
+        print(f"  saved: {os.path.relpath(path, ROOT)}")
     with open(CURRENT_PTR, "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
-    print(f"\nЗАФИКСИРОВАНО как current: версия {ver}")
+    print(f"\nPINNED as current: version {ver}")
     if fallback_used:
-        print("⚠️ зафиксировано с ЗАПАСНОГО источника (см. манифест)")
-    print(f"указатель: {os.path.relpath(CURRENT_PTR, ROOT)}")
+        print("⚠️ pinned from a FALLBACK source (see the manifest)")
+    print(f"pointer: {os.path.relpath(CURRENT_PTR, ROOT)}")
     return 0
 
 

@@ -1,39 +1,39 @@
 # -*- coding: utf-8 -*-
 """
-Матчер для знака @ (U+0040, COMMERCIAL AT). ZONE_2, класс PH.
+Matcher for the @ sign (U+0040, COMMERCIAL AT). ZONE_2, class PH.
 
-Соответствует SIGN_CORE_CARD_AT_U0040_GEN3_v0_3_RU (WORKINGLY_CLOSED).
-Возвращает 3-tuple (safe_ids, risk_ids, interpretation) — как
-dot/solidus (структурный знак без культурных эпох).
+Matches SIGN_CORE_CARD_AT_U0040_GEN3_v0_3 (WORKINGLY_CLOSED).
+Returns a 3-tuple (safe_ids, risk_ids, interpretation) — like
+dot/solidus (a structural sign without cultural epochs).
 
-ГЛАВНЫЙ ПРИНЦИП (из карточки): @ в подавляющем большинстве ЛЕГИТИМЕН
-(email, mention, декоратор, ценник, федеративный handle). RISK ТОЛЬКО
-в URL-userinfo-контексте. Default НЕ "@ = угроза" (CG3).
+MAIN PRINCIPLE (from the card): @ is overwhelmingly LEGITIMATE
+(email, mention, decorator, price tag, federated handle). RISK ONLY
+in the URL-userinfo context. The default is NOT "@ = threat" (CG3).
 
-RISK-механика детерминирована ТОЛЬКО при наличии URL-схемы (PATCH_03,
-факт-аудит Alibaba/Copilot по WHATWG + RFC 3986): в http(s)://...@host
-хост = сегмент после ПОСЛЕДНЕГО @, всё до — userinfo. БЕЗ схемы строка
-paypal.com@evil.ru не даёт host=evil.ru (WHATWG: protocol='paypal.com:',
-host пустой) — поэтому без схемы это контекстная неоднозначность (Q1),
-не автоматический RISK.
+RISK mechanics are deterministic ONLY with a URL scheme (PATCH_03,
+Alibaba/Copilot fact audit per WHATWG + RFC 3986): in http(s)://...@host
+host = the segment after the LAST @, everything before is userinfo.
+Without a scheme, paypal.com@evil.ru does NOT give host=evil.ru
+(WHATWG: protocol='paypal.com:', host empty) — so without a scheme
+it is contextual ambiguity (Q1), not automatic RISK.
 
 MATCHER_PATCH_HISTORY:
-  создан 2026-07-06 под карточку @ (после конвейера 5/5 + 2 факт-аудита).
+  created 2026-07-06 for the @ card (after a 5/5 conveyor + 2 fact audits).
 """
 from __future__ import annotations
 import re
 
-# URL-схема перед @ — маркер URL-контекста (RISK-детерминизм только тут)
+# URL scheme before @ — marker of URL context (RISK determinism only here)
 _URL_SCHEME_RE = re.compile(r'(https?|ftp)://', re.IGNORECASE)
-# mailto — email-контекст, @ легитимен (SAFE, не URL-userinfo)
+# mailto — email context, @ is legitimate (SAFE, not URL-userinfo)
 _MAILTO_RE = re.compile(r'mailto:', re.IGNORECASE)
 
-# домен с TLD (для распознавания бренда в userinfo-позиции)
+# a domain with a TLD (to recognise a brand in userinfo position)
 _DOMAIN_RE = re.compile(r'[\w-]+\.[A-Za-z]{2,}')
-# IP-адрес как хост (RC2)
+# an IP address as host (RC2)
 _IP_RE = re.compile(r'\d{1,3}(?:\.\d{1,3}){3}')
 
-# декоратор в коде: @ в начале строки/после отступа перед идентификатором
+# a code decorator: @ at line start/after indent before an identifier
 _DECORATOR_RE = re.compile(r'(^|\n)\s*@[A-Za-z_]\w*')
 
 INTERPRETATION = {
@@ -52,8 +52,8 @@ INTERPRETATION = {
 
 
 def _url_context_around(text: str, offset: int):
-    """Извлекает URL-подобный токен, содержащий @ на позиции offset.
-    Токен = непрерывная последовательность без пробелов вокруг offset."""
+    """Extracts the URL-like token containing @ at the offset.
+    Token = the contiguous whitespace-free run around the offset."""
     start = offset
     while start > 0 and not text[start - 1].isspace():
         start -= 1
@@ -64,12 +64,12 @@ def _url_context_around(text: str, offset: int):
 
 
 def match(text: str, offset: int):
-    """Возвращает (safe_ids, risk_ids, interpretation).
-    @ на позиции offset. RISK только в URL-userinfo-контексте."""
+    """Returns (safe_ids, risk_ids, interpretation).
+    @ at the offset. RISK only in the URL-userinfo context."""
     safe, risk = [], []
 
-    # Проверка: по offset действительно @ (или fullwidth-эквивалент уже
-    # нормализован до @ на входе рантайма — см. NORMALIZATION_NOTE)
+    # Check: the offset really holds @ (or a fullwidth equivalent already
+    # normalised to @ at runtime input — see NORMALIZATION_NOTE)
     if offset < 0 or offset >= len(text) or text[offset] != "@":
         return [], [], None
 
@@ -79,71 +79,71 @@ def match(text: str, offset: int):
     has_scheme = bool(_URL_SCHEME_RE.search(token))
     is_mailto = bool(_MAILTO_RE.search(token))
 
-    # --- SAFE: mailto (email в mailto-схеме, не URL-userinfo) ---
+    # --- SAFE: mailto (email in the mailto scheme, not URL-userinfo) ---
     if is_mailto:
         safe.append("SAFE_CASE_005")
         return safe, risk, INTERPRETATION["SAFE_CASE_005"]
 
-    # --- RISK-ветка: ТОЛЬКО при URL-схеме (PATCH_03 детерминизм) ---
+    # --- RISK branch: ONLY with a URL scheme (PATCH_03 determinism) ---
     if has_scheme:
-        # часть токена после схемы
+        # the token part after the scheme
         after_scheme = _URL_SCHEME_RE.sub("", token)
         at_count = after_scheme.count("@")
-        # хост = после ПОСЛЕДНЕГО @ (WHATWG)
+        # host = after the LAST @ (WHATWG)
         last_at = after_scheme.rfind("@")
         userinfo = after_scheme[:last_at]
         host_part = after_scheme[last_at + 1:]
 
-        # RC3: множественные @ в URL — обфускация
+        # RC3: multiple @ in a URL — obfuscation
         if at_count >= 2:
             risk.append("RISK_CASE_003")
             return safe, risk, INTERPRETATION["RISK_CASE_003"]
 
-        # бренд-домен в userinfo (до @) — сигнал имитации
+        # a brand domain in userinfo (before @) — an imitation signal
         brand_in_userinfo = bool(_DOMAIN_RE.search(userinfo))
         host_is_ip = bool(_IP_RE.match(host_part))
         host_is_domain = bool(_DOMAIN_RE.match(host_part))
 
         if brand_in_userinfo and host_is_ip:
-            # RC2: бренд в userinfo + IP-хост
+            # RC2: brand in userinfo + IP host
             risk.append("RISK_CASE_002")
             return safe, risk, INTERPRETATION["RISK_CASE_002"]
         if brand_in_userinfo and host_is_domain:
-            # RC1: базовый userinfo-spoofing (бренд.tld @ другой-домен.tld)
+            # RC1: basic userinfo spoofing (brand.tld @ other-domain.tld)
             risk.append("RISK_CASE_001")
             return safe, risk, INTERPRETATION["RISK_CASE_001"]
-        # @ в URL, но userinfo без бренд-домена — легитимный userinfo
-        # (напр. user@host) — не спуфинг
+        # @ in a URL but userinfo without a brand domain — legitimate
+        # userinfo (e.g. user@host) — not spoofing
         safe.append("SAFE_CASE_001")
         return safe, risk, INTERPRETATION["SAFE_CASE_001"]
 
-    # --- БЕЗ схемы: контекстная неоднозначность (Q1) → SAFE-ветвление ---
-    # декоратор в коде
+    # --- NO scheme: contextual ambiguity (Q1) -> SAFE branching ---
+    # a code decorator
     if _DECORATOR_RE.search(text[max(0, offset - 40):offset + 40]):
         safe.append("SAFE_CASE_003")
         return safe, risk, INTERPRETATION["SAFE_CASE_003"]
 
-    # федеративный handle @user@domain (SAFE_CASE_007): два @ БЕЗ схемы
+    # federated handle @user@domain (SAFE_CASE_007): two @ with NO scheme
     if token.count("@") >= 2 and _DOMAIN_RE.search(token):
         safe.append("SAFE_CASE_007")
         return safe, risk, INTERPRETATION["SAFE_CASE_007"]
 
-    # email: слово@домен.tld без схемы, один @
+    # email: word@domain.tld without a scheme, single @
     if token.count("@") == 1 and _DOMAIN_RE.search(token[token.find("@"):]):
         safe.append("SAFE_CASE_001")
         return safe, risk, INTERPRETATION["SAFE_CASE_001"]
 
-    # ценник: @ рядом с цифрами/валютой ("10 шт @ 5$")
+    # price tag: @ next to digits/currency ("10 pcs @ 5$")
     around = text[max(0, offset - 10):offset + 10]
     if re.search(r'\d', around) and re.search(r'[$€£\d]', text[offset:offset + 10]):
         safe.append("SAFE_CASE_004")
         return safe, risk, INTERPRETATION["SAFE_CASE_004"]
 
-    # mention: @ перед словом-handle
+    # mention: @ before a handle word
     if offset + 1 < len(text) and (text[offset + 1].isalnum() or text[offset + 1] == "_"):
         safe.append("SAFE_CASE_002")
         return safe, risk, INTERPRETATION["SAFE_CASE_002"]
 
-    # дефолт: одиночный @ без контекста — DATA_ONLY, безопасно
+    # default: a lone @ with no context — DATA_ONLY, safe
     safe.append("SAFE_CASE_002")
     return safe, risk, INTERPRETATION["SAFE_CASE_002"]

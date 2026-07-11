@@ -1,22 +1,22 @@
 """
-Движок SEQUENCE_MODULE_TEMPLATE — STAGE_1-7.
+SEQUENCE_MODULE_TEMPLATE engine — STAGE_1-7.
 
-Реализует SEQUENCE_MODULE_TEMPLATE_GEN3_v0_2_PLUS_EPOCH_v0_1 с
-PATCH_24/25/26. Слой работает ПОВЕРХ результатов одиночных знаков
-(module_engine): берёт исходный текст + список OutputStatus от каждого
-обработанного знака, ищет среди известных SEQUENCE_CANDIDATES всех
-задействованных карт совпадения, идущие подряд в тексте.
+Implements SEQUENCE_MODULE_TEMPLATE_GEN3_v0_2_PLUS_EPOCH_v0_1 with
+PATCH_24/25/26. The layer works ON TOP of single-sign results
+(module_engine): takes the source text + the list of OutputStatus of
+every processed sign, and searches the known SEQUENCE_CANDIDATES of
+all involved cards for matches that are contiguous in the text.
 
-КЛЮЧЕВОЙ ПРИНЦИП adjacency (проверка смежности): кандидат считается
-сработавшим, только если его буквальная последовательность реально
-присутствует в тексте КАК НЕПРЕРЫВНАЯ подстрока. Это защищает от
-ложного "слипания" знаков, стоящих в разных концах текста (например,
-две точки в "конец. Начало." не образуют SEQUENCE '..', потому что
-между ними есть другие символы).
+KEY adjacency PRINCIPLE: a candidate only fires when its literal
+sequence is actually present in the text AS A CONTIGUOUS
+substring. This protects against false "gluing" of signs standing
+in different parts of the text (e.g. two dots in "end. Start." do
+not form SEQUENCE '..' because other characters sit between them).
 
-CROSS-CARD (PATCH_26): CANDIDATE_POOL — объединение SEQUENCE_CANDIDATES
-ВСЕХ карт из CARD_SET, а не одной. Это позволяет ловить межкарточные
-идиомы вроде '../' (точка+точка+солидус — кандидаты есть и у DOT, и у
+
+CROSS-CARD (PATCH_26): CANDIDATE_POOL is the union of the
+SEQUENCE_CANDIDATES of ALL CARD_SET cards, not one. This catches
+cross-card idioms like '../' (dot+dot+solidus — both DOT and
 SOLIDUS), '://' (SOLIDUS.SC7).
 """
 
@@ -27,27 +27,27 @@ from sequence_output import SequenceMatch, SequenceOutput
 
 
 def _build_candidate_pool(cards: list) -> list:
-    """STAGE_2/2a (PATCH_26): CANDIDATE_POOL = объединение
-    SEQUENCE_CANDIDATES всех карт. Каждый элемент — (candidate, card)."""
+    """STAGE_2/2a (PATCH_26): CANDIDATE_POOL = the union of all
+    cards' SEQUENCE_CANDIDATES. Each element is (candidate, card)."""
     pool = []
     for card in cards:
         for sc in card.sequence_candidates:
             pool.append((sc, card))
-    # сортируем по убыванию длины последовательности — более длинные
-    # (специфичные) кандидаты проверяются первыми, чтобы '../../../'
-    # имел приоритет над '..' на том же месте
+    # sort by decreasing sequence length — longer (more specific)
+    # candidates are checked first so that '../../../' takes
+    # priority over '..' at the same spot
     pool.sort(key=lambda pair: len(pair[0].sequence), reverse=True)
     return pool
 
 
 def _valid_scheme_before(text: str, colon_idx: int) -> bool:
-    """SOLIDUS_SCHEME_PATCH (CODE_REVIEW Q1 fix, 2026-07-07): проверяет,
-    что перед двоеточием на позиции colon_idx стоит ВАЛИДНАЯ схема URL по
+    """SOLIDUS_SCHEME_PATCH (CODE_REVIEW Q1 fix, 2026-07-07): checks
+    that a VALID URL scheme precedes the colon at colon_idx per
     RFC 3986 §3.1: scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." ).
-    То есть последовательность начинается с буквы и состоит из
-    букв/цифр/+/-/.  Отсекает ложное понижение "//" в псевдосхемах
-    (":://", где перед ":" нет буквы) — найдено code-review 6 ревьюерами.
-    Различитель "://" срабатывает только для настоящих схем."""
+    I.e. the sequence starts with a letter and consists of
+    letters/digits/+/-/. Cuts the false "//" downgrade in pseudo-schemes
+    ("::/", no letter before ":") — found by 6 code reviewers.
+    The "://" discriminator fires only for real schemes."""
     i = colon_idx - 1
     end = colon_idx
     while i >= 0 and (text[i].isalnum() or text[i] in "+-."):
@@ -61,44 +61,44 @@ def _find_literal_matches(text: str, pool: list,
                           card_signs: set = None,
                           strict: bool = False,
                           known_signs: set = None) -> list:
-    """STAGE_3-4: ищет непрерывные буквальные совпадения каждого
-    кандидата в тексте. adjacency обеспечивается тем, что str.find
-    ищет именно НЕПРЕРЫВНУЮ подстроку.
+    """STAGE_3-4: finds contiguous literal matches of every candidate
+    in the text. Adjacency is guaranteed because str.find looks for
+    a CONTIGUOUS substring.
 
-    ИСПРАВЛЕНО (раунд 2, 2026-06-29): прежнее "правило якоря"
-    (ведущий символ ОБЯЗАН быть знаком набора) было опровергнуто
-    контрпримером SOLIDUS.SC6 "*/" — ведущий "*" вне набора знаков,
-    но кандидат легитимен, если "/" провалидирован. Новое правило:
+    FIXED (round 2, 2026-06-29): the old "anchor rule" (the leading
+    character MUST be a set sign) was disproved by the SOLIDUS.SC6
+    "*/" counter-example — the leading "*" is outside the sign set,
+    yet the candidate is legitimate if "/" is validated. New rule:
 
-      (а) ВСЕ символы кандидата, которые являются знаками из CARD_SET
-          ИЛИ из known_signs (полного реестра знаков системы, см.
-          ниже), обязаны быть провалидированы;
-      (б) среди символов кандидата должен быть хотя бы ОДИН знак из
-          CARD_SET (защита от полностью "пустых" Ghost-совпадений);
-      (в) символы кандидата, которых нет ни в CARD_SET, ни в
-          known_signs (истинный контекст — 🎃/😭/☠️ у SKULL, "*" в
-          "*/", для которых в системе вообще нет SIGN_CORE_CARD),
-          валидации не требуют.
+      (a) ALL candidate characters that are signs from CARD_SET OR
+          from known_signs (the full system sign registry, see below)
+          must be validated;
+      (b) at least ONE candidate character must be a CARD_SET sign
+          (protection against fully "empty" Ghost matches);
+      (c) candidate characters absent from both CARD_SET and
+          known_signs (true context — 🎃/😭/☠️ for SKULL, "*" in "*/",
+          which have no SIGN_CORE_CARD in the system at all)
+          need no validation.
 
-    ИСПРАВЛЕНО (раунд 3, 2026-06-29, CARD_SET_COMPLETENESS, найдено
-    по итогам код-ревью): card_signs строится только из ПЕРЕДАННЫХ в
-    конкретный вызов карт. Если вызывающий код забыл передать DOT,
-    а кандидат SOLIDUS.SC3 "../" содержит точки — точки раньше
-    считались "внешним контекстом" (как звёздочка), хотя DOT-карточка
-    РЕАЛЬНО существует в системе, просто не была передана в ЭТОТ
-    вызов. Это давало Ghost-Matching через невнимательность вызывающего
-    кода, не через намеренный дизайн. known_signs — отдельный,
-    опциональный параметр: ПОЛНЫЙ реестр знаков, известных системе
-    (не только текущему CARD_SET). Если передан — символ из
-    known_signs ВСЕГДА требует валидации, даже если его карта не
-    входит в card_signs этого вызова. known_signs=None (по умолчанию)
-    — сохраняет прежнее поведение (без реестра, для изолированных
-    юнит-тестов одной карты).
+    FIXED (round 3, 2026-06-29, CARD_SET_COMPLETENESS, found in code
+    review): card_signs is built only from the cards PASSED to the
+    specific call. If the caller forgot to pass DOT while the
+    SOLIDUS.SC3 candidate "../" contains dots — the dots used to
+    count as "external context" (like the asterisk) although the DOT
+    card REALLY exists in the system, just was not passed to THIS
+    call. That produced Ghost-Matching via caller inattention, not
+    deliberate design. known_signs is a separate optional parameter:
+    the FULL registry of signs known to the system (not only the
+    current CARD_SET). When passed, a known_signs character ALWAYS
+    requires validation even if its card is not in this call's
+    card_signs. known_signs=None (default) keeps the old behaviour
+    (no registry, for isolated single-card unit tests).
+    
 
-    UPSTREAM_DEPENDENT (sc.scope) проверяется отдельно и безусловно
-    блокирует кандидат в strict-режиме — см. SOLIDUS.SC7 "://".
+    UPSTREAM_DEPENDENT (sc.scope) is checked separately and
+    unconditionally blocks the candidate in strict mode — SOLIDUS.SC7 "://".
 
-    strict=False: validated_offsets не переданы → текстовый режим."""
+    strict=False: validated_offsets not passed -> text mode."""
     matches = []
     claimed = []
     card_signs = card_signs or set()
@@ -108,9 +108,9 @@ def _find_literal_matches(text: str, pool: list,
         if validated_offsets is None:
             return not strict
         if sc.scope == "UPSTREAM_DEPENDENT":
-            # явная пометка из карточки: кандидат структурно зависит
-            # от символа вне системы знаков — в strict-режиме
-            # недостижим, пока для такого символа нет своей карточки
+            # an explicit card mark: the candidate structurally depends
+            # on a character outside the sign system — unreachable in
+            # strict mode until such a character gets its own card
             return False
         has_card_sign = False
         for pos in range(idx, end):
@@ -118,8 +118,8 @@ def _find_literal_matches(text: str, pool: list,
             if ch in card_signs:
                 has_card_sign = True
             if ch in registry:
-                # знак из CARD_SET ИЛИ из полного реестра системы —
-                # в обоих случаях обязан быть провалидирован
+                # a sign from CARD_SET OR the full system registry —
+                # must be validated in both cases
                 if pos not in validated_offsets:
                     return False
         return has_card_sign
@@ -136,23 +136,23 @@ def _find_literal_matches(text: str, pool: list,
             end = idx + len(seq)
             covered = any(c_start <= idx and end <= c_end for c_start, c_end in claimed)
             if not covered and _candidate_validated(sc, idx, end):
-                # ── SOLIDUS_SCHEME_PATCH (вариант «б», AUTHOR_DECISION 2026-07-07) ──
-                # Если "//" непосредственно предшествует ":" → это связка схемы
-                # URL ("://"), легитимная. CLARIFICATION_2: только "://" (с
-                # двоеточием) нейтрализуется; "//" без ":" остаётся под анализом
-                # с риском из карточки. CLARIFICATION_1: схема выставляет
-                # url_context_flag, который downstream может использовать ТОЛЬКО
-                # для повышения scrutiny, никогда для понижения риска.
+                # ── SOLIDUS_SCHEME_PATCH (variant "b", AUTHOR_DECISION 2026-07-07) ──
+                # If "//" immediately follows ":" it is the scheme link
+                # of a URL ("://"), legitimate. CLARIFICATION_2: only "://" (with
+                # the colon) is neutralised; "//" without ":" stays under analysis
+                # with the card risk. CLARIFICATION_1: the scheme sets
+                # url_context_flag, which downstream may use ONLY to raise
+                # scrutiny, never to lower risk.
                 eff_risk = sc.risk_level
                 url_ctx = False
                 scheme_neut = False
                 if seq == "//" and idx >= 2 and text[idx - 1] == ":" \
                         and _valid_scheme_before(text, idx - 1):
-                    eff_risk = RiskLevel.NONE  # enum, НЕ строка "NONE" —
-                    # RiskLevel.max()/order.index() требует член enum;
-                    # строка упала бы с ValueError при агрегации нескольких
-                    # sequence-матчей (CODE_REVIEW Q4, найдено 6 ревьюерами)
-                    url_ctx = True             # помечает URL-режим для @/точки
+                    eff_risk = RiskLevel.NONE  # an enum, NOT the string "NONE" —
+                    # RiskLevel.max()/order.index() requires an enum member;
+                    # a string would crash with ValueError when aggregating
+                    # several sequence matches (CODE_REVIEW Q4, found by 6 reviewers)
+                    url_ctx = True             # marks URL mode for @/dot
                     scheme_neut = True
                 matches.append(SequenceMatch(
                     sc_id=sc.sc_id,
@@ -172,10 +172,10 @@ def _find_literal_matches(text: str, pool: list,
 
 
 def _attach_source_offsets(matches: list, sign_statuses: list) -> None:
-    """PATCH_25: для каждого совпадения — какие одиночные знаки
-    (по их SIGN_OFFSET) попали в диапазон [match_start, match_end).
-    Заполняет source_sign_offsets реальными данными (SOURCE_SIGN_LIST),
-    что стало возможным благодаря PATCH_23 (offset в OutputStatus)."""
+    """PATCH_25: per match — which single signs (by their
+    SIGN_OFFSET) fell into [match_start, match_end).
+    Fills source_sign_offsets with real data (SOURCE_SIGN_LIST),
+    made possible by PATCH_23 (offset in OutputStatus)."""
     for m in matches:
         for st in sign_statuses:
             if m.match_start <= st.sign_offset_start < m.match_end:
@@ -213,7 +213,7 @@ def _detect_context_at(text: str, offset: int) -> str:
 
 
 _SCOPE_RISK = {
-    "HOST": RiskLevel.HIGH,     # host-подмена — главный кейс
+    "HOST": RiskLevel.HIGH,     # host substitution — the main case
     "URL": RiskLevel.MEDIUM,
     "PATH": RiskLevel.MEDIUM,
     "FREE_TEXT": RiskLevel.NONE,
@@ -270,27 +270,27 @@ def _assess_relation_risk(text: str, sign_statuses: list) -> list:
 def process_sequence(text: str, cards: list,
                      sign_statuses: list = None,
                      known_signs: set = None) -> SequenceOutput:
-    """Полный STAGE_1-7 sequence-слоя.
+    """The full STAGE_1-7 of the sequence layer.
 
-    text          — исходный текст (тот же, что подавался в module_engine)
-    cards          — список SignCoreCard, реально задействованных
-                     (CARD_SET, PATCH_26); обычно те карты, чьи знаки
-                     присутствуют в тексте
-    sign_statuses  — список OutputStatus от module_engine (для
-                     SOURCE_SIGN_LIST); опционально
-    known_signs    — ПОЛНЫЙ реестр visible_form всех SIGN_CORE_CARD,
-                     известных системе (не только переданных в cards).
-                     Закрывает CARD_SET_COMPLETENESS пробел (найдено
-                     по итогам код-ревью, 2026-06-29): без этого
-                     параметра, если вызывающий код передал неполный
-                     CARD_SET (например, забыл DOT), точки в
-                     SOLIDUS.SC3 "../" ошибочно считались "внешним
-                     контекстом" и матчились без валидации. В
-                     production-рантайме (msl_mip_runtime.py) сюда
-                     следует передавать registry со ВСЕХ загруженных
-                     карт системы, а не только cards этого вызова.
-                     По умолчанию None — для изолированных юнит-тестов
-                     одной карты, сохраняет прежнее поведение.
+    text          — the source text (same as fed to module_engine)
+    cards          — the SignCoreCards actually involved
+                     (CARD_SET, PATCH_26); usually the cards whose signs
+                     are present in the text
+    sign_statuses  — the OutputStatus list from module_engine (for
+                     SOURCE_SIGN_LIST); optional
+    known_signs    — the FULL registry of visible_forms of all
+                     SIGN_CORE_CARDs known to the system (not just cards).
+                     Closes the CARD_SET_COMPLETENESS gap (found in
+                     code review, 2026-06-29): without this parameter,
+                     if the caller passed an incomplete CARD_SET
+                     (e.g. forgot DOT), the dots in SOLIDUS.SC3 "../"
+                     were wrongly treated as "external context" and
+                     matched without validation. In the production
+                     runtime (msl_mip_runtime.py) pass the registry
+                     of ALL loaded system cards here, not only this
+                     call's cards.
+                     Default None — for isolated single-card unit
+                     tests, keeps the old behaviour.
     """
     sign_statuses = sign_statuses or []
 
@@ -305,13 +305,13 @@ def process_sequence(text: str, cards: list,
     # --- STAGE_2: CARD_SET_DETERMINATION (PATCH_26) ---
     card_set = [c.codepoint for c in cards]
 
-    # ИСПРАВЛЕНО (найдено по итогам код-ревью, 2026-06-29, Grok):
-    # раньше sequence-слой не проверял document_status карт в
-    # CARD_SET вообще — WORKING_DRAFT карточка участвовала в поиске
-    # последовательностей молча, без какого-либо сигнала о том, что
-    # результат для неё ненадёжен (в отличие от module_engine, где
-    # такое предупреждение обязательно). Теперь sequence-слой тоже
-    # честно предупреждает, не блокируя работу.
+    # FIXED (found in code review, 2026-06-29, Grok): the
+    # sequence layer used not to check card document_status in
+    # CARD_SET at all — a WORKING_DRAFT card silently participated
+    # in sequence search with no signal that its result is
+    # unreliable (unlike module_engine, where such a warning is
+    # mandatory). The sequence layer now warns honestly too,
+    # without blocking.
     _CONFIRMED_STATUSES = {"WORKINGLY_CLOSED", "ARTIFACT_CONFIRMED"}
     draft_cards = [
         c for c in cards
@@ -319,8 +319,8 @@ def process_sequence(text: str, cards: list,
     ]
     draft_warnings = [
         f"CARD_NOT_CONVEYOR_REVIEWED: {c.card_uid or c.codepoint} "
-        f"(status={c.document_status}) реально встретился в тексте — "
-        f"результаты для последовательностей с этим знаком ненадёжны"
+        f"(status={c.document_status}) actually occurs in the text — "
+        f"sequence results involving this sign are unreliable"
         for c in draft_cards
     ]
 
@@ -336,11 +336,11 @@ def process_sequence(text: str, cards: list,
                               warnings=["EMPTY_CANDIDATE_POOL"],
                               relation_verdicts=relation_verdicts)
 
-    # Множество позиций, реально прошедших single-sign валидацию.
-    # Каждый OutputStatus покрывает [sign_offset_start, sign_offset_end).
-    # Если статусы предоставлены — включаем strict-валидацию совпадений
-    # (Ghost Matching fix): кандидат принимается, только если все его
-    # позиции провалидированы. Если статусов нет — текстовый режим.
+    # The set of positions that actually passed single-sign validation.
+    # Each OutputStatus covers [sign_offset_start, sign_offset_end).
+    # When statuses are provided, strict match validation is on
+    # (Ghost Matching fix): a candidate is accepted only when all its
+    # positions are validated. No statuses -> text mode.
     validated_offsets = None
     strict = False
     if sign_statuses:
@@ -362,16 +362,16 @@ def process_sequence(text: str, cards: list,
     # --- STAGE_6: MULTIPLE_MATCHES (PATCH_26) ---
     multiple = len(matches) > 1
 
-    # ИСПРАВЛЕНО (найдено по итогам код-ревью, 2026-06-29, GPT-5.5):
-    # проверка "visible_form карты в тексте" пропускает редкий, но
-    # реальный случай — WORKING_DRAFT карта объявляет SEQUENCE_
-    # CANDIDATE, который сам НЕ содержит visible_form этой карты
-    # (например, гипотетическая карта объявляет кандидат "://" без
-    # собственного знака внутри него). Такое совпадение реально
-    # сработает, но предупреждение по проверке "visible_form in text"
-    # не появится. Вторая, независимая проверка: если совпадение
-    # пришло от непроверенной карты — предупреждение обязано
-    # появиться, независимо от первой проверки.
+    # FIXED (found in code review, 2026-06-29, GPT-5.5): the
+    # "card visible_form in text" check misses a rare but real
+    # case — a WORKING_DRAFT card declares a SEQUENCE_CANDIDATE
+    # that does NOT contain that card's visible_form (e.g. a
+    # hypothetical card declares the "://" candidate without its
+    # own sign inside). Such a match will really fire, but the
+    # "visible_form in text" warning will not appear. A second,
+    # independent check: if the match came from an unreviewed
+    # card, the warning must appear regardless of the first
+    # check.
     draft_codepoints = {c.codepoint for c in cards
                         if c.document_status not in _CONFIRMED_STATUSES}
     matched_draft = {m.candidate_source_card for m in matches
@@ -380,8 +380,8 @@ def process_sequence(text: str, cards: list,
     for cp in matched_draft - already_warned:
         draft_warnings.append(
             f"CARD_NOT_CONVEYOR_REVIEWED_MATCHED_SEQUENCE_SOURCE: "
-            f"{cp} — непроверенная карта стала источником совпадения "
-            f"в SEQUENCE, хотя её visible_form не найден в тексте напрямую"
+            f"{cp} — an unreviewed card became a match source "
+            f"in SEQUENCE although its visible_form is not directly in the text"
         )
 
     # --- STAGE_7: OUTPUT_ASSEMBLY ---
@@ -391,7 +391,7 @@ def process_sequence(text: str, cards: list,
         matches=matches,
         multiple_matches=multiple,
         source_sign_list=source_sign_list,
-        source_occurrence_list="NOT_AVAILABLE",  # честный стаб (PATCH_25)
+        source_occurrence_list="NOT_AVAILABLE",  # honest stub (PATCH_25)
         check_unavailable=False,
         warnings=draft_warnings,
         relation_verdicts=relation_verdicts,

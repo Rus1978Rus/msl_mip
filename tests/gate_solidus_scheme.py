@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-SIMULATION_GATE для SOLIDUS_SCHEME_PATCH — постоянный набор.
-Расширен по SIMULATION_GATE_REVIEW (6 ревьюеров, NEEDS_MORE_TESTS,
-2026-07-07): добавлены классы краевых случаев (регистр схемы, схема с
-+/-/., тройной слэш, невалидная схема, граница idx, комбинации,
-класс "не падает").
+SIMULATION_GATE for SOLIDUS_SCHEME_PATCH — the permanent suite.
+Extended per SIMULATION_GATE_REVIEW (6 reviewers, NEEDS_MORE_TESTS,
+2026-07-07): edge-case classes added (scheme case, schemes with
++/-/., triple slash, invalid scheme, idx boundary, combinations,
+the "does not crash" class).
 
-Запуск: python3 gate_solidus_scheme.py
+Run: python3 gate_solidus_scheme.py
 """
 import subprocess, sys, os
 
-# кросс-платформенный запуск: рантайм выводит UTF-8 (кириллица в interp,
-# эмодзи ☠), но Windows по умолчанию декодирует subprocess в cp1251 →
-# вердикт не находится в битой строке. Форсируем UTF-8 всюду.
+# cross-platform run: the runtime prints UTF-8 (Cyrillic in interp,
+# emoji ☠), but Windows decodes subprocess as cp1251 by default ->
+# the verdict is not found in a mangled string. Force UTF-8 everywhere.
 _ENV = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
 
 def _run(text):
@@ -23,40 +23,40 @@ def _run(text):
         encoding="utf-8", errors="replace", env=_ENV,
     )
 
-# (вход, ожидаемый_вердикт, комментарий)
-# вердикт: PASS | HOLD  (HOLD = HOLD_PENDING_REVIEW)
+# (input, expected_verdict, comment)
+# verdict: PASS | HOLD  (HOLD = HOLD_PENDING_REVIEW)
 CASES = [
-    # --- базовые: цель патча (шум схемы убран) ---
-    ("http://example.com/page", "PASS", "чистый URL — шум // убран"),
-    ("https://github.com/user/repo", "PASS", "https чистый"),
-    ("ftp://server/file", "PASS", "ftp схема"),
-    # --- @ различитель не сломан ---
-    ("http://paypal.com@evil.ru", "HOLD", "фишинг @ со схемой"),
-    ("подпишись на @user@mastodon.social", "PASS", "федеративный handle"),
-    ("ivan@example.com", "PASS", "обычная почта"),
+    # --- basic: patch goal (scheme noise removed) ---
+    ("http://example.com/page", "PASS", "clean URL — // noise removed"),
+    ("https://github.com/user/repo", "PASS", "clean https"),
+    ("ftp://server/file", "PASS", "ftp scheme"),
+    # --- the @ discriminator is not broken ---
+    ("http://paypal.com@evil.ru", "HOLD", "@ phishing with a scheme"),
+    ("подпишись на @user@mastodon.social", "PASS", "federated handle"),
+    ("ivan@example.com", "PASS", "ordinary email"),
     ("https://secure-paypal.com@192.168.1.5/verify", "HOLD", "brand+IP @"),
-    ("http://evil.ru@paypal.com", "HOLD", "@ HIGH — флаг НЕ понизил соседа"),
-    # --- // без валидной схемы = HIGH (path-traversal сохранён) ---
-    ("a//b", "HOLD", "// без схемы = HIGH"),
-    (":://evil.com", "HOLD", "Q1: псевдосхема (нет буквы) НЕ понижена"),
-    ("://evil.com", "HOLD", "':// в начале — idx граница, не падает, HIGH"),
-    ("1http://example", "HOLD", "схема с цифры невалидна (RFC) → HIGH"),
-    # --- Q4: enum-агрегация, множественные // не падают ---
-    ("http://a//b", "HOLD", "Q4: схема // + path // — enum max без краха"),
-    ("http:///path", "HOLD", "тройной слэш — второй // без схемы HIGH"),
-    # --- регистр и спецсимволы схемы (RFC 3986 §3.1) ---
-    ("HTTP://evil.com", "PASS", "схема верхний регистр (case-insensitive)"),
-    ("HtTp://evil.com", "PASS", "смешанный регистр схемы"),
-    ("coap+tcp://host/path", "PASS", "схема с '+' валидна"),
-    ("view-source://example", "PASS", "схема с '-' валидна"),
-    # --- комбинации @ + точка + // ---
-    ("http://paypal.com.security-check.ru/verify", "HOLD", "схема + точка-подмена"),
-    ("paypal.com.security-check.ru/verify", "HOLD", "точка-подмена без схемы (регрессия)"),
-    # --- контроль: другие знаки целы ---
-    ("я тебя отравлю ☠", "HOLD", "☠ угроза — контроль"),
+    ("http://evil.ru@paypal.com", "HOLD", "@ HIGH — the flag did NOT lower the neighbour"),
+    # --- // without a valid scheme = HIGH (path traversal kept) ---
+    ("a//b", "HOLD", "// without a scheme = HIGH"),
+    (":://evil.com", "HOLD", "Q1: pseudo-scheme (no letter) NOT lowered"),
+    ("://evil.com", "HOLD", "':// at start — idx boundary, no crash, HIGH"),
+    ("1http://example", "HOLD", "a scheme starting with a digit is invalid (RFC) -> HIGH"),
+    # --- Q4: enum aggregation, multiple // do not crash ---
+    ("http://a//b", "HOLD", "Q4: scheme // + path // — enum max without a crash"),
+    ("http:///path", "HOLD", "triple slash — the second // without a scheme HIGH"),
+    # --- scheme case and special characters (RFC 3986 §3.1) ---
+    ("HTTP://evil.com", "PASS", "uppercase scheme (case-insensitive)"),
+    ("HtTp://evil.com", "PASS", "mixed-case scheme"),
+    ("coap+tcp://host/path", "PASS", "a scheme with '+' is valid"),
+    ("view-source://example", "PASS", "a scheme with '-' is valid"),
+    # --- combinations of @ + dot + // ---
+    ("http://paypal.com.security-check.ru/verify", "HOLD", "scheme + dot substitution"),
+    ("paypal.com.security-check.ru/verify", "HOLD", "dot substitution without a scheme (regression)"),
+    # --- control: other signs intact ---
+    ("я тебя отравлю ☠", "HOLD", "☠ threat — control"),
 ]
 
-# класс "не падает" (Q4) — только проверка отсутствия исключений
+# the "does not crash" class (Q4) — exception absence only
 NO_CRASH = ["http://a//b//c", "scheme://///", ":////", "http://a//b//c//d",
             "://", "//", ":"]
 
@@ -75,21 +75,21 @@ def main():
         mark = "✓" if got == exp else "✗"
         if got == exp: ok += 1
         print(f"  {mark} [{got:4}/{exp:4}] {note}")
-    print(f"\n  вердикты: {ok}/{len(CASES)}")
+    print(f"\n  verdicts: {ok}/{len(CASES)}")
 
-    print("\n=== класс 'не падает' (Q4) ===")
+    print("\n=== the 'does not crash' class (Q4) ===")
     nc_ok = 0
     for text in NO_CRASH:
         r = _run(text)
         crash = "Traceback" in r.stderr or "Error" in r.stderr
-        mark = "✓" if not crash else "✗ КРАШ"
+        mark = "✓" if not crash else "✗ CRASH"
         if not crash: nc_ok += 1
         print(f"  {mark} {text!r}")
-    print(f"\n  без краха: {nc_ok}/{len(NO_CRASH)}")
+    print(f"\n  no crashes: {nc_ok}/{len(NO_CRASH)}")
 
     total = ok + nc_ok
     grand = len(CASES) + len(NO_CRASH)
-    print(f"\n=== ИТОГО: {total}/{grand} ===")
+    print(f"\n=== TOTAL: {total}/{grand} ===")
     sys.exit(0 if total == grand else 1)
 
 if __name__ == "__main__":

@@ -1,19 +1,19 @@
 """
-Движок INTEGRATOR_TEMPLATE (одиночный знак).
+INTEGRATOR_TEMPLATE engine (single sign).
 
-ОГОВОРКА: реализовано по общей архитектуре, подтверждённой на
-SEQUENCE_INTEGRATOR_TEMPLATE в этом же проекте (демо-политика
-ACTION_MAP: NONE/LOW/MEDIUM/HIGH/CRITICAL → конкретное runtime-
-действие), а не как буквальная копия текста INTEGRATOR_TEMPLATE_
-SINGLE_SIGN — этот документ я помню менее точно, чем MODULE_TEMPLATE.
-Если у автора есть точный текст документа — логику можно поправить
-под него позже, интерфейс (вход/выход) для этого не изменится.
+CAVEAT: implemented after the general architecture confirmed on
+SEQUENCE_INTEGRATOR_TEMPLATE in this project (demo policy
+ACTION_MAP: NONE/LOW/MEDIUM/HIGH/CRITICAL -> a concrete runtime
+action), not as a literal copy of the INTEGRATOR_TEMPLATE_
+SINGLE_SIGN document, which is remembered less precisely.
+If the author has the exact document text, the logic can be adjusted
+later; the interface (input/output) will not change.
 
-Принцип (MODULE_MUST_NOT_BLOCK_DIRECTLY): MODULE_TEMPLATE сам не
-решает, "блокировать" или нет — он только классифицирует риск и
-даёт RECOMMENDED_ACTION как совет. Конкретное runtime-решение —
-исключительно работа интегратора, на основе ПОЛИТИКИ, не встроенной
-в сам знак.
+Principle (MODULE_MUST_NOT_BLOCK_DIRECTLY): MODULE_TEMPLATE does not
+decide "block or not" — it only classifies risk and offers
+RECOMMENDED_ACTION as advice. The concrete runtime decision is
+exclusively the integrator job, based on a POLICY not baked into
+the sign itself.
 """
 
 from __future__ import annotations
@@ -24,8 +24,8 @@ from sign_core_card import RiskLevel
 from output_status import OutputStatus
 
 
-# Демо-политика, по аналогии с уже подтверждённой
-# SEQUENCE_INTEGRATOR_POLICY (см. SEQUENCE_PIPELINE_*_RUN раунды)
+# Demo policy, by analogy with the already confirmed
+# SEQUENCE_INTEGRATOR_POLICY (see SEQUENCE_PIPELINE_*_RUN rounds)
 DEFAULT_ACTION_MAP = {
     RiskLevel.NONE: "pass",
     RiskLevel.LOW: "log_only",
@@ -59,12 +59,12 @@ class RuntimeActionRequest:
 
 def process_output(status: OutputStatus,
                     action_map: dict = None) -> RuntimeActionRequest:
-    """STAGE_1 (валидация входа) + STAGE_2 (выбор действия по политике)
-    + STAGE_3 (сборка RUNTIME_ACTION_REQUEST)."""
+    """STAGE_1 (input validation) + STAGE_2 (policy action selection)
+    + STAGE_3 (RUNTIME_ACTION_REQUEST assembly)."""
 
     action_map = action_map or DEFAULT_ACTION_MAP
 
-    # STAGE_1: INPUT_VALIDATION — OUTPUT_STATUS должен быть валиден
+    # STAGE_1: INPUT_VALIDATION — OUTPUT_STATUS must be valid
     if status.effect_fields_status != "VALID":
         raise ValueError(
             f"INTEGRATOR_INPUT_INVALID: EFFECT_FIELDS_STATUS={status.effect_fields_status}"
@@ -81,9 +81,9 @@ def process_output(status: OutputStatus,
     if status.ambiguity_flag:
         rationale_parts.append("ambiguity_flag=YES")
 
-    # AMBIGUITY: если контекст неоднозначен (AMBIGUITY_FLAG=YES),
-    # действие не понижается ниже queue_for_review, даже если
-    # RISK_LEVEL сам по себе NONE/LOW (advisory escalation)
+    # AMBIGUITY: when context is ambiguous (AMBIGUITY_FLAG=YES),
+    # the action is not lowered below queue_for_review even if
+    # RISK_LEVEL alone is NONE/LOW (advisory escalation)
     final_action = base_action
     if status.ambiguity_flag and base_action in ("pass", "log_only"):
         final_action = "queue_for_review"

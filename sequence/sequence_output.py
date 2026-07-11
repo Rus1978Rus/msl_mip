@@ -1,19 +1,19 @@
 """
-Структуры результата SEQUENCE_MODULE_TEMPLATE.
+Result structures of SEQUENCE_MODULE_TEMPLATE.
 
-Отражает OUTPUT_INTERFACE из SEQUENCE_MODULE_TEMPLATE_GEN3_v0_2_PLUS_
-EPOCH_v0_1 с применёнными PATCH_24/25/26:
-  - PATCH_24: SEQUENCE_CANDIDATE_MATCH (мост одиночный→sequence)
-  - PATCH_25: SOURCE_SIGN_LIST (реальные данные) + SOURCE_OCCURRENCE_
-    LIST (честный стаб NOT_AVAILABLE до полной реализации позиций)
-  - PATCH_26: CROSS_CARD — CARD_SET, CANDIDATE_POOL (объединение),
+Mirrors OUTPUT_INTERFACE from SEQUENCE_MODULE_TEMPLATE_GEN3_v0_2_PLUS_
+EPOCH_v0_1 with PATCH_24/25/26 applied:
+  - PATCH_24: SEQUENCE_CANDIDATE_MATCH (single->sequence bridge)
+  - PATCH_25: SOURCE_SIGN_LIST (real data) + SOURCE_OCCURRENCE_
+    LIST (honest NOT_AVAILABLE stub until positions are fully done)
+  - PATCH_26: CROSS_CARD — CARD_SET, CANDIDATE_POOL (union),
     MULTIPLE_MATCHES, CANDIDATE_SOURCE_CARD
 
-ВАЖНО (ENUM_GUARD / RULE_3A): risk_level кандидата может быть как
-RiskLevel (enum), так и описательной строкой (у SKULL ВСЕ SC имеют
-строковый risk: 'intensity-dependent', 'combined idiom' и т.п.).
-Агрегатор НЕ имеет права слепо сравнивать/максимизировать смесь
-enum и строк — см. SequenceOutput.aggregate_risk.
+IMPORTANT (ENUM_GUARD / RULE_3A): a candidate risk_level may be
+either a RiskLevel (enum) or a descriptive string (ALL SKULL SCs
+carry string risks: 'intensity-dependent', 'combined idiom' etc.).
+The aggregator must NOT blindly compare/maximise a mix of enums
+and strings — see SequenceOutput.aggregate_risk.
 """
 
 from __future__ import annotations
@@ -24,20 +24,20 @@ from sign_core_card import RiskLevel
 
 @dataclass
 class SequenceMatch:
-    """Одно сработавшее совпадение SEQUENCE_CANDIDATE в тексте."""
+    """One fired SEQUENCE_CANDIDATE match in the text."""
     sc_id: str
     sequence: str
     name: str
     risk_level: object              # RiskLevel | str (ENUM_GUARD!)
-    candidate_source_card: str      # CODEPOINT карты-владельца (PATCH_26)
-    match_start: int                # позиция начала совпадения в тексте
-    match_end: int                  # позиция конца (эксклюзивно)
+    candidate_source_card: str      # owner card CODEPOINT (PATCH_26)
+    match_start: int                # match start position in the text
+    match_end: int                  # end position (exclusive)
     source_sign_offsets: list = field(default_factory=list)  # PATCH_25
-    url_context_flag: bool = False  # SOLIDUS_SCHEME_PATCH: "://" помечает URL-режим.
-                                    # Флаг только ПОВЫШАЕТ scrutiny downstream,
-                                    # НИКОГДА не понижает риск (CLARIFICATION_1).
-    scheme_neutralized: bool = False  # True если "//" был частью "://" схемы и
-                                      # риск понижен до NONE как легитимная связка
+    url_context_flag: bool = False  # SOLIDUS_SCHEME_PATCH: "://" marks URL mode.
+                                    # The flag only RAISES downstream scrutiny,
+                                    # NEVER lowers risk (CLARIFICATION_1).
+    scheme_neutralized: bool = False  # True if "//" was part of a "://" scheme and
+                                      # risk was lowered to NONE as a legitimate link
 
     @property
     def risk_is_enum(self) -> bool:
@@ -62,26 +62,26 @@ class SequenceMatch:
 
 @dataclass
 class SequenceOutput:
-    """SEQUENCE_OUTPUT_STATUS — результат всего STAGE_1-7 sequence-слоя."""
+    """SEQUENCE_OUTPUT_STATUS — the result of the whole sequence STAGE_1-7."""
     card_set: list = field(default_factory=list)        # PATCH_26: CODEPOINTs
     matches: list = field(default_factory=list)          # list[SequenceMatch]
     multiple_matches: bool = False                       # PATCH_26
-    source_sign_list: list = field(default_factory=list) # PATCH_25 (реальные)
-    source_occurrence_list: str = "NOT_AVAILABLE"        # PATCH_25 (честный стаб)
+    source_sign_list: list = field(default_factory=list) # PATCH_25 (real)
+    source_occurrence_list: str = "NOT_AVAILABLE"        # PATCH_25 (honest stub)
     check_unavailable: bool = False                      # PATCH_24 CHECK_UNAVAILABLE
     warnings: list = field(default_factory=list)
     relation_verdicts: list = field(default_factory=list)  # step 4 of the relation axis: mask verdicts (D-REL-4/6)
 
     def aggregate_risk(self):
-        """Агрегированный риск sequence-слоя.
+        """Aggregated sequence-layer risk.
 
-        ENUM_GUARD (RULE_3A): берём max ТОЛЬКО по тем совпадениям, чей
-        risk_level — реальный enum. Описательные строки ('intensity-
-        dependent' и т.п.) НЕ участвуют в численной максимизации —
-        они возвращаются отдельным списком non_enum_risks для
-        интегратора, который решает по политике, а не сравнением.
+        ENUM_GUARD (RULE_3A): max is taken ONLY over matches whose
+        risk_level is a real enum. Descriptive strings ('intensity-
+        dependent' etc.) do NOT join numeric maximisation — they are
+        returned as a separate non_enum_risks list for the integrator,
+        which decides by policy, not comparison.
 
-        Возвращает (enum_risk: RiskLevel, non_enum_risks: list[str])."""
+        Returns (enum_risk: RiskLevel, non_enum_risks: list[str])."""
         enum_levels = []
         non_enum = []
         for m in self.matches:

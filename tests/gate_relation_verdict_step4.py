@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-GATE: шаг 4 оси «отношение» — вердикт маски в sequence-слое.
+GATE: relation-axis step 4 — mask verdict in the sequence layer.
 
-Основание: AUTHOR_DECISION_20260708 (D-REL-4/6) + решения ревью шага 4:
-  D1 — шкала: HOST→HIGH, URL/PATH→MEDIUM, FREE_TEXT→NONE;
-       CANDIDATE-ребро понижает на ступень.
-  D2 — грубый HOST-детектор (главный кейс gоog／le.com).
-  D3 — зонд отложен: canon_hypothesis остаётся None.
-  Барьер N3 — вердикт только по active_relation_candidates;
-              выключенные рёбра НЕ влияют.
+Basis: AUTHOR_DECISION_20260708 (D-REL-4/6) + step-4 review decisions:
+  D1 — scale: HOST->HIGH, URL/PATH->MEDIUM, FREE_TEXT->NONE;
+       a CANDIDATE edge downgrades one step.
+  D2 — rough HOST detector (main gоog／le.com case).
+  D3 — probe deferred: canon_hypothesis stays None.
+  Barrier N3 — verdict only from active_relation_candidates;
+              disabled edges have NO effect.
 
-Проверяется вживую через process_sign + process_sequence.
+Verified live via process_sign + process_sequence.
 """
 
 import os
@@ -109,65 +109,65 @@ SIGN_RELATIONS:
 """
 
 print("=" * 60)
-print("GATE: шаг 4 — вердикт маски (ось «отношение»)")
+print("GATE: step 4 — mask verdict (relation axis)")
 print("=" * 60)
 
-# --- 1. Шкала риска по контексту (D1) ---
-print("\n[1] Шкала риска по контексту (VERIFIED ребро)")
+# --- 1. Risk scale by context (D1) ---
+print("\n[1] Risk scale by context (VERIFIED edge)")
 v = _card(VERIFIED_CARD)
 
 vd = _verdict(v, "http://gоog／le.com")
-check("HOST → HIGH", vd and vd[0]["risk_level"] == "HIGH", vd)
-check("HOST → detected_context=HOST", vd and vd[0]["detected_context"] == "HOST")
+check("HOST -> HIGH", vd and vd[0]["risk_level"] == "HIGH", vd)
+check("HOST -> detected_context=HOST", vd and vd[0]["detected_context"] == "HOST")
 
 vd = _verdict(v, "http://ok.com/a／b")
-check("PATH → MEDIUM", vd and vd[0]["risk_level"] == "MEDIUM", vd)
+check("PATH -> MEDIUM", vd and vd[0]["risk_level"] == "MEDIUM", vd)
 
-vd = _verdict(v, "просто ／ текст")
-check("FREE_TEXT → NONE (RELATION_FOUND ≠ THREAT)",
+vd = _verdict(v, "just ／ text")
+check("FREE_TEXT -> NONE (RELATION_FOUND != THREAT)",
       vd and vd[0]["risk_level"] == "NONE", vd)
-check("FREE_TEXT → protected=False", vd and vd[0]["protected"] is False)
+check("FREE_TEXT -> protected=False", vd and vd[0]["protected"] is False)
 
-# --- 2. CANDIDATE-понижение (D1) ---
-print("\n[2] CANDIDATE-ребро понижает риск на ступень")
+# --- 2. CANDIDATE downgrade (D1) ---
+print("\n[2] A CANDIDATE edge downgrades risk one step")
 c = _card(CANDIDATE_CARD)
 vd = _verdict(c, "http://gоog／le.com")
-check("CANDIDATE в HOST → MEDIUM (не HIGH)",
+check("CANDIDATE in HOST -> MEDIUM (not HIGH)",
       vd and vd[0]["risk_level"] == "MEDIUM", vd)
 
-# --- 3. Зонд отложен (D3) ---
-print("\n[3] Зонд канона отложен")
+# --- 3. Probe deferred (D3) ---
+print("\n[3] Canon probe deferred")
 vd = _verdict(v, "http://gоog／le.com")
 check("canon_hypothesis = None", vd and vd[0]["canon_hypothesis"] is None)
 
-# --- 4. Барьер N3: disabled не влияет на вердикт ---
-print("\n[4] Барьер N3 — выключенное ребро не даёт вердикт")
+# --- 4. Barrier N3: disabled does not affect the verdict ---
+print("\n[4] Barrier N3 — a disabled edge yields no verdict")
 mx = _card(MIXED_CARD)
 off = "http://x／y.com".index("／")
 st = process_sign(mx, "http://x／y.com", off)
-check("в кандидате ВСЕ рёбра (отладка): 2",
+check("ALL edges in the candidate (debug): 2",
       len(st.relation_candidates) == 2, len(st.relation_candidates))
-check("active_relation_candidates: только 1",
+check("active_relation_candidates: only 1",
       len(st.active_relation_candidates) == 1)
 out = process_sequence("http://x／y.com", [mx], sign_statuses=[st],
                        known_signs={"／"})
-check("вердикт ровно 1 (по активному ребру U+002F)",
+check("exactly 1 verdict (from the active U+002F edge)",
       len(out.relation_verdicts) == 1, len(out.relation_verdicts))
-check("выключенное ребро U+2044 в вердиктах ОТСУТСТВУЕТ",
+check("the disabled U+2044 edge is ABSENT from verdicts",
       all(rv["target"] != "U+2044" for rv in out.relation_verdicts))
 
-# --- 5. D1: legacy знаки не задеты ---
-print("\n[5] D1 — legacy карточки без relations не дают вердиктов")
+# --- 5. D1: legacy signs untouched ---
+print("\n[5] D1 — legacy cards without relations yield no verdicts")
 legacy = load_card(os.path.join(
     BASE, "cards", "SIGN_CORE_CARD_SOLIDUS_U002F_GEN3_v0_3_RU__1_.md"))
 from module_engine import process_sign as ps
-st = ps(legacy, "http://ok.com/path", 5)  # обычный /
+st = ps(legacy, "http://ok.com/path", 5)  # an ordinary /
 out = process_sequence("http://ok.com/path", [legacy],
                        sign_statuses=[st], known_signs={"/"})
-check("обычный / не порождает relation_verdicts",
+check("an ordinary / produces no relation_verdicts",
       out.relation_verdicts == [], out.relation_verdicts)
 
 print("\n" + "=" * 60)
-print(f"ИТОГО: {PASSED} OK / {FAILED} FAIL")
+print(f"TOTAL: {PASSED} OK / {FAILED} FAIL")
 print("=" * 60)
 sys.exit(1 if FAILED else 0)

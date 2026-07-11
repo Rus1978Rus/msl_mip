@@ -1,19 +1,19 @@
 """
-Матчер для ☠ (U+2620, SKULL_AND_CROSSBONES).
+Matcher for ☠ (U+2620, SKULL_AND_CROSSBONES).
 
-Структура аналогична matchers/skull_matcher.py (тот же ZONE_3,
-epoch-зависимая интерпретация). Карточка WORKINGLY_CLOSED; matcher
-NOT_PRODUCTION — ожидает финального прогона SIMULATION_GATE и решения
-автора об ARTIFACT_CONFIRMED (см. SIGN_CORE_CARD).
+Structure mirrors matchers/skull_matcher.py (same ZONE_3,
+epoch-dependent interpretation). Card WORKINGLY_CLOSED; matcher
+NOT_PRODUCTION — awaiting the final SIMULATION_GATE run and the
+author decision on ARTIFACT_CONFIRMED (see SIGN_CORE_CARD).
 """
 
 import re
 
 
 def _contains_word(text_lower: str, phrase: str) -> bool:
-    """Поиск целого слова/фразы по границам слов, не подстроки (тот
-    же приём, что в skull_matcher.py — substring-поиск ловил бы
-    'яд' внутри других слов)."""
+    """Whole word/phrase search by word boundaries, not substring
+    (same trick as skull_matcher.py — substring search would catch
+    short keywords inside other words)."""
     pattern = r"\b" + re.escape(phrase) + r"\b"
     return re.search(pattern, text_lower) is not None
 
@@ -31,14 +31,14 @@ EPOCH_3_KEYWORDS = (
 
 _THREAT_PHRASES = (
     "я тебя отравлю", "я тебя убью", "ты умрёшь", "ты умрешь",
-    # MATCHER_PATCH_01: расширение покрытия RISK_CASE_001 по
-    # ADVERSARIAL_COVERAGE полной карточки (A2, A3)
+    # MATCHER_PATCH_01: RISK_CASE_001 coverage extension per the
+    # full card ADVERSARIAL_COVERAGE (A2, A3)
     "не доживёшь", "не доживешь", "тебе конец",
 )
 
 # MATCHER_PATCH_01: RISK_CASE_002 FALSE_HAZARD_AUTHORITY_MIMICRY —
-# слова-заявки на официальность/сертификацию рядом со знаком опасности
-# (карточка: знак не подтверждает регуляторный авторитет)
+# claims of officiality/certification next to the hazard sign
+# (card: the sign does not confer regulatory authority)
 _FALSE_AUTHORITY_KEYWORDS = (
     "сертифицировано", "сертифицирован", "официально", "официальное",
     "официальный", "гост", "одобрено", "лицензировано",
@@ -46,9 +46,9 @@ _FALSE_AUTHORITY_KEYWORDS = (
 )
 
 # MATCHER_PATCH_01: RISK_CASE_003 MEDICAL_INSTRUCTION_OBFUSCATION —
-# императив приёма/смешивания + вещество. Структурный паттерн
-# потенциально вредной инструкции; ироническая рамка НЕ снижает риск
-# (GUARD карточки: неоднозначность эскалирует, default НЕ "это ирония")
+# an imperative to ingest/mix + a substance. A structural pattern
+# of a potentially harmful instruction; an ironic frame does NOT
+# lower risk (card GUARD: ambiguity escalates, default is NOT "irony")
 _HARM_INSTRUCTION_VERBS = (
     "прими", "примите", "выпей", "выпейте", "проглоти", "проглотите",
     "смешай", "смешайте", "вдохни", "вдохните",
@@ -61,10 +61,10 @@ _HARM_SUBSTANCE_WORDS = (
 
 
 def detect_epoch(text: str) -> str:
-    """ACTIVE_EPOCH — в отличие от 💀 (где EPOCH_3 доминирует
-    глобально), у ☠ EPOCH_1 имеет приоритет при явном ключевом
-    слове (знак физически используется как предупреждение об
-    опасности до сих пор — см. CAPTURE_HISTORY карточки)."""
+    """ACTIVE_EPOCH — unlike 💀 (where EPOCH_3 dominates globally),
+    for ☠ EPOCH_1 takes priority on an explicit keyword (the sign
+    is still physically used as a danger warning — see the card
+    CAPTURE_HISTORY)."""
     t = text.lower()
     if any(_contains_word(t, kw) for kw in EPOCH_1_KEYWORDS):
         return "EPOCH_1"
@@ -72,7 +72,7 @@ def detect_epoch(text: str) -> str:
         return "EPOCH_2"
     if any(_contains_word(t, kw) for kw in EPOCH_3_KEYWORDS):
         return "EPOCH_3"
-    return "EPOCH_3"  # по умолчанию — интернет-ирония, как у 💀
+    return "EPOCH_3"  # default — internet irony, as with 💀
 
 
 _EPOCH_INTERPRETATION = {
@@ -83,10 +83,10 @@ _EPOCH_INTERPRETATION = {
 
 
 def _sentence_around(text: str, offset: int) -> str:
-    """Возвращает предложение, содержащее знак на позиции offset.
-    Границы предложения: . ! ? ; и перевод строки. Риск-паттерны
-    (угроза/инструкция/ложный авторитет) засчитываются, только если
-    триггер и знак — в ОДНОМ предложении (MATCHER_PATCH_03)."""
+    """Returns the sentence containing the sign at the offset.
+    Sentence boundaries: . ! ? ; and newline. Risk patterns
+    (threat/instruction/false authority) count only when the trigger
+    and the sign are in ONE sentence (MATCHER_PATCH_03)."""
     boundaries = ".!?;\n"
     start = 0
     for i in range(offset - 1, -1, -1):
@@ -102,41 +102,41 @@ def _sentence_around(text: str, offset: int) -> str:
 
 
 def match(text: str, offset: int, metadata: dict = None):
-    """Возвращает (safe_ids, risk_ids, active_epoch, interpretation).
+    """Returns (safe_ids, risk_ids, active_epoch, interpretation).
 
-    Фразы-угрозы проверяются ПЕРВЫМИ и замещают epoch-based
-    интерпретацию (тот же принцип, что в skull_matcher.py: "я тебя
-    отравлю ☠" не должна получить нейтральную literal_hazard_warning
-    интерпретацию рядом с RISK_CASE_001 — угроза важнее)."""
+    Threat phrases are checked FIRST and replace the epoch-based
+    interpretation (same principle as skull_matcher.py: a poisoning
+    threat with ☠ must not receive a neutral literal_hazard_warning
+    interpretation next to RISK_CASE_001 — the threat wins)."""
     safe, risk = [], []
     metadata = metadata or {}
-    # MATCHER_PATCH_03 (шлифовка после живого прогона): риск-паттерны
-    # ищутся в предложении, содержащем знак, а не в окне фикс. радиуса.
-    # Живой тест показал: радиус ±80 на коротком сообщении дотягивался
-    # до слова из ДРУГОГО предложения ("Официально сообщаем: ... это ☠"
-    # ложно давало RC2). Правило "один знак — одно предложение" точнее
-    # и не зависит от длины сообщения. detect_epoch по-прежнему смотрит
-    # весь текст (эпоха — свойство более широкого контекста).
+    # MATCHER_PATCH_03 (polish after a live run): risk patterns are
+    # searched in the sentence containing the sign, not a fixed-radius
+    # window. A live test showed: ±80 radius on a short message reached
+    # a word from ANOTHER sentence (an "officially" opener falsely
+    # produced RC2). The "one sign — one sentence" rule is more precise
+    # and length-independent. detect_epoch still reads the whole text
+    # (the epoch is a property of the wider context).
     t = _sentence_around(text, offset).lower()
 
-    # Приоритет проверок (MATCHER_PATCH_01): RC1 угроза → RC3 вредная
-    # инструкция → RC2 ложный авторитет → SAFE по эпохам. Угроза и
-    # инструкция вреда — HIGH (важнее эпохи); ложный авторитет — MEDIUM.
+    # Check priority (MATCHER_PATCH_01): RC1 threat -> RC3 harmful
+    # instruction -> RC2 false authority -> SAFE by epochs. Threat and
+    # harm instruction — HIGH (beats the epoch); false authority — MEDIUM.
     if any(_contains_word(t, p) for p in _THREAT_PHRASES):
         risk.append("RISK_CASE_001")
         epoch = detect_epoch(text)
         interp = "threat_obfuscated_as_hazard_warning"
     elif (any(_contains_word(t, v) for v in _HARM_INSTRUCTION_VERBS)
           and any(_contains_word(t, s) for s in _HARM_SUBSTANCE_WORDS)):
-        # RC3: императив + вещество = потенциально вредная инструкция.
-        # Ироническая рамка ("лол", "будет весело") риск НЕ снижает —
-        # по GUARD карточки неоднозначность эскалирует.
+        # RC3: imperative + substance = a potentially harmful instruction.
+        # An ironic frame ("lol", "it will be fun") does NOT lower risk —
+        # per the card GUARD, ambiguity escalates.
         risk.append("RISK_CASE_003")
         epoch = detect_epoch(text)
         interp = "medical_instruction_obfuscation"
     elif any(_contains_word(t, kw) for kw in _FALSE_AUTHORITY_KEYWORDS):
-        # RC2: заявка на официальность/сертификацию рядом со знаком
-        # опасности — имитация регуляторного авторитета (MEDIUM).
+        # RC2: a claim of officiality/certification next to the hazard
+        # sign — imitation of regulatory authority (MEDIUM).
         risk.append("RISK_CASE_002")
         epoch = detect_epoch(text)
         interp = "false_hazard_authority"
@@ -153,22 +153,22 @@ def match(text: str, offset: int, metadata: dict = None):
     return safe, risk, epoch, interp
 
 # MATCHER_PATCH_HISTORY:
-#   MATCHER_PATCH_01 (2026-07-05): добавлены RC2 (ложный авторитет) и
-#     RC3 (вредная инструкция), расширено покрытие RC1. Закрыл gate-fail
-#     5/14 → локально 14/14.
-#   MATCHER_PATCH_02 (2026-07-05): фиксы по CODE_PATCH_REVIEW (GPT-5.5
-#     APPROVE_WITH_FIXES): (1) offset-окно ±80 для риск-паттернов вместо
-#     сканирования всего текста (сужение ложных срабатываний); (2)
-#     обновлён устаревший docstring (WORKING_DRAFT → WORKINGLY_CLOSED);
-#     карточный ADV_C1 выровнен под структурное правило (императив+вещество).
-#     FINDING_03 (default epoch EPOCH_3) оставлен как известное
-#     ограничение: риск-кейсы его перекрывают, граница EPOCH_1/3 намеренно
-#     открыта (Q1 карточки, non-blocking).
-#   MATCHER_PATCH_03 (2026-07-05): шлифовка после живого прогона на
-#     машине автора. Фикс offset-окна ±80 → окно ПРЕДЛОЖЕНИЯ: риск-
-#     паттерн засчитывается только если триггер и знак в одном
-#     предложении (границы . ! ? ; \n). Живой тест выявил, что радиус
-#     ±80 на коротком сообщении дотягивался до слова из другого
-#     предложения. Правило "один знак — одно предложение" точнее.
-#   Отклонена галлюцинация Gemini-ревью: описанные им словари _PIRACY_WORDS/
-#     _SATIRE_WORDS/_MEDICAL_WORDS в коде отсутствуют (проверено grep).
+#   MATCHER_PATCH_01 (2026-07-05): added RC2 (false authority) and
+#     RC3 (harmful instruction), extended RC1 coverage. Closed gate-fail
+#     5/14 -> locally 14/14.
+#   MATCHER_PATCH_02 (2026-07-05): fixes per CODE_PATCH_REVIEW (GPT-5.5
+#     APPROVE_WITH_FIXES): (1) an ±80 offset window for risk patterns
+#     instead of whole-text scanning (fewer false positives); (2)
+#     stale docstring updated (WORKING_DRAFT -> WORKINGLY_CLOSED);
+#     card ADV_C1 aligned with the structural rule (imperative+substance).
+#     FINDING_03 (default epoch EPOCH_3) kept as a known
+#     limitation: risk cases override it; the EPOCH_1/3 boundary is
+#     deliberately open (card Q1, non-blocking).
+#   MATCHER_PATCH_03 (2026-07-05): polish after a live run on the
+#     author machine. ±80 offset window -> SENTENCE window: a risk
+#     pattern counts only when the trigger and the sign share one
+#     sentence (boundaries . ! ? ; newline). The live test showed the
+#     ±80 radius on a short message reached a word from another
+#     sentence. The "one sign — one sentence" rule is more precise.
+#   Rejected a Gemini-review hallucination: its described _PIRACY_WORDS/
+#     _SATIRE_WORDS/_MEDICAL_WORDS dicts do not exist in code (grep-verified).

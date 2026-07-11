@@ -1,13 +1,13 @@
 """
-MSL/MIP — базовые типы данных.
+MSL/MIP — core data types.
 
-Реализует структуру данных SIGN_CORE_CARD в виде Python dataclass-ов.
-Соответствует SIGN_CORE_CARD_TEMPLATE_GEN3_v0_3_RU и трём подтверждённым
-(ARTIFACT_CONFIRMED) картам: DOT, SOLIDUS, SKULL.
+Implements the SIGN_CORE_CARD data structure as Python dataclasses.
+Matches SIGN_CORE_CARD_TEMPLATE_GEN3_v0_3 and the three confirmed
+(ARTIFACT_CONFIRMED) cards: DOT, SOLIDUS, SKULL.
 
-ВАЖНО: это РЕАЛИЗАЦИЯ спецификации, не сама спецификация. Если реальный
-код расходится с текстом шаблонов — это повод пересмотреть код или
-формально патчить шаблон через AUTHOR_DECISION, не тихо менять поведение.
+IMPORTANT: this is an IMPLEMENTATION of the spec, not the spec itself.
+If real code diverges from the template text, either revisit the code
+or patch the template formally via AUTHOR_DECISION — never silently.
 """
 
 from __future__ import annotations
@@ -18,11 +18,11 @@ from typing import Optional
 
 
 class RiskLevel(Enum):
-    """Перечислимые уровни риска. ВАЖНО: некоторые SEQUENCE_CANDIDATE
-    в карточках (например SKULL.SC1) имеют НЕ-перечислимый, описательный
-    RISK_LEVEL ('intensity-dependent') — такие случаи представлены как
-    обычная строка, не как член этого enum (см. RULE_3A / ENUM_GUARD
-    в sequence_module.py)."""
+    """Enumerated risk levels. NOTE: some SEQUENCE_CANDIDATEs in cards
+    (e.g. SKULL.SC1) carry a NON-enumerable, descriptive RISK_LEVEL
+    ('intensity-dependent') — such cases are stored as a plain string,
+    not as a member of this enum (see RULE_3A / ENUM_GUARD
+    in sequence_module.py)."""
 
     NONE = "NONE"
     LOW = "LOW"
@@ -32,8 +32,8 @@ class RiskLevel(Enum):
 
     @classmethod
     def is_enum_value(cls, value) -> bool:
-        """ENUM_GUARD: проверка, что значение — реальный член RiskLevel,
-        а не описательная строка типа 'intensity-dependent'."""
+        """ENUM_GUARD: check that a value is a real RiskLevel member,
+        not a descriptive string like 'intensity-dependent'."""
         if isinstance(value, RiskLevel):
             return True
         if isinstance(value, str):
@@ -51,12 +51,12 @@ class RiskLevel(Enum):
 
 
 class Zone(Enum):
-    """ZONE из LAYER_A карточки. Определяет, по какому STAGE_3x идёт
-    обработка в MODULE_TEMPLATE (см. STAGE_2 ZONE_DETECTION)."""
+    """ZONE from the card LAYER_A. Selects the STAGE_3x processing path
+    in MODULE_TEMPLATE (see STAGE_2 ZONE_DETECTION)."""
 
-    ZONE_1 = 1  # STABLE — семантика не зависит от контекста/эпохи
-    ZONE_2 = 2  # CONTEXT_DEPENDENT — контекст выбирает SUBSTRATE
-    ZONE_3 = 3  # PRECESSIONAL — культурные эпохи, EPOCH_MATCHING
+    ZONE_1 = 1  # STABLE — semantics independent of context/epoch
+    ZONE_2 = 2  # CONTEXT_DEPENDENT — context selects the SUBSTRATE
+    ZONE_3 = 3  # PRECESSIONAL — cultural epochs, EPOCH_MATCHING
 
 
 @dataclass
@@ -117,9 +117,9 @@ class ContradictionGuard:
 
 @dataclass
 class SequenceCandidate:
-    """SC из раздела SEQUENCE_LAYER_BOUNDARY. RISK_LEVEL может быть как
-    RiskLevel (enum), так и описательной строкой (например
-    'intensity-dependent' у SKULL.SC1) — см. ENUM_GUARD в STAGE_3
+    """SC from SEQUENCE_LAYER_BOUNDARY. RISK_LEVEL may be either a
+    RiskLevel (enum) or a descriptive string (e.g.
+    'intensity-dependent' in SKULL.SC1) — see ENUM_GUARD in STAGE_3.
     SEQUENCE_MODULE."""
 
     sc_id: str
@@ -127,14 +127,13 @@ class SequenceCandidate:
     name: str
     risk_level: object  # RiskLevel | str
     possible_contexts: str = ""
-    scope: str = ""  # "" (обычный) | "UPSTREAM_DEPENDENT" (см. SOLIDUS.SC7)
+    scope: str = ""  # "" (normal) | "UPSTREAM_DEPENDENT" (see SOLIDUS.SC7)
 
 
 @dataclass
 class EpochDefinition:
-    """Запись CAPTURE_HISTORY для ZONE_3 знаков (SEMANTIC_EPOCH_TRACKER).
-    Используется EPOCH_MATCHING (STAGE_3c MODULE_TEMPLATE) для подсчёта
-    MATCH_SCORE."""
+    """A CAPTURE_HISTORY record for ZONE_3 signs (SEMANTIC_EPOCH_TRACKER).
+    Used by EPOCH_MATCHING (STAGE_3c MODULE_TEMPLATE) MATCH_SCORE counting."""
 
     epoch_id: str
     name: str
@@ -148,9 +147,9 @@ class EpochDefinition:
 
 @dataclass
 class SignCoreCard:
-    """Полная карточка знака — то подмножество полей SIGN_CORE_CARD,
-    которое реально потребляется MODULE_TEMPLATE / SEQUENCE_MODULE_TEMPLATE
-    в их текущем (патченом) виде."""
+    """Full sign card — the subset of SIGN_CORE_CARD fields actually
+    consumed by MODULE_TEMPLATE / SEQUENCE_MODULE_TEMPLATE
+    in their current (patched) form."""
 
     card_uid: str
     codepoint: str
@@ -173,8 +172,8 @@ class SignCoreCard:
     active_epoch_type: Optional[str] = None
 
     def find_sequence_candidate_by_literal(self, text: str):
-        """Точное буквальное совпадение SEQUENCE.
-        Используется STAGE_2a SEQUENCE_MODULE (PATCH_24/26)."""
+        """Exact literal SEQUENCE match.
+        Used by STAGE_2a SEQUENCE_MODULE (PATCH_24/26)."""
         for sc in self.sequence_candidates:
             if sc.sequence == text:
                 return sc
