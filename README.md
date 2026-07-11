@@ -80,6 +80,8 @@ templates/              Templates for extending the system
 
 2. **Sequence** — signs combine into candidates. Cross-sign patterns emerge here: `../../../` (path traversal), `//` (protocol injection), `💀☠` (epoch mismatch). A sequence only counts if all its signs were validated by layer 1.
 
+   The sequence layer also decides **mask (homoglyph) verdicts** (the relation axis): a sign declared as a mask of a canon (e.g. fullwidth `／` U+FF0F masking `/` U+002F) gets its risk from *context*, not from the sign itself — HIGH inside a host, MEDIUM in a URL path, NONE in free text, and only when the relation scope covers that context. A relation alone is never a threat (RELATION_FOUND != THREAT).
+
 3. **Integration** — the final graded verdict, preserving space for human judgment. The system flags; humans decide.
 
 ---
@@ -88,11 +90,13 @@ templates/              Templates for extending the system
 
 The system is designed to be extended. To add a sign you need three things, all with templates in [`templates/`](templates/):
 
-1. **A Sign Card** (`cards/`) — define the sign's codepoint, epochs, safe cases, risk cases, and sequence candidates. Template: `SIGN_CORE_CARD_TEMPLATE_GEN3_v0_3_RU.md`
+1. **A Sign Card** (`cards/`) — define the sign's codepoint, epochs, safe cases, risk cases, and sequence candidates where applicable. Template: `SIGN_CORE_CARD_TEMPLATE_GEN3_v0_3_R1_RU.md` / `_EN.md`. Filling rules: `SIGN_CORE_CARD_CONVEYOR_RULES_GEN3_v0_3_R1`.
 
 2. **A Matcher** (`single_sign/matchers/`) — the code that reads context and returns interpretation + risk. Template: `MODULE_TEMPLATE_SINGLE_SIGN_GEN3_v0_2_PLUS_EPOCH_v0_1_EN.md`
 
 3. **Register it** — add one line to the `_MATCHER_REGISTRY` in `single_sign/module_engine.py`.
+
+**Mask signs (homoglyphs) take a shorter path.** If the sign can act as a visual mask of another sign in a protected context (e.g. `／` masking `/`), you do NOT write a matcher. Declare a `SIGN_RELATIONS` block in the card (relation type, canon target, `CONTEXT_SCOPE`) — see the `OPTIONAL_FIELDS_RELATION` section of the conveyor rules. The runtime emits relation candidates automatically and the sequence layer decides the risk from context.
 
 For sequence-level behavior, see the `SEQUENCE_MODULE_TEMPLATE` and `SEQUENCE_INTEGRATOR_TEMPLATE` in `templates/`.
 
@@ -116,7 +120,7 @@ To submit a change for review, use the packet template: `templates/CONVEYOR_RUN_
 - **WORKING_DRAFT** — this is an active research project, not production software.
 - The system works with **structure only**. It does not know "PayPal" is a brand. It knows that `com` in a non-final position of a domain chain is a structural signal of mimicry.
 - **Brand-lookalike domains with a single dot** (e.g. `paypai.com`) currently pass — that requires a separate reputation/typosquatting layer, which is future work.
-- Card `☠` (U+2620) is a **test card** (WORKING_DRAFT), created to validate cross-card sequence logic. The other three cards are confirmed.
+- Five sign cards are currently loaded (`.` `/` `💀` `☠` `@`); card `☠` (U+2620) remains a **test card** (WORKING_DRAFT), created to validate cross-card sequence logic. The **relation axis** (mask/homoglyph verdicts) is implemented and gated (step-4 gate 12/12), but no production mask card has been authored yet — the fullwidth solidus `／` card is the next planned entry.
 - Sign cards are written in Russian (the project's authoritative language). Code output is in English.
 
 ## Standards Alignment
@@ -225,7 +229,7 @@ single_sign/            Слой анализа одиночных знаков
   integrator_engine.py    Вердикт для одного знака
   matchers/               По одному матчеру на знак
 sequence/               Слой анализа последовательностей
-  sequence_engine.py      Межзнаковые паттерны (../,  //, и т.д.)
+  sequence_engine.py      Межзнаковые паттерны (../, //) + вердикты масок (отношения)
 cards/                  Определения знаков (база знаний)
 templates/              Шаблоны для расширения системы
 ```
@@ -238,6 +242,8 @@ templates/              Шаблоны для расширения систем�
 
 2. **Последовательность** — знаки объединяются в кандидаты. Здесь возникают межзнаковые паттерны: `../../../` (path traversal), `//` (protocol injection), `💀☠` (конфликт эпох). Последовательность засчитывается, только если все её знаки прошли валидацию на первом слое.
 
+   Sequence-слой также выносит **вердикты по маскам (гомоглифам)** — ось «отношение»: знак, объявленный маской канона (например, полноширинный `／` U+FF0F, маскирующий `/` U+002F), получает риск из *контекста*, а не из самого знака — HIGH внутри host-части, MEDIUM в пути URL, NONE в свободном тексте, и только когда scope отношения покрывает этот контекст. Само отношение — никогда не угроза (RELATION_FOUND ≠ THREAT).
+
 3. **Интеграция** — финальный градуированный вердикт, сохраняющий место для человеческого суждения. Система отмечает; человек решает.
 
 ---
@@ -246,11 +252,13 @@ templates/              Шаблоны для расширения систем�
 
 Система спроектирована для расширения. Чтобы добавить знак, нужны три вещи, все с шаблонами в [`templates/`](templates/):
 
-1. **Карточка знака** (`cards/`) — определите кодпоинт, эпохи, безопасные случаи, рисковые случаи и кандидаты-последовательности. Шаблон: `SIGN_CORE_CARD_TEMPLATE_GEN3_v0_3_RU.md`
+1. **Карточка знака** (`cards/`) — определите кодпоинт, эпохи, безопасные случаи, рисковые случаи и кандидаты-последовательности (где применимо). Шаблон: `SIGN_CORE_CARD_TEMPLATE_GEN3_v0_3_R1_RU.md` / `_EN.md`. Правила заполнения: `SIGN_CORE_CARD_CONVEYOR_RULES_GEN3_v0_3_R1`.
 
 2. **Матчер** (`single_sign/matchers/`) — код, который читает контекст и возвращает интерпретацию + риск. Шаблон: `MODULE_TEMPLATE_SINGLE_SIGN_GEN3_v0_2_PLUS_EPOCH_v0_1_EN.md`
 
 3. **Зарегистрировать** — добавьте одну строку в `_MATCHER_REGISTRY` в `single_sign/module_engine.py`.
+
+**Знаки-маски (гомоглифы) идут коротким путём.** Если знак может выступать визуальной маской другого знака в защищённом контексте (например, `／` маскирует `/`), матчер писать НЕ нужно. Объявите блок `SIGN_RELATIONS` в карточке (тип отношения, канон-цель, `CONTEXT_SCOPE`) — см. раздел `OPTIONAL_FIELDS_RELATION` в правилах конвейера. Рантайм эмитит кандидатов отношения автоматически, а sequence-слой выносит риск из контекста.
 
 Для поведения на уровне последовательностей см. `SEQUENCE_MODULE_TEMPLATE` и `SEQUENCE_INTEGRATOR_TEMPLATE` в `templates/`.
 
@@ -274,7 +282,7 @@ templates/              Шаблоны для расширения систем�
 - **WORKING_DRAFT** — это активный исследовательский проект, не production-софт.
 - Система работает **только со структурой**. Она не знает, что «PayPal» — это бренд. Она знает, что `com` в непоследней позиции доменной цепочки — структурный сигнал имитации.
 - **Домены-двойники брендов с одной точкой** (например `paypai.com`) сейчас проходят — для них нужен отдельный слой репутации/детекции typosquatting, это будущая работа.
-- Карточка `☠` (U+2620) — **тестовая** (WORKING_DRAFT), создана для проверки межкарточной последовательной логики. Остальные три карточки подтверждены.
+- Сейчас загружены пять карточек знаков (`.` `/` `💀` `☠` `@`); карточка `☠` (U+2620) остаётся **тестовой** (WORKING_DRAFT), создана для проверки межкарточной последовательной логики. **Ось «отношение»** (вердикты по маскам/гомоглифам) реализована и закрыта gate-тестом (шаг 4: 12/12), но боевой карточки-маски ещё нет — полноширинный солидус `／` запланирован следующим.
 - Карточки знаков написаны на русском (авторитетный язык проекта). Вывод программы — на английском.
 
 ## Соответствие стандартам
