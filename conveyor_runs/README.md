@@ -39,6 +39,7 @@ These runs demonstrate the project's core rules in action:
 | RUN_001 | DOT card English translation | CARD_TRANSLATION_REVIEW | APPROVE |
 | RUN_002 | SOLIDUS RISK_CASE_001 patch | CARD_PATCH_REVIEW | APPROVE (5/5) |
 | RUN_003 | PHAGO dimension in registry | REGISTRY_DIMENSION_REVIEW | APPROVE |
+| RUN_004 | _domain_prefix rewrite (bare-domain detector G1) | NARROW_CIRCLE_REVIEW | FIX_FIRST — D-DET-4 accepted; 2 voices set aside |
 
 NOTE: These are illustrative examples selected from the project's run
 history, not the complete set. They are provided so the conveyor

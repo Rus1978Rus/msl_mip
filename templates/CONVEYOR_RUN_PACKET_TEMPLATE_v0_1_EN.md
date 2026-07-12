@@ -8,6 +8,14 @@ STATUS: WORKINGLY_CLOSED / NOT_LOCKED / NOT_RUNTIME / NOT_VALIDATOR / NOT_PRODUC
 AUTHOR_DECISION_REFERENCE: AUTHOR_DECISION_20260621_003_CONVEYOR_RUN_PACKET_TEMPLATE_v0_1_WORKINGLY_CLOSED_RU
 AUTHOR: Ruslan Malyavsky
 CREATED_AT: 2026-06-21
+REVISION_NOTE_20260712: FINDING_STATUS/FINDING_BASIS raised from Part C
+  (FINDING_STATUS_RULE) into section 0 as RULE_REMINDER:
+  PER_FINDING_STATUS_AND_BASIS_MANDATORY — mandatory for ANY packet, not
+  only in the deliverable format. Reason — the 2026-07-12 round (narrow
+  circle on _domain_prefix): one reviewer passed a guess off as
+  verification, another reviewed non-existent code for the second round
+  running; both are caught by the section-0 BASIS requirement. Machinery
+  source — ACK_GAP_TRIVALENT_v0_2.
 
 TRANSLATION_NOTE: This is the English translation of
   CONVEYOR_RUN_PACKET_TEMPLATE_v0_1_RU. The Russian version remains
@@ -81,6 +89,30 @@ RULE_REMINDER: AUTHOR_DECISION_STATUS_AUTHORITY
   rounds where this rule was violated as part of a reminder for the
   coordinator; raised to a formal section-0 rule following external
   review (GPT-5.5, Copilot).
+
+RULE_REMINDER: PER_FINDING_STATUS_AND_BASIS_MANDATORY
+  For EVERY finding by any reviewer, two fields are mandatory:
+    FINDING_STATUS: VERIFIED | REJECTED | UNVERIFIABLE
+    FINDING_BASIS:  what it rests on — a code trace with the EXACT input
+                    and the EXACT line/branch, OR a direct quote from the
+                    packet with a locator, OR an honest "could not verify".
+  A verdict without BASIS is NOT accepted for arbitration. An assertion is
+  not a proof. UNVERIFIABLE is a legitimate answer; a guess dressed as
+  verification is not. A bare "VERIFIED"/"checked"/"obvious" without
+  METHOD+TARGET+OBSERVED = no FINDING_STATUS (a decorative field). The full
+  machinery (trivalence, BASIS_MINIMUM, the elision ban
+  UNVERIFIABLE→VERIFIED and the guillotine ban UNVERIFIABLE→REJECTED,
+  FINDING_STATUS≠ISSUE_SEVERITY, UNIVERSAL_SCOPE) lives in Part C,
+  FINDING_STATUS_RULE; it is raised here into section 0 so it binds ANY
+  packet from the moment the task is posed, not only in the deliverable
+  format. Found in the 2026-07-12 round (narrow circle on _domain_prefix):
+  one live reviewer wrote "Devanagari → HOST ✅" without checking (took a
+  bare base letter without its vowel sign; a real Devanagari IDN carries a
+  combining mark — DEVANAGARI VOWEL SIGN AA, U+093E, isalnum()=False — on
+  which the positive scan halts: a guess passed off as verification);
+  another voice reviewed non-existent code for the second round running.
+  Both are caught by the single BASIS requirement.
+  SOURCE: ACK_GAP_TRIVALENT_v0_2 (AUTHOR_DECISION 2026-07-05).
 
 ============================================================
 DOCUMENT_ID: CONVEYOR_RUN_PACKET_<SHORT_ROUND_NAME>

@@ -223,6 +223,22 @@ for wrapped in ("*gоog／le.com*", "gоog／le.com—x", "~gоog／le.com~",
           _ctx(card, wrapped) == "HOST" and _risk(card, wrapped) == "HIGH",
           (_ctx(card, wrapped), _risk(card, wrapped)))
 
+# --- AUTHOR_DECISION D-DET-4 (2026-07-12, FIX_FIRST round 2): a LEADING
+# structural separator is NOT a wrapper. The round-1 positive scan skipped
+# everything before the first domain char, so a leading '@' (email/mention)
+# or '/' (path) vanished and '@example.com／x' / '/example.com／x' mis-read
+# as bare domains -> PATH/MEDIUM. D-DET-4 makes leading / \ ? # : @ a
+# HARD_STOP (_domain_prefix returns ""), so these are FREE_TEXT again — the
+# structural character keeps its meaning instead of being discarded as
+# framing. The five wrapper bypasses above must still be HOST/HIGH (a
+# wrapper is not a structural separator). ---
+print("\n[D-DET-4] Leading structural separator is a HARD_STOP, not a wrapper")
+for lead in ("#example.com／x", "/example.com／x", "@example.com／x", ":example.com／x"):
+    check(f"{lead!r} -> FREE_TEXT (leading structural char kept, not skipped; "
+          f"was PATH/MEDIUM before D-DET-4)",
+          _ctx(card, lead) == "FREE_TEXT",
+          _ctx(card, lead))
+
 # --- AUTHOR_DECISION D-DET-3 (2026-07-12): concatenation false positives
 # are DOCUMENTED here, not fixed. The positive-extraction fix above is
 # necessarily a heuristic without a full URL parser: once masks are
@@ -245,6 +261,17 @@ check("example.com,／test -> HOST/HIGH (known_behavior: the comma stops the "
       "PATH; 'test' is silently dropped from consideration)",
       _ctx(card, "example.com,／test") == "HOST" and _risk(card, "example.com,／test") == "HIGH",
       (_ctx(card, "example.com,／test"), _risk(card, "example.com,／test")))
+# D-DET-3 addendum (round 2): a mask AFTER the domain reads as HOST, not
+# PATH. 'gоogle.com*／path' — the '*' ends the positive run at 'gоogle.com',
+# and both the left-only check and the concat check re-derive that domain
+# and fire HOST; the ／ mask actually sits in the PATH segment. Kin to the
+# concatenation FPs (same rough-heuristic root), but a distinct mechanism
+# (trailing wrapper, not gluing). Documented/accepted, pinned, not fixed.
+check("gоogle.com*／path -> HOST/HIGH (known_behavior: mask AFTER the domain; "
+      "the trailing '*' ends the run at gоogle.com so it reads HOST, not the "
+      "PATH the mask position would suggest — D-DET-3 addendum)",
+      _ctx(card, "gоogle.com*／path") == "HOST" and _risk(card, "gоogle.com*／path") == "HIGH",
+      (_ctx(card, "gоogle.com*／path"), _risk(card, "gоogle.com*／path")))
 
 # --- Deferred to v0.5 (known, not fixed in this round) ---
 print("\n[v0.5, known] Deferred tails — not fixed in this round")
@@ -262,6 +289,25 @@ check("-example.com／x -> PATH/MEDIUM (known_behavior: a leading hyphen on "
       "validates as a domain label)",
       _ctx(card, "-example.com／x") == "PATH",
       _ctx(card, "-example.com／x"))
+# Combining-mark IDN (round 2, corrects a docstring that claimed "any
+# script"): U+093E DEVANAGARI VOWEL SIGN AA is a combining mark (category
+# Mc) and returns isalnum()=False, so the positive run is cut at the base
+# letter and the label is dropped. FREE_TEXT. NOT a regression (the old
+# block-list kept the mark but the per-label check rejected it just the
+# same); a pre-existing limitation for combining marks / diacritics /
+# niqqud / NFD Latin. Closing it needs IDNA/NFC canonicalisation of the
+# candidate — out of this rough detector's scope. The test string is
+# built from escapes so its bytes are unambiguous: bha + VOWEL SIGN AA +
+# fullwidth solidus mask + ra + ta + "." + bha + VOWEL SIGN AA + ra + ta.
+_DEVA_COMBINING = (
+    "\u092d\u093e\uff0f\u0930\u0924\u002e\u092d\u093e\u0930\u0924"
+)  # भा／रत.भारत (bharat.bharat, masked after the first syllable)
+check("Devanagari label with a combining vowel sign -> FREE_TEXT "
+      "(known_limitation: the vowel sign is a combining mark, "
+      "isalnum()=False, so the run is cut; documents that 'isalnum()' "
+      "!= 'any letter of any script')",
+      _ctx(card, _DEVA_COMBINING) == "FREE_TEXT",
+      _ctx(card, _DEVA_COMBINING))
 
 _reset_tld_state_for_test()
 

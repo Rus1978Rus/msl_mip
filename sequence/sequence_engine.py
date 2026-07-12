@@ -204,14 +204,20 @@ def _attach_source_offsets(matches: list, sign_statuses: list) -> None:
 # of mask characters is taken from the cards (SIGN_RELATIONS -> visible_form),
 # never hardcoded. See run_mask_chars in _assess_relation_risk.
 #
-# FIX_FIRST (2026-07-12, first conveyor round): _domain_prefix rewritten from
-# a block-list (_STRIP_OUTER, a fixed punctuation set) to a positive
-# character allow-list. Three reviewers found the block-list bypass — see
-# _domain_prefix's own docstring for the mechanism and foundation_layer/
-# AUTHOR_DECISION_20260712_BARE_DOMAIN_DETECTOR_FIX_FIRST_ROUND1.md for the
-# full writeup, including AUTHOR_DECISION D-DET-3 (concatenation false
-# positives are documented, not fixed) and two v0.5-deferred tails
-# (already-punycode input, edge-hyphen labels).
+# FIX_FIRST round 1 (2026-07-12): _domain_prefix rewritten from a block-list
+# (_STRIP_OUTER, a fixed punctuation set) to a positive character allow-list.
+# Three reviewers found the block-list bypass — see _domain_prefix's own
+# docstring and foundation_layer/AUTHOR_DECISION_20260712_BARE_DOMAIN_
+# DETECTOR_FIX_FIRST_ROUND1.md, including AUTHOR_DECISION D-DET-3
+# (concatenation false positives documented, not fixed) and two v0.5 tails.
+#
+# FIX_FIRST round 2 (2026-07-12): the narrow-circle review of round 1 found
+# that the positive scan skipped a LEADING structural separator as if it
+# were a wrapper (@example.com, /example.com mis-read as bare domains).
+# AUTHOR_DECISION D-DET-4: leading / \\ ? # : @ are a HARD_STOP. Same round
+# corrected the "any script" docstring wording (combining marks fail
+# isalnum() — a pre-existing limitation) and added the mask-after-domain
+# concatenation FP as a D-DET-3 addendum. See FIX_FIRST_ROUND2.md.
 # ─────────────────────────────────────────────────────────────────────
 
 # TLD registry state (lazy, once per process). Health check mirrors the
@@ -275,13 +281,38 @@ def _demask(s: str, mask_chars) -> str:
     return "".join(ch for ch in s if ch not in mask_chars)
 
 
+# D-DET-4 (FIX_FIRST round 2, 2026-07-12): a LEADING structural separator
+# is not a wrapper. The positive scan below skips leading non-domain
+# characters to see past wrappers ((, ", *, …); but /, \, ?, #, :, @ carry
+# structural meaning (path, query, fragment, port, authority/email), and
+# silently skipping them made "@example.com", "/example.com" etc. mis-read
+# as bare domains (FREE_TEXT -> PATH). These are a HARD_STOP: hit one before
+# the domain block starts and the token has no bare-domain prefix at all.
+# This is NOT a return to the block-list — punctuation is unbounded, but the
+# set of structural separators is closed and already meaningful in the spec.
+_LEADING_STRUCTURAL_STOPS = frozenset("/\\?#:@")
+
+
 def _domain_prefix(token: str) -> str:
     """POSITIVE extraction (FIX_FIRST 2026-07-12, blocker — three reviewers
     found the bypass in the first conveyor round): return the first maximal
-    run of domain-shaped characters in the token — a Unicode letter (any
-    script, so IDN labels such as a Cyrillic homoglyph attack still match —
-    this is the thing we WANT to catch, not exclude), a digit, '-', or '.' —
-    and discard everything outside that run.
+    run of domain-shaped characters in the token — a character for which
+    str.isalnum() is True (any Unicode letter or digit, so IDN labels such
+    as a Cyrillic homoglyph attack still match — this is the thing we WANT
+    to catch, not exclude), plus '-' and '.' — and discard everything
+    outside that run.
+
+    PRECISION (a reviewer caught the docstring lying): "isalnum() is True"
+    is NOT the same as "any letter of any script". Unicode COMBINING MARKS
+    (categories Mn/Mc) return isalnum()=False — e.g. U+093E DEVANAGARI VOWEL
+    SIGN AA, Arabic diacritics, Hebrew niqqud, NFD-decomposed Latin. So an
+    IDN label carrying such a mark (भारत.भारत, …) has its run cut at the
+    mark and is dropped -> FREE_TEXT. This is a PRE-EXISTING limitation, not
+    a regression (the old block-list left the mark in the string but the
+    per-label isalnum-or-hyphen check then rejected it just the same);
+    documented, deferred (see the gate case and FIX_FIRST_ROUND1). Closing
+    it needs proper IDNA/NFC canonicalisation of the whole candidate, out of
+    this rough detector's scope.
 
     Replaces the old block-list approach (strip a fixed punctuation set,
     _STRIP_OUTER, off the token's outer edges). A block list only ever
@@ -294,6 +325,11 @@ def _domain_prefix(token: str) -> str:
     — the asterisks were never in _STRIP_OUTER; see the gate for the
     literal example). A positive allow-list closes the whole class at
     once instead of chasing individual punctuation marks.
+
+    D-DET-4 (round 2): a LEADING structural separator (/ \\ ? # : @) is a
+    HARD_STOP, not a skippable wrapper — returns "" so the token has no
+    bare-domain prefix. Without this, the scan skipped a leading @ or /
+    and mis-read '@example.com' / '/example.com' as bare domains.
 
     This also subsumes the old separate 'cut at the first /, ?, #, :,
     space' step (P5): none of those characters are in the allow-list, so
@@ -309,6 +345,8 @@ def _domain_prefix(token: str) -> str:
     n = len(token)
     i = 0
     while i < n and not (token[i].isalnum() or token[i] in ".-"):
+        if token[i] in _LEADING_STRUCTURAL_STOPS:
+            return ""  # D-DET-4: leading structural separator, not a wrapper
         i += 1
     j = i
     while j < n and (token[j].isalnum() or token[j] in ".-"):

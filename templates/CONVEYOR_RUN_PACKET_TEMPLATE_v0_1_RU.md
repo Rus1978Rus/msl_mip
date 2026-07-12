@@ -8,6 +8,13 @@ STATUS: WORKINGLY_CLOSED / NOT_LOCKED / NOT_RUNTIME / NOT_VALIDATOR / NOT_PRODUC
 AUTHOR_DECISION_REFERENCE: AUTHOR_DECISION_20260621_003_CONVEYOR_RUN_PACKET_TEMPLATE_v0_1_WORKINGLY_CLOSED_RU
 AUTHOR: Руслан Малявский
 CREATED_AT: 2026-06-21
+REVISION_NOTE_20260712: FINDING_STATUS/FINDING_BASIS подняты из Части C
+  (FINDING_STATUS_RULE) в Раздел 0 как RULE_REMINDER:
+  PER_FINDING_STATUS_AND_BASIS_MANDATORY — обязательны для ЛЮБОГО пакета,
+  не только в формате поставки. Причина — круг 2026-07-12 (узкий круг по
+  _domain_prefix): один ревьюер выдал догадку за проверку, другой второй
+  раз подряд рецензировал несуществующий код; оба ловятся требованием
+  BASIS в разделе 0. Источник механики — ACK_GAP_TRIVALENT_v0_2.
 
 ============================================================
 КАК ПОЛЬЗОВАТЬСЯ ЭТИМ ШАБЛОНОМ
@@ -78,6 +85,30 @@ RULE_REMINDER: AUTHOR_DECISION_STATUS_AUTHORITY
   трёх раундов проекта, где это правило нарушалось как часть
   напоминания для координатора; поднято до формального правила
   раздела 0 по итогам внешнего ревью (GPT-5.5, Copilot).
+
+RULE_REMINDER: PER_FINDING_STATUS_AND_BASIS_MANDATORY
+  Для КАЖДОЙ находки любого ревьюера обязательны два поля:
+    FINDING_STATUS: VERIFIED | REJECTED | UNVERIFIABLE
+    FINDING_BASIS:  на чём основано — трейс по коду с ТОЧНЫМ входом и
+                    ТОЧНОЙ строкой/веткой, ЛИБО прямая цитата из пакета
+                    с локатором, ЛИБО честное «не смог проверить».
+  Вердикт без BASIS НЕ ПРИНИМАЕТСЯ к арбитражу. Утверждение — не
+  доказательство. UNVERIFIABLE — законный ответ; догадка, выданная за
+  проверку, — нет. Голое «VERIFIED»/«проверил»/«очевидно» без
+  METHOD+TARGET+OBSERVED = отсутствие FINDING_STATUS (декоративное поле).
+  Полная механика (трёхзначность, BASIS_MINIMUM, запреты элизии
+  UNVERIFIABLE→VERIFIED и гильотины UNVERIFIABLE→REJECTED,
+  FINDING_STATUS≠ISSUE_SEVERITY, UNIVERSAL_SCOPE) — в Части C,
+  FINDING_STATUS_RULE; здесь она поднята в раздел 0, чтобы действовать
+  для ЛЮБОГО пакета с момента постановки задачи, а не только в формате
+  поставки. Найдено по итогам круга 2026-07-12 (узкий круг по
+  _domain_prefix): один живой ревьюер написал «Devanagari → HOST ✅», не
+  проверив (взял голую базовую букву без огласовки; реальный IDN-домен
+  на деванагари несёт combining mark — DEVANAGARI VOWEL SIGN AA, U+093E,
+  для которого isalnum()=False, и позитивная выборка на ней обрывается —
+  догадка выдана за проверку); ещё один голос второй раз подряд рецензировал
+  несуществующий код. Оба ловятся одним требованием BASIS.
+  ИСТОЧНИК: ACK_GAP_TRIVALENT_v0_2 (AUTHOR_DECISION 2026-07-05).
 
 ============================================================
 DOCUMENT_ID: CONVEYOR_RUN_PACKET_<КРАТКОЕ_ИМЯ_РАУНДА>
