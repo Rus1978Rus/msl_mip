@@ -110,6 +110,114 @@ def most_severe(actions: list) -> str:
     return max(actions, key=lambda a: _SEVERITY.get(a, 0))
 
 
+# Relation (mask) verdict -> action map (relation axis, D-REL-4).
+# NONE->pass, LOW->log_only, MEDIUM->queue, HIGH/CRITICAL->hold.
+# Module-level (was inline in analyze) so the safeguard chaos gate can
+# monkey-patch the mapping to simulate a severed aggregation path.
+_REL_ACTION = {"NONE": "pass", "LOW": "log_only",
+               "MEDIUM": "queue_for_review",
+               "HIGH": "hold_pending_review",
+               "CRITICAL": "hold_pending_review"}
+
+
+def _relation_actions(seq_out) -> list:
+    """Derive runtime actions from the sequence layer's relation (mask)
+    verdicts. Extracted as a module-level seam so tests/gate_safeguard.py
+    can monkey-patch it to simulate a severed mask path WITHOUT touching
+    seq_out.relation_verdicts — the source of truth the invariant reads."""
+    actions = []
+    for v in seq_out.relation_verdicts:
+        act = _REL_ACTION.get(v["risk_level"])
+        if act is None:
+            # Unknown enum value must be visible, not silently mapped.
+            print(f"[WARNING] UNKNOWN_RISK_LEVEL in relation verdict: "
+                  f"{v['risk_level']!r} — falling back to queue_for_review")
+            act = "queue_for_review"
+        actions.append(act)
+    return actions
+
+
+class IntegrityViolation(Exception):
+    """Raised by the finish-line safeguard (D-GUARD-1) in STRICT mode when
+    the conservation-of-risk invariant is broken: a HIGH/CRITICAL mask
+    verdict coexisting with a PASS final verdict means the mask path was
+    severed. In production the verdict is NOT changed (the author is the
+    only authority to overturn it) — the violation is recorded and the run
+    is marked PASS_WITH_INTEGRITY_VIOLATION instead."""
+
+
+def _integrity_check(final_action: str, seq_out, cards: list):
+    """D-GUARD-1 + D-GUARD-2 — an INDEPENDENT check of the RESULT, run after
+    aggregation and before return. Reads ONLY the computed final_action, the
+    sequence layer's relation_verdicts (source of truth for the mask axis),
+    and the loaded cards' edge validation_warnings. It does NOT re-walk the
+    aggregation path, so it does not duplicate that path's fragility.
+
+    D-GUARD-1 (conservation of risk): a HIGH/CRITICAL relation verdict must
+    not coexist with a PASS final verdict — that can only mean the mask
+    verdict never reached the final action. A MEDIUM relation verdict with a
+    PASS final is the softer INTEGRITY_CONCERN, not a violation.
+
+    D-GUARD-2 revives validation_warnings (until now written by the parser
+    and read NOWHERE — dead code that manufactured a false sense of safety):
+    an ACTIVE edge that carried a load-time validation_warning AND whose
+    verdict contributed nothing (risk NONE) is flagged as a CONCERN — the
+    misconfigured edge is silently inert, exactly as its own warning
+    predicted.
+
+    Returns (violations, concerns) — lists of detail dicts."""
+    final_is_pass = (final_action == "pass")
+    violations = []
+    concerns = []
+
+    # D-GUARD-1
+    for v in seq_out.relation_verdicts:
+        rl = v.get("risk_level")
+        if rl in ("HIGH", "CRITICAL") and final_is_pass:
+            violations.append({
+                "rule": "D-GUARD-1",
+                "relation_id": v.get("relation_id", ""),
+                "visible_form": v.get("visible_form", ""),
+                "at_offset": v.get("at_offset"),
+                "detected_context": v.get("detected_context"),
+                "relation_risk": rl,
+                "final_action": final_action,
+                "detail": (f"relation verdict {rl} at offset {v.get('at_offset')} "
+                           f"(context={v.get('detected_context')}) but final_action=pass "
+                           f"-> mask path severed"),
+            })
+        elif rl == "MEDIUM" and final_is_pass:
+            concerns.append({
+                "rule": "D-GUARD-1-SOFT",
+                "relation_id": v.get("relation_id", ""),
+                "relation_risk": rl,
+                "final_action": final_action,
+                "detail": ("MEDIUM relation verdict with final pass -> "
+                           "INTEGRITY_CONCERN (not a violation)"),
+            })
+
+    # D-GUARD-2 — revive validation_warnings
+    warn_by_edge = {}
+    for c in cards:
+        for r in getattr(c, "relations", []):
+            if getattr(r, "is_active", False) and getattr(r, "validation_warnings", None):
+                warn_by_edge[(c.visible_form, r.relation_id)] = list(r.validation_warnings)
+    for v in seq_out.relation_verdicts:
+        w = warn_by_edge.get((v.get("visible_form"), v.get("relation_id")))
+        if w and v.get("risk_level") == "NONE":
+            concerns.append({
+                "rule": "D-GUARD-2",
+                "relation_id": v.get("relation_id", ""),
+                "visible_form": v.get("visible_form", ""),
+                "validation_warnings": w,
+                "relation_risk": "NONE",
+                "detail": ("active edge carried a load-time validation_warning and "
+                           "produced no verdict (risk NONE) -> misconfigured edge "
+                           "silently inert"),
+            })
+    return violations, concerns
+
+
 def analyze(text: str, cards: list) -> dict:
     """Full text run through all layers. Returns a report structure
     for printing (and possible programmatic use)."""
@@ -130,25 +238,33 @@ def analyze(text: str, cards: list) -> dict:
     seq_decision = process_sequence_output(seq_out)
 
     # --- Relation (mask) verdicts -> actions (relation axis, D-REL-4) ---
-    # Aligned with integrator DEFAULT_ACTION_MAP (review finding):
-    # NONE->pass, LOW->log_only, MEDIUM->queue, HIGH/CRITICAL->hold.
-    _REL_ACTION = {"NONE": "pass", "LOW": "log_only",
-                   "MEDIUM": "queue_for_review",
-                   "HIGH": "hold_pending_review",
-                   "CRITICAL": "hold_pending_review"}
-    relation_actions = []
-    for v in seq_out.relation_verdicts:
-        act = _REL_ACTION.get(v["risk_level"])
-        if act is None:
-            # Unknown enum value must be visible, not silently mapped.
-            print(f"[WARNING] UNKNOWN_RISK_LEVEL in relation verdict: "
-                  f"{v['risk_level']!r} — falling back to queue_for_review")
-            act = "queue_for_review"
-        relation_actions.append(act)
+    relation_actions = _relation_actions(seq_out)
 
     # --- Final verdict ---
     final_action = most_severe(single_actions + [seq_decision.runtime_action]
                                + relation_actions)
+
+    # --- FINISH-LINE SAFEGUARD (D-GUARD-1/2) ---
+    # Independent conservation-of-risk check AFTER aggregation, reading only
+    # the RESULT (final_action + relation_verdicts + edge warnings). It does
+    # not re-walk the path, so it does not duplicate the path's fragility.
+    # HYBRID behaviour:
+    #   production  -> the verdict is NOT changed (the author is the only
+    #                  authority to overturn it); the violation is recorded
+    #                  and the run is marked PASS_WITH_INTEGRITY_VIOLATION.
+    #   strict mode -> the same violation RAISES, so a severed mask path
+    #                  fails a run in development (env MSL_MIP_GUARD_STRICT=1).
+    integrity_violations, integrity_concerns = _integrity_check(
+        final_action, seq_out, cards)
+    if integrity_violations:
+        integrity_status = "PASS_WITH_INTEGRITY_VIOLATION"
+        if os.environ.get("MSL_MIP_GUARD_STRICT") == "1":
+            raise IntegrityViolation(
+                "; ".join(v["detail"] for v in integrity_violations))
+    elif integrity_concerns:
+        integrity_status = "INTEGRITY_CONCERN"
+    else:
+        integrity_status = "OK"
 
     return {
         "text": text,
@@ -157,6 +273,9 @@ def analyze(text: str, cards: list) -> dict:
         "sequence_output": seq_out,
         "sequence_decision": seq_decision,
         "final_action": final_action,
+        "integrity_status": integrity_status,
+        "integrity_violations": integrity_violations,
+        "integrity_concerns": integrity_concerns,
     }
 
 
@@ -200,6 +319,13 @@ def print_report(report: dict) -> None:
 
     print("\n" + "=" * 60)
     print(f"FINAL VERDICT: {report['final_action'].upper()}")
+    status = report.get("integrity_status", "OK")
+    if status != "OK":
+        print(f"INTEGRITY: {status}")
+        for viol in report.get("integrity_violations", []):
+            print(f"  [INTEGRITY_VIOLATION] {viol['detail']}")
+        for con in report.get("integrity_concerns", []):
+            print(f"  [{con['rule']}] {con['detail']}")
     print("=" * 60)
 
 
