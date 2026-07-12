@@ -32,6 +32,8 @@ ALLOWLIST = {
         "TEST_INPUTS (Russian detection cases)",
     os.path.join("tests", "gate_relation_verdict_step4.py"):
         "HOMOGLYPH_SPECIMENS (Cyrillic letter in the test domain is the test subject)",
+    os.path.join("tests", "gate_bare_domain_detector.py"):
+        "HOMOGLYPH_SPECIMENS (Cyrillic homoglyph + IDN domains are the test subject)",
 }
 
 CYR = re.compile(r"[\u0400-\u04FF]")

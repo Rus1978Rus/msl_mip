@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from sign_core_card import SignCoreCard, RiskLevel
 from sequence_output import SequenceMatch, SequenceOutput
+from public_suffix import load_single_tlds
 
 
 def _build_candidate_pool(cards: list) -> list:
@@ -183,32 +184,200 @@ def _attach_source_offsets(matches: list, sign_statuses: list) -> None:
         m.source_sign_offsets.sort()
 
 
-def _detect_context_at(text: str, offset: int) -> str:
-    """Rough context detector around the mask position (step 4, D2).
-    First pass: URL / HOST / PATH. Returns a scope name or FREE_TEXT.
-    HOST = between 'scheme://' and the next '/' (main gοοgle.com case).
-    Cheap, string-based; full URL parsing is a separate pass."""
-    before = text[:offset]
-    scheme_pos = before.rfind("://")
-    if scheme_pos != -1:
-        after_scheme = text[scheme_pos + 3:]
-        rel = offset - (scheme_pos + 3)  # mask position inside after_scheme
-        next_slash = after_scheme.find("/")
-        # host separators: '/', '?', '#' — end of the host part
-        host_end = len(after_scheme)
+# ─────────────────────────────────────────────────────────────────────
+# BARE-DOMAIN DETECTOR (boundary G1) — reconstructed 2026-07-12 from FIX_VERIFICATION
+# reviews (six runs) used AS A REQUIREMENTS SPEC. Status: NEW_ARTIFACT,
+# NOT_REVIEWED — the reviews are input, not sign-off. Two author decisions
+# are fixed here in code and in foundation_layer/
+# AUTHOR_DECISION_20260712_BARE_DOMAIN_DETECTOR_D-DET-1_2.md:
+#
+#   D-DET-1  Two or more masks in one token: remove ALL masks before the
+#            domain check (not just the current one — the P6 double-mask
+#            miss caught by DeepSeek-R1 and Qwen). If the remainder looks
+#            like a domain → HOST.
+#   D-DET-2  TLD registry unavailable: a domain-shaped token with a mask
+#            raises an alarm, NOT silence; the whole run is marked DEGRADED
+#            (fail-closed by BEHAVIOUR, not only by flag — the V3 concern
+#            raised by 5 of 6 reviewers).
+#
+# ARCHITECTURAL CONSTRAINT (ARCH_DECISION_HOMOGLYPH_VIA_CARD_ONLY): the set
+# of mask characters is taken from the cards (SIGN_RELATIONS -> visible_form),
+# never hardcoded. See run_mask_chars in _assess_relation_risk.
+# ─────────────────────────────────────────────────────────────────────
+
+# Outer punctuation trimmed off a token before the domain check (P3). A
+# domain wrapped in brackets/quotes/trailing comma is still a domain.
+_STRIP_OUTER = "()[]{}<>\"'`,;!?»«“”‘’"
+
+# TLD registry state (lazy, once per process). Health check mirrors the
+# reviews: a set with >= _TLD_MIN_HEALTHY entries is trusted; anything
+# smaller/broken is DEGRADED (D-DET-2). load_single_tlds() itself already
+# has a three-level fallback (live -> cache -> embedded ~200 entries), so
+# DEGRADED only fires on a genuinely empty/corrupt registry.
+_TLD_SET = None
+_TLD_SOURCE_DEGRADED = False
+_TLD_MIN_HEALTHY = 100
+
+
+def _tlds():
+    """Returns (frozenset_of_tlds, degraded_bool). Cached for the process
+    lifetime — the caller must not fetch on every mask."""
+    global _TLD_SET, _TLD_SOURCE_DEGRADED
+    if _TLD_SET is None:
+        try:
+            entries, _source = load_single_tlds()
+        except Exception:
+            entries = frozenset()
+        if not isinstance(entries, (set, frozenset)) or len(entries) < _TLD_MIN_HEALTHY:
+            _TLD_SET = frozenset(entries) if isinstance(entries, (set, frozenset)) else frozenset()
+            _TLD_SOURCE_DEGRADED = True
+        else:
+            _TLD_SET = frozenset(entries)
+            _TLD_SOURCE_DEGRADED = False
+    return _TLD_SET, _TLD_SOURCE_DEGRADED
+
+
+def _force_tld_state_for_test(tld_set, degraded: bool) -> None:
+    """Test hook only: pin the TLD registry state so a gate can exercise
+    the DEGRADED path (D-DET-2) without touching the network."""
+    global _TLD_SET, _TLD_SOURCE_DEGRADED
+    _TLD_SET = frozenset(tld_set)
+    _TLD_SOURCE_DEGRADED = bool(degraded)
+
+
+def _reset_tld_state_for_test() -> None:
+    """Test hook only: drop the cache so the next _tlds() reloads live."""
+    global _TLD_SET, _TLD_SOURCE_DEGRADED
+    _TLD_SET = None
+    _TLD_SOURCE_DEGRADED = False
+
+
+def _demask(s: str, mask_chars) -> str:
+    """D-DET-1: remove EVERY mask character from s (all occurrences, all
+    declared masks — not only the current one). mask_chars comes from the
+    cards, never hardcoded.
+
+    NOTE (documented boundary, not silently narrowed): the only masks in
+    the system today are structural separators (fullwidth solidus U+FF0F),
+    which a real domain string cannot contain — deleting them reconstructs
+    the domain. Should a LETTER-homoglyph mask ever be carded (e.g. a
+    Cyrillic letter masquerading as Latin 'o'), blanket deletion would
+    corrupt the label and D-DET-1 would need a follow-up AUTHOR_DECISION
+    (delete vs. canon substitution). Flagged in the foundation doc as an
+    open item."""
+    if not mask_chars:
+        return s
+    return "".join(ch for ch in s if ch not in mask_chars)
+
+
+def _domain_prefix(token: str) -> str:
+    """P3 + P5: trim outer punctuation, then cut the tail at the first
+    structural separator (path/query/fragment/port/space). Returns the bare
+    domain candidate — 'evil.com/path' -> 'evil.com', '(a.com)' -> 'a.com'."""
+    token = token.strip().strip(_STRIP_OUTER)
+    cut = len(token)
+    for sep in ("/", "?", "#", ":", " "):
+        p = token.find(sep)
+        if p != -1:
+            cut = min(cut, p)
+    return token[:cut].strip(_STRIP_OUTER)
+
+
+def _is_tld(label: str, tld_set, degraded: bool) -> bool:
+    """P2 (IDN): a label is a TLD if it is in the registry directly OR its
+    punycode A-label is (an IDN ccTLD label -> its A-label, e.g. xn--p1ai).
+    D-DET-2: when the registry is
+    DEGRADED, accept a TLD-SHAPED label (alphabetic, 2..63) rather than go
+    silent — alarm, not miss."""
+    label = label.lower()
+    if label in tld_set:
+        return True
+    try:
+        alabel = label.encode("idna").decode("ascii").lower()
+        if alabel in tld_set:
+            return True
+    except Exception:
+        pass
+    if degraded:
+        return label.isalpha() and 2 <= len(label) <= 63
+    return False
+
+
+def _looks_like_domain(raw: str, tld_set, degraded: bool) -> bool:
+    """A string looks like a bare domain: >= 2 labels, each a valid DNS
+    label (alnum or '-', non-empty, <= 63 chars), last label a TLD. The
+    tail (path/port/query) is trimmed by _domain_prefix first (P5)."""
+    s = _domain_prefix(raw)
+    if not s:
+        return False
+    labels = s.strip(".").split(".")
+    if len(labels) < 2:
+        return False
+    for lbl in labels:
+        if not lbl or len(lbl) > 63:
+            return False
+        if not all(ch.isalnum() or ch == "-" for ch in lbl):
+            return False
+    return _is_tld(labels[-1], tld_set, degraded)
+
+
+def _detect_context_at(text: str, offset: int, mask_chars=frozenset()) -> str:
+    """Context detector around the mask position (step 4, D2): URL / HOST /
+    PATH / FREE_TEXT.
+
+    Two passes:
+      1. SCHEME (P4): a 'scheme://' is honoured ONLY inside the mask's own
+         whitespace-delimited token, before the mask — a 'http://' earlier
+         in the sentence (a different token) must not lower a later bare
+         mask.
+      2. BARE DOMAIN (boundary G1): no scheme in the token — reconstruct
+         the domain by removing ALL masks (D-DET-1) and test the mask's sides.
+
+    mask_chars — the mask alphabet for this run, sourced from the cards
+    (SIGN_RELATIONS visible_form), never hardcoded."""
+    # token = the whitespace-delimited unit that contains the mask
+    left_bound = offset
+    while left_bound > 0 and not text[left_bound - 1].isspace():
+        left_bound -= 1
+    right_bound = offset
+    while right_bound < len(text) and not text[right_bound].isspace():
+        right_bound += 1
+    token = text[left_bound:right_bound]
+    rel = offset - left_bound  # mask index inside the token
+
+    # --- Pass 1: SCHEME_SCOPE (P4) — scheme only inside THIS token ---
+    scheme_at = token.rfind("://", 0, rel)
+    if scheme_at != -1:
+        after = token[scheme_at + 3:]
+        rel_s = rel - (scheme_at + 3)
+        host_end = len(after)
         for sep in ("/", "?", "#"):
-            p = after_scheme.find(sep)
+            p = after.find(sep)
             if p != -1:
                 host_end = min(host_end, p)
-        if 0 <= rel < host_end:
+        if 0 <= rel_s < host_end:
             return "HOST"
-        if next_slash != -1 and rel >= next_slash:
+        if "/" in after[:rel_s]:
             return "PATH"
         return "URL"
-    # no scheme: is there a url-like structure a.b/c nearby
-    window = text[max(0, offset - 20):offset + 20]
-    if "/" in window and "." in window:
-        return "URL"
+
+    # --- Pass 2: BARE DOMAIN (boundary G1), no scheme in the token ---
+    tld_set, degraded = _tlds()
+    left_part = _demask(token[:rel], mask_chars)       # D-DET-1: strip ALL masks,
+    right_part = _demask(token[rel + 1:], mask_chars)  # not only the current one
+
+    # host substitution — a domain on BOTH sides of the mask
+    # (a.com<mask>evil.com, incl. tails via _domain_prefix in _looks_like_domain)
+    if _looks_like_domain(left_part, tld_set, degraded) \
+            and _looks_like_domain(right_part, tld_set, degraded):
+        return "HOST"
+    # mask inserted INSIDE one domain (goog<mask>le.com -> google.com). D-DET-1
+    # makes the double-mask goog<mask>le.<mask>com collapse to google.com too.
+    if _looks_like_domain(left_part + right_part, tld_set, degraded):
+        return "HOST"
+    # a domain then the mask opens a tail -> path segment (readme.md<mask>x)
+    if _looks_like_domain(left_part, tld_set, degraded):
+        return "PATH"
     return "FREE_TEXT"
 
 
@@ -233,11 +402,21 @@ def _assess_relation_risk(text: str, sign_statuses: list) -> list:
     """STAGE_6b: verdict per active mask (D-REL-4/6).
     Barrier N3: read ONLY active_relation_candidates."""
     verdicts = []
+    # ARCH constraint: the mask alphabet for this run is taken from the
+    # cards (SIGN_RELATIONS -> visible_form), never hardcoded. D-DET-1
+    # strips exactly these characters when reconstructing a bare domain.
+    run_mask_chars = frozenset(
+        c.get("visible_form", "")
+        for st in sign_statuses
+        for c in getattr(st, "active_relation_candidates", [])
+        if c.get("visible_form")
+    )
+    _, tld_degraded = _tlds()  # D-DET-2: run-level DEGRADED signal
     for st in sign_statuses:
         for cand in getattr(st, "active_relation_candidates", []):
             offset = cand.get("at_offset", 0)
             scope_of_edge = set(cand.get("context_scope", []))
-            ctx = _detect_context_at(text, offset)
+            ctx = _detect_context_at(text, offset, run_mask_chars)
 
             # PROTECTED_CONTEXT: the real context is in the edge scope
             # (or the edge is ANY). Otherwise the mask is out of scope.
@@ -263,6 +442,7 @@ def _assess_relation_risk(text: str, sign_statuses: list) -> list:
                 "risk_level": risk.value,
                 "canon_hypothesis": None,  # probe deferred (D3)
                 "relation_id": cand.get("relation_id", ""),
+                "tld_source_degraded": tld_degraded,  # D-DET-2
             })
     return verdicts
 
@@ -329,12 +509,25 @@ def process_sequence(text: str, cards: list,
     # mask is itself a reason to analyse. Barrier N3: only active ones.
     relation_verdicts = _assess_relation_risk(text, sign_statuses)
 
+    # D-DET-2: mark the whole run DEGRADED when a bare-domain mask verdict
+    # was computed against an unavailable TLD registry (fail-closed by
+    # behaviour, not only by flag). The warning is honest, non-blocking.
+    degraded = any(v.get("tld_source_degraded") for v in relation_verdicts)
+    if degraded:
+        draft_warnings.append(
+            "TLD_SOURCE_DEGRADED: the single-TLD registry is unavailable; "
+            "bare-domain mask verdicts were computed fail-closed (TLD-shaped "
+            "labels accepted UNVERIFIED — alarm, not silence). Treat HOST/PATH "
+            "verdicts on bare domains as provisional (D-DET-2)."
+        )
+
     # --- STAGE_2a: CANDIDATE_POOL (PATCH_26) ---
     pool = _build_candidate_pool(cards)
     if not pool:
         return SequenceOutput(card_set=card_set, check_unavailable=True,
-                              warnings=["EMPTY_CANDIDATE_POOL"],
-                              relation_verdicts=relation_verdicts)
+                              warnings=["EMPTY_CANDIDATE_POOL"] + draft_warnings,
+                              relation_verdicts=relation_verdicts,
+                              degraded=degraded)
 
     # The set of positions that actually passed single-sign validation.
     # Each OutputStatus covers [sign_offset_start, sign_offset_end).
@@ -395,4 +588,5 @@ def process_sequence(text: str, cards: list,
         check_unavailable=False,
         warnings=draft_warnings,
         relation_verdicts=relation_verdicts,
+        degraded=degraded,
     )

@@ -71,6 +71,10 @@ class SequenceOutput:
     check_unavailable: bool = False                      # PATCH_24 CHECK_UNAVAILABLE
     warnings: list = field(default_factory=list)
     relation_verdicts: list = field(default_factory=list)  # step 4 of the relation axis: mask verdicts (D-REL-4/6)
+    degraded: bool = False  # AUTHOR_DECISION D-DET-2: the whole run is marked
+                            # DEGRADED when the TLD source is unavailable and
+                            # bare-domain verdicts were computed fail-closed
+                            # (TLD-shaped labels accepted unverified, alarm not silence)
 
     def aggregate_risk(self):
         """Aggregated sequence-layer risk.
@@ -105,4 +109,5 @@ class SequenceOutput:
             "SOURCE_OCCURRENCE_LIST": self.source_occurrence_list,
             "CHECK_UNAVAILABLE": "YES" if self.check_unavailable else "NO",
             "WARNINGS": list(self.warnings),
+            "DEGRADED": "YES" if self.degraded else "NO",
         }
