@@ -1,0 +1,542 @@
+CONVEYOR PACKET — NARROW CIRCLE — _domain_prefix REWRITE ONLY
+DATE: 2026-07-12
+AUTHOR: Ruslan Malyavsky
+FORMAT: single .txt (no zip) — paste this whole file into the reviewer prompt.
+
+════════════════════════════════════════════════════════════════════
+HEADER — READ FIRST
+════════════════════════════════════════════════════════════════════
+
+NARROW CIRCLE. The full first conveyor round on the bare-domain detector
+(informally "G1") was completed by four reviewers: architecture,
+D-DET-1/2, card/code consistency, and the documented seams — all
+confirmed and UNCHANGED. This is not a re-review of any of that.
+
+Three reviewers found one bypass CLASS: _domain_prefix trimmed the
+framing around a domain using a block-list (_STRIP_OUTER, a fixed
+punctuation set), so ANY character outside that list — markdown * _ ~ |,
+em dash U+2014, fullwidth quotation marks, angle brackets — stuck to the
+domain and produced a silent FREE_TEXT (the real HOST/HIGH verdict was
+lost).
+
+THE FIX: the block-list is replaced by a POSITIVE extraction. The
+detector now pulls the first contiguous run of "letter of ANY script /
+digit / hyphen / dot" and discards everything else.
+
+REVIEW ONLY THIS FIX. Nothing else is reopened this round.
+
+Gate: 34/34. Older gates: 12/12, 28/28, English CLEAN. Zero regressions.
+Status: NEW_ARTIFACT / NOT_REVIEWED.
+
+Language note: the AUTHOR_DECISION document (Part D) is in Russian — it
+is the actual committed file, quoted verbatim; a short English gloss
+follows it. All code, string literals (including the fullwidth solidus
+mask ／ = U+FF0F and Cyrillic homoglyph/IDN test text such as
+"gоog／le.com" and "приме／р.рф"), and gate output are the real UTF-8
+bytes, not transliterated.
+
+════════════════════════════════════════════════════════════════════
+PART A — _domain_prefix: OLD vs NEW, side by side
+════════════════════════════════════════════════════════════════════
+
+The ONLY function whose body changed. Everything in Parts B and C is
+either unchanged (B) or new tests (C). Both versions are quoted verbatim
+— OLD from git commit f9f0afd, NEW from the current working tree.
+
+--- The block-list constant the OLD version depended on (now DELETED) ---
+
+    _STRIP_OUTER = "()[]{}<>\"'`,;!?»«“”‘’"
+
+--- OLD (block-list; the bypass) — sequence/sequence_engine.py @ f9f0afd ---
+
+def _domain_prefix(token: str) -> str:
+    """P3 + P5: trim outer punctuation, then cut the tail at the first
+    structural separator (path/query/fragment/port/space). Returns the bare
+    domain candidate — 'evil.com/path' -> 'evil.com', '(a.com)' -> 'a.com'."""
+    token = token.strip().strip(_STRIP_OUTER)
+    cut = len(token)
+    for sep in ("/", "?", "#", ":", " "):
+        p = token.find(sep)
+        if p != -1:
+            cut = min(cut, p)
+    return token[:cut].strip(_STRIP_OUTER)
+
+    # BYPASS MECHANISM: token.strip(_STRIP_OUTER) only removes characters
+    # that happen to be in _STRIP_OUTER. Wrap the domain in anything NOT in
+    # that set — e.g. "*gоog／le.com*" (markdown emphasis) — and the leading/
+    # trailing '*' survives. It then rides into _looks_like_domain, where the
+    # per-label check `all(ch.isalnum() or ch == "-" for ch in lbl)` fails on
+    # '*', so the string is NOT a domain -> FREE_TEXT. A real HOST mask goes
+    # silent. Block lists only ever cover the punctuation someone enumerated.
+
+--- NEW (positive extraction; the fix) — current working tree ---
+
+def _domain_prefix(token: str) -> str:
+    """POSITIVE extraction (FIX_FIRST 2026-07-12, blocker — three reviewers
+    found the bypass in the first conveyor round): return the first maximal
+    run of domain-shaped characters in the token — a Unicode letter (any
+    script, so IDN labels such as a Cyrillic homoglyph attack still match —
+    this is the thing we WANT to catch, not exclude), a digit, '-', or '.' —
+    and discard everything outside that run.
+
+    Replaces the old block-list approach (strip a fixed punctuation set,
+    _STRIP_OUTER, off the token's outer edges). A block list only ever
+    covers the punctuation someone thought to enumerate: markdown '*', an
+    em dash, a tilde, a pipe, a fullwidth quotation mark and any other
+    wrapping character NOT in that specific list stuck to the domain,
+    made a label fail the isalnum-or-hyphen check in _looks_like_domain,
+    and silently downgraded a real HOST mask to FREE_TEXT (a fullwidth-
+    solidus mask domain wrapped in asterisks bypassed detection this way
+    — the asterisks were never in _STRIP_OUTER; see the gate for the
+    literal example). A positive allow-list closes the whole class at
+    once instead of chasing individual punctuation marks.
+
+    This also subsumes the old separate 'cut at the first /, ?, #, :,
+    space' step (P5): none of those characters are in the allow-list, so
+    the scan stops there on its own — no separate pass needed.
+
+    Deliberately NOT trimmed here (known, deferred — see AUTHOR_DECISION
+    D-DET-3 / FIX_FIRST_ROUND1 in foundation_layer): a leading/trailing
+    hyphen on the extracted run (RFC-invalid but not rejected — v0.5
+    tail), and the concatenation false positives this positive scan can
+    itself produce when two unrelated fragments glue into a domain-shaped
+    string once the mask is removed."""
+    token = token.strip()
+    n = len(token)
+    i = 0
+    while i < n and not (token[i].isalnum() or token[i] in ".-"):
+        i += 1
+    j = i
+    while j < n and (token[j].isalnum() or token[j] in ".-"):
+        j += 1
+    return token[i:j]
+
+KEY BEHAVIOURAL DELTA to scrutinise:
+  - OLD kept the WHOLE token minus enumerated edge punctuation, then cut
+    at the first structural separator.
+  - NEW keeps ONLY the first maximal [letter-any-script | digit | - | .]
+    run and drops everything before and after it. `token[i].isalnum()` is
+    Unicode-aware, so non-ASCII letters (Cyrillic, Arabic, Devanagari, …)
+    are INSIDE the allow-list on purpose — an IDN/homoglyph domain must
+    still be extracted, not discarded.
+
+════════════════════════════════════════════════════════════════════
+PART B — the rest of the path, UNCHANGED but needed to judge the fix
+(_domain_prefix feeds these two; quoted verbatim from the current tree)
+════════════════════════════════════════════════════════════════════
+
+def _is_tld(label: str, tld_set, degraded: bool) -> bool:
+    """P2 (IDN): a label is a TLD if it is in the registry directly OR its
+    punycode A-label is (an IDN ccTLD label -> its A-label, e.g. xn--p1ai).
+    D-DET-2: when the registry is
+    DEGRADED, accept a TLD-SHAPED label (alphabetic, 2..63) rather than go
+    silent — alarm, not miss."""
+    label = label.lower()
+    if label in tld_set:
+        return True
+    try:
+        alabel = label.encode("idna").decode("ascii").lower()
+        if alabel in tld_set:
+            return True
+    except Exception:
+        pass
+    if degraded:
+        return label.isalpha() and 2 <= len(label) <= 63
+    return False
+
+
+def _looks_like_domain(raw: str, tld_set, degraded: bool) -> bool:
+    """A string looks like a bare domain: >= 2 labels, each a valid DNS
+    label (alnum or '-', non-empty, <= 63 chars), last label a TLD. The
+    tail (path/port/query) is trimmed by _domain_prefix first (P5)."""
+    s = _domain_prefix(raw)
+    if not s:
+        return False
+    labels = s.strip(".").split(".")
+    if len(labels) < 2:
+        return False
+    for lbl in labels:
+        if not lbl or len(lbl) > 63:
+            return False
+        if not all(ch.isalnum() or ch == "-" for ch in lbl):
+            return False
+    return _is_tld(labels[-1], tld_set, degraded)
+
+NOTE on the interaction (this is exactly what the reviewer should probe):
+_looks_like_domain calls _domain_prefix FIRST, then splits the result on
+'.', then per-label runs `all(ch.isalnum() or ch == "-")`. So a character
+survives to a label ONLY if _domain_prefix kept it. Since the positive
+scan keeps `isalnum() or '.' or '-'`, and the per-label check accepts
+`isalnum() or '-'`, the '.' is consumed by the split and everything else
+was already dropped. That is the whole reason the bypass closes — but it
+is also where any NEW miss or NEW false positive would live. Parts of the
+label check that matter for the questions below: len>63 is rejected;
+empty label (from '..' or a leading/trailing '.') is rejected; a hyphen
+anywhere (including edges) is accepted; digits are accepted everywhere
+including the last label (so a numeric TLD is shape-valid and then
+gated only by _is_tld / registry membership).
+
+════════════════════════════════════════════════════════════════════
+PART C — the nine NEW gate cases, with expectations
+(tests/gate_bare_domain_detector.py — verbatim; the fixtures use the
+literal fullwidth solidus ／ U+FF0F as the mask and Cyrillic homoglyphs)
+════════════════════════════════════════════════════════════════════
+
+The gate pins TLD state to a fixed offline set
+  _PINNED_TLDS = frozenset({"com", "org", "net", "md", "ru", "io", "xn--p1ai"})
+and drives every case through the real process_sign + process_sequence
+pipeline (not by calling _domain_prefix directly), so these are
+end-to-end verdicts. _ctx() returns the detected_context of the first
+mask verdict; _risk() its risk_level.
+
+--- 5 bypass cases (the blocker): each was a silent FREE_TEXT before,
+    must now be HOST/HIGH ---
+
+for wrapped in ("*gоog／le.com*", "gоog／le.com—x", "~gоog／le.com~",
+                "|gоog／le.com|", "＂gоog／le.com＂"):
+    check(f"{wrapped!r} -> HOST/HIGH (was a silent FREE_TEXT bypass)",
+          _ctx(card, wrapped) == "HOST" and _risk(card, wrapped) == "HIGH",
+          (_ctx(card, wrapped), _risk(card, wrapped)))
+
+    # wrappers exercised: markdown asterisk '*', trailing em dash U+2014 '—',
+    # tilde '~', pipe '|', fullwidth quotation mark U+FF02 '＂'. None were in
+    # _STRIP_OUTER; each used to survive into a label and fail the check.
+
+--- 2 D-DET-3 cases (concatenation false positives — DOCUMENTED, not
+    fixed; assertions pin the OBSERVED verdict) ---
+
+check("my-host／name.com -> HOST/HIGH (known_behavior: 'my-host'+'name.com' "
+      "glues into 'my-hostname.com', a syntactically valid domain — no real "
+      "attack here, just two hyphenated/dotted fragments coinciding)",
+      _ctx(card, "my-host／name.com") == "HOST" and _risk(card, "my-host／name.com") == "HIGH",
+      (_ctx(card, "my-host／name.com"), _risk(card, "my-host／name.com")))
+check("example.com,／test -> HOST/HIGH (known_behavior: the comma stops the "
+      "positive-extraction run before 'test', so the concatenated check "
+      "just re-derives the left-hand domain and fires HOST rather than "
+      "PATH; 'test' is silently dropped from consideration)",
+      _ctx(card, "example.com,／test") == "HOST" and _risk(card, "example.com,／test") == "HIGH",
+      (_ctx(card, "example.com,／test"), _risk(card, "example.com,／test")))
+
+--- 2 v0.5 tails (known, deferred; assertions pin the OBSERVED verdict) ---
+
+check("gоog／le.xn--zckzah -> FREE_TEXT/NONE (known_behavior: an "
+      "already-punycode TLD label absent from the ACTIVE registry is a "
+      "silent miss — a registry-completeness dependency, not a distinct "
+      "detector bug; production risk is low since the real IANA registry "
+      "carries current punycode ccTLDs, but a stale/narrow registry can "
+      "still miss one)",
+      _ctx(card, "gоog／le.xn--zckzah") == "FREE_TEXT",
+      _ctx(card, "gоog／le.xn--zckzah"))
+check("-example.com／x -> PATH/MEDIUM (known_behavior: a leading hyphen on "
+      "a label is RFC 952/1035-invalid but the per-label check only tests "
+      "isalnum-or-hyphen membership, not position, so '-example' still "
+      "validates as a domain label)",
+      _ctx(card, "-example.com／x") == "PATH",
+      _ctx(card, "-example.com／x"))
+
+EXPECTATION TABLE (all nine, as asserted and as measured — see Part F):
+  *gоog／le.com*         -> HOST / HIGH      (bypass closed)
+  gоog／le.com—x         -> HOST / HIGH      (bypass closed)
+  ~gоog／le.com~         -> HOST / HIGH      (bypass closed)
+  |gоog／le.com|         -> HOST / HIGH      (bypass closed)
+  ＂gоog／le.com＂         -> HOST / HIGH      (bypass closed)
+  my-host／name.com      -> HOST / HIGH      (D-DET-3, accepted FP)
+  example.com,／test     -> HOST / HIGH      (D-DET-3, accepted FP)
+  gоog／le.xn--zckzah    -> FREE_TEXT / NONE (v0.5 tail, known miss)
+  -example.com／x        -> PATH / MEDIUM    (v0.5 tail, known lax)
+
+════════════════════════════════════════════════════════════════════
+PART D — AUTHOR_DECISION D-DET-3, in full
+(foundation_layer/AUTHOR_DECISION_20260712_BARE_DOMAIN_DETECTOR_FIX_FIRST_ROUND1.md
+— verbatim, Russian; English gloss follows)
+════════════════════════════════════════════════════════════════════
+
+ЧАСТНЫЙ АВТОРСКИЙ ПРОЕКТ / COMMERCIAL USE PROHIBITED
+
+DOCUMENT_ID: AUTHOR_DECISION_20260712_BARE_DOMAIN_DETECTOR_FIX_FIRST_ROUND1
+DOCUMENT_TYPE: AUTHOR_DECISION (D-DET-3) + FIX_FIRST-протокол первого круга
+STATUS: ACCEPTED (решение автора по D-DET-3); код детектора остаётся
+        NEW_ARTIFACT, NOT_REVIEWED — идёт на ВТОРОЙ круг конвейера
+AUTHOR: Руслан Малявский (AUTHOR_DECISION_STATUS_AUTHORITY)
+DATE: 2026-07-12
+BASIS: FIX_FIRST по итогам первого круга конвейера над детектором
+       голого домена (см. AUTHOR_DECISION_20260712_BARE_DOMAIN_
+       DETECTOR_D-DET-1_2.md — тот заход и его basis). Один блокер от
+       трёх ревьюеров, одно новое решение автора (D-DET-3), два хвоста
+       отложены на v0.5.
+
+════════════════════════════════════════════════════════════════
+БЛОКЕР — _domain_prefix: чёрный список → позитивная выборка
+════════════════════════════════════════════════════════════════
+НАХОДКА (три ревьюера, первый круг). _domain_prefix обрезал обрамление
+домена по чёрному списку _STRIP_OUTER (фиксированный набор пунктуации).
+Любой символ ВНЕ этого списка — markdown-звёздочка *, тире U+2014,
+тильда ~, pipe |, полноширинная кавычка U+FF02 и т.п. — прилипал к
+домену. Пример: `*gоog／le.com*` — после снятия маски label становится
+`*gоogle.com*` (или после старой логики — `*gоog` / `le.com*` по
+частям), в любом случае лишний символ остаётся ВНУТРИ метки, проверка
+`ch.isalnum() or ch == "-"` на этот символ проваливается → домен не
+распознаётся → тихий FREE_TEXT. Реальный обход HOST/HIGH-вердикта, не
+краевой случай — блокирует READY_TO_SAVE.
+
+РЕШЕНИЕ (не AUTHOR_DECISION в строгом смысле — обязательное
+исправление корректности, не решение по вкусу). _domain_prefix
+переписан с чёрного списка на ПОЗИТИВНУЮ выборку: находит первый
+максимальный непрерывный блок домено-подобных символов — буква
+ЛЮБОГО алфавита (Unicode-осведомлённая проверка `ch.isalnum()`,
+поэтому IDN/гомоглиф-атака кириллицей по-прежнему ловится — это то,
+что детектор ДОЛЖЕН ловить, а не исключать), цифра, дефис, точка — и
+отбрасывает всё остальное. Закрывает весь класс обхода одним
+изменением, а не патчами по символу.
+
+Побочный эффект: этот же позитивный скан САМ ПО СЕБЕ подхватывает
+старую функцию отреза хвоста (P5: `/`, `?`, `#`, `:`, пробел) — ни
+один из этих символов не входит в allow-list, скан останавливается на
+них естественным образом. Отдельный цикл `for sep in (...)` убран как
+избыточный.
+
+ПРОВЕРКА. Весь предыдущий gate (25 прежних кейсов: P2/P3/P4/P5,
+D-DET-1, D-DET-2, FP-guard, zero-width boundary) прогнан ПОСЛЕ правки
+— 25/25 без изменений в ожидаемых вердиктах. Плюс 5 новых кейсов на
+сам обход (звёздочка, тире, тильда, pipe, полноширинная кавычка) — все
+теперь дают HOST/HIGH вместо прежнего тихого FREE_TEXT.
+
+════════════════════════════════════════════════════════════════
+D-DET-3 — ЛОЖНЯКИ СКЛЕЙКИ: ДОКУМЕНТИРОВАТЬ, НЕ ЧИНИТЬ
+════════════════════════════════════════════════════════════════
+РЕШЕНИЕ АВТОРА. Позитивная выборка выше — эвристика, не полноценный
+URL-парсер. Склейка левой и правой части токена вокруг маски
+(left_part + right_part, механика D-DET-1) может дать ложный HOST на
+двух НЕ связанных фрагментах, если результат синтаксически похож на
+домен. Это признаётся и документируется как известное поведение
+эвристики, НЕ как дефект, требующий немедленного исправления.
+
+ПРИМЕРЫ (реальный вывод детектора, не предположение — прогнано
+07-12):
+  - `my-host／name.com` → HOST/HIGH. «my-host» и «name.com» — два
+    самостоятельных фрагмента (например, из разных предложений или
+    случайно соседствующих слов), которые после снятия маски
+    склеиваются в синтаксически корректный `my-hostname.com`.
+    Настоящей подмены домена здесь может не быть.
+  - `example.com,／test` → HOST/HIGH (НЕ HOST/PATH — уточнено прогоном:
+    запятая останавливает позитивный скан ДО «test», поэтому проверка
+    «склеенное = домен» просто заново находит левый домен
+    `example.com` и даёт HOST; «test» молча выпадает из рассмотрения).
+
+ПОЧЕМУ НЕ ЧИНИТЬ СЕЙЧАС. Убрать этот класс ложняков означало бы
+полноценный URL/токен-парсер с пониманием границ «слово / слово»
+против «домен», что выходит за рамки текущего грубого детектора (Г1
+исторически и есть «грубый», см. исходный докстринг
+`_detect_context_at`). Правильный инструмент — отдельная итерация
+детектора, не патч поверх позитивной выборки.
+
+ЗАКРЕПЛЕНО В GATE. `tests/gate_bare_domain_detector.py`, секция
+`[D-DET-3, known] Concatenation false positives — documented, not
+fixed` — оба примера закреплены ассёршенами на НАБЛЮДАЕМЫЙ вердикт
+(не на «правильный»), чтобы будущее изменение эвристики проявилось
+здесь явно, а не расползлось незамеченным.
+
+════════════════════════════════════════════════════════════════
+ДВА ХВОСТА — ОТЛОЖЕНЫ НА v0.5, ДОБАВЛЕНЫ В GATE КАК KNOWN
+════════════════════════════════════════════════════════════════
+ХВОСТ 1 — уже-punycode вход вне активного справочника.
+  Пример: `gоog／le.xn--zckzah` → FREE_TEXT/NONE (тихий пропуск) —
+  проверено на пришпиленном тестовом TLD-наборе, НЕ содержащем
+  `xn--zckzah`. `_is_tld` сперва проверяет метку как есть (не найдена),
+  затем пробует `.encode("idna")` (для уже-ASCII `xn--...` строки не
+  меняет её), тоже не находит. Это зависимость от ПОЛНОТЫ активного
+  справочника, а не отдельный баг детектора: в проде (live IANA fetch
+  или встроенный fallback ~200 записей) современные punycode ccTLD
+  почти наверняка присутствуют. Помечено как известное, не чинится в
+  этом круге.
+
+ХВОСТ 2 — дефис на краю метки.
+  Пример: `-example.com／x` → PATH/MEDIUM. Проверка метки
+  `all(ch.isalnum() or ch == "-" for ch in lbl)` не учитывает ПОЗИЦИЮ
+  дефиса — RFC 952/1035 запрещают дефис в начале/конце метки, текущий
+  код это не проверяет, поэтому `-example` проходит как валидная
+  метка. Не чинится в этом круге — записано как известное отклонение
+  от строгого RFC.
+
+ЗАКРЕПЛЕНО В GATE. `tests/gate_bare_domain_detector.py`, секция
+`[v0.5, known] Deferred tails — not fixed in this round`.
+
+════════════════════════════════════════════════════════════════
+СТАТУС ПОСЛЕ ЭТОГО КРУГА
+════════════════════════════════════════════════════════════════
+Код детектора: NEW_ARTIFACT, NOT_REVIEWED — этот FIX_FIRST не меняет
+статус, он готовит артефакт ко ВТОРОМУ кругу конвейера (первый круг
+дал FIX_FIRST по блокеру; блокер закрыт этим документом и коммитом).
+gate_bare_domain_detector.py: 34/34 (было 25, добавлено 5 на блокер +
+2 на D-DET-3 + 2 на v0.5-хвосты). Полная регрессия: gate_relation_
+verdict_step4 12/12, gate_solidus_scheme 28/28, gate_english_only
+CLEAN — все прогнаны ПОСЛЕ правки _domain_prefix, не только до.
+
+Карточка SIGN_CORE_CARD_FULLWIDTH_SOLIDUS_UFF0F: VERSION v0_3,
+LIMITATION_STATEMENT дополнен строками ИСПРАВЛЕНО (блокер) и ИЗВЕСТНО
+И НЕ ЧИНИТСЯ (D-DET-3) и ОТЛОЖЕНО (v0.5-хвосты). Карточка и детектор
+по-прежнему идут на конвейер ОДНИМ пакетом.
+
+СВЯЗЬ: AUTHOR_DECISION_20260712_BARE_DOMAIN_DETECTOR_D-DET-1_2.md
+(первый заход — D-DET-1, D-DET-2), SIGN_CORE_CARD_FULLWIDTH_SOLIDUS_
+UFF0F v0_3, ARCH_DECISION_HOMOGLYPH_VIA_CARD_ONLY (Unicode-буква любого
+алфавита в позитивной выборке — это ЧТЕНИЕ формы символа, не заведение
+нового знака мимо карточки; список масок по-прежнему только из
+SIGN_RELATIONS, позитивная выборка не расширяет и не сужает этот
+список — она лишь решает, что «похоже на домен» ВНУТРИ уже demask-нутой
+строки).
+
+--- ENGLISH GLOSS (orientation only; the Russian above is authoritative) ---
+
+BLOCKER: _domain_prefix used a block-list (_STRIP_OUTER). Any wrapping
+character outside it stuck to the domain, failed the per-label
+isalnum-or-hyphen check, and produced a silent FREE_TEXT — a real bypass
+of the HOST/HIGH verdict, found by three reviewers, blocking
+READY_TO_SAVE. Fix (mandatory correctness fix, not a taste call): rewrite
+to a positive extraction — first maximal run of any-script letter / digit
+/ hyphen / dot; Unicode-aware isalnum() keeps IDN/Cyrillic-homoglyph
+domains matchable (which is what we must catch, not exclude). The
+positive scan subsumes the old P5 tail-cut for free. All 25 prior gate
+cases re-run after the change, unchanged; 5 new bypass cases now HOST/HIGH.
+
+D-DET-3 (author's decision): the positive-extraction heuristic can glue
+two unrelated fragments across the mask into a domain-shaped string
+(my-host／name.com -> HOST; example.com,／test -> HOST, the comma dropping
+"test"). Documented as known/accepted, NOT fixed — removing it needs a
+real URL/word-boundary parser, out of this rough detector's scope. Pinned
+in the gate against observed verdicts.
+
+Two v0.5 tails, known, deferred, added to the gate: (1) an already-
+punycode TLD label absent from the ACTIVE registry -> silent FREE_TEXT
+(a registry-completeness dependency, not a distinct bug; real IANA data
+carries current punycode ccTLDs); (2) a leading-hyphen label -> accepted
+(RFC 952/1035-invalid; the per-label check tests membership, not
+position).
+
+Status after this round: detector code stays NEW_ARTIFACT, NOT_REVIEWED,
+heading to conveyor round 2. Gates: bare-domain 34/34, relation 12/12,
+solidus 28/28, English CLEAN — all re-run AFTER the _domain_prefix change.
+Card bumped to v0_3, LIMITATION_STATEMENT updated; card and detector ship
+as one package.
+
+════════════════════════════════════════════════════════════════════
+QUESTIONS TO REVIEWERS — THREE, NARROW
+════════════════════════════════════════════════════════════════════
+
+Review ONLY the _domain_prefix rewrite (Part A), judged against the
+unchanged path it feeds (Part B). Do NOT reopen D-DET-1/2, the seams,
+zero-width, OPEN_QUESTION_001, or card/code consistency — those are done
+and out of scope this round. For any finding, give the exact input
+string and the exact line/branch.
+
+N1 — NEW MISSES. Did the positive extraction LOSE anything the old
+block-list caught? Find an input the OLD version would have carried to a
+correct HOST/PATH verdict but the NEW version now releases to FREE_TEXT
+(or otherwise under-classifies). Push specifically on: a domain with an
+UNDERSCORE (is '_' correctly out of the allow-list, and is that the right
+call for host detection?); a DIGIT in the TLD position; IDN labels in
+non-Latin scripts beyond Cyrillic (Arabic, Devanagari, Hebrew — does
+`str.isalnum()` treat their letters as alnum so the run is not cut
+short?); and any input where the FIRST domain-shaped run ends BEFORE the
+real domain (so the scan returns an early fragment and the real host is
+dropped).
+
+N2 — NEW FALSE POSITIVES. Did the extraction GLUE too much — can it now
+assemble a "domain" from material the old version discarded? (D-DET-3
+already covers the mask-concatenation FPs and is out of scope — look for
+DIFFERENT ones introduced by the positive scan itself.) Push on: runs of
+consecutive dots/hyphens; version strings (v1.2.3); dotted abbreviations
+and initials (U.S.A., e.g.); truncated sentence fragments where a
+word.word pair coincidentally ends in a real TLD token.
+
+N3 — IDN NOT BROKEN. A Cyrillic (or other non-Latin) label IS the attack
+— those letters MUST pass. Confirm the positive scan does not strip
+non-ASCII letters: "приме／р.рф" must still reach HOST (it does in the
+gate; verify the reasoning, not just the result). And the converse:
+confirm the scan STOPS at structural characters ('/', '@', ':') rather
+than letting them into a label — i.e. it neither over-includes a
+separator nor under-includes a letter.
+
+════════════════════════════════════════════════════════════════════
+PART F — RAW GATE OUTPUT, 34/34 (measured, not asserted)
+════════════════════════════════════════════════════════════════════
+
+Command: py -3 tests/gate_bare_domain_detector.py
+Elision note: the pipeline prints one identical
+"[CARD_WARNING] CARD_NOT_CONVEYOR_REVIEWED: BD has WORKING_DRAFT status …"
+line per process_sign() call (dozens of identical lines — the card is
+WORKING_DRAFT by design, which is correct and expected). Those identical
+boilerplate lines are elided below; every ✓/section/TOTAL line is
+verbatim. Exit code: 0.
+
+================================================================
+GATE: bare-domain detector (Г1) — NEW_ARTIFACT, NOT_REVIEWED
+================================================================
+
+[P3] Outer punctuation around a bare domain -> HOST
+  ✓ (gоog／le.com) -> HOST
+  ✓ "gоog／le.com" -> HOST
+  ✓ gоog／le.com, -> HOST
+  ✓ bare gоog／le.com -> HOST/HIGH
+
+[P4] Scheme scope is token-local
+  ✓ http://safe.com/path then gоog／le.com -> HOST
+  ✓ http://safe.com then readme.md／x -> PATH
+  ✓ http://gоog／le.com -> HOST (in-scheme host)
+  ✓ http://ok.com/a／b -> PATH (in-scheme path)
+
+[P5] Domain on both sides with a tail -> HOST
+  ✓ a.com／evil.com/path -> HOST
+  ✓ a.com／evil.com:443 -> HOST
+  ✓ a.com／evil.com?x=1 -> HOST
+
+[P2] IDN / punycode
+  ✓ приме／р.рф -> HOST
+  ✓ _looks_like_domain(пример.рф) True
+
+[D-DET-1] Double mask in one token -> HOST (all masks stripped)
+  ✓ gоog／le.／com yields 2 verdicts (one per mask)
+  ✓ both masks -> HOST
+
+[V2] Glued scheme (no space) is not downgraded
+  ✓ http://safe.comgоog／le.com -> HOST
+
+[FP-guard] CJK fullwidth date stays FREE_TEXT
+  ✓ 2026／07／11 -> all FREE_TEXT/NONE
+
+[FREE_TEXT] Lone mask -> NONE, not protected
+  ✓ just ／ text -> FREE_TEXT/NONE
+  ✓ just ／ text -> protected=False
+
+[BOUNDARY] Zero-width between labels defeats detection (documented)
+  ✓ gоog<ZWSP>／le.com -> FREE_TEXT (KNOWN LIMITATION, D-DET doc)
+
+[D-DET-2] Degraded TLD registry -> HOST + run marked DEGRADED
+  ✓ degraded: gоog／le.com -> HOST (not silent FREE_TEXT)
+  ✓ degraded: verdict carries tld_source_degraded=True
+  ✓ degraded: SequenceOutput.degraded=True
+  ✓ degraded: TLD_SOURCE_DEGRADED warning present
+  ✓ healthy: run not marked degraded
+
+[FIX_FIRST] Block-list punctuation bypass is closed (positive extraction)
+  ✓ '*gоog／le.com*' -> HOST/HIGH (was a silent FREE_TEXT bypass)
+  ✓ 'gоog／le.com—x' -> HOST/HIGH (was a silent FREE_TEXT bypass)
+  ✓ '~gоog／le.com~' -> HOST/HIGH (was a silent FREE_TEXT bypass)
+  ✓ '|gоog／le.com|' -> HOST/HIGH (was a silent FREE_TEXT bypass)
+  ✓ '＂gоog／le.com＂' -> HOST/HIGH (was a silent FREE_TEXT bypass)
+
+[D-DET-3, known] Concatenation false positives — documented, not fixed
+  ✓ my-host／name.com -> HOST/HIGH (known_behavior: 'my-host'+'name.com' glues into 'my-hostname.com', a syntactically valid domain — no real attack here, just two hyphenated/dotted fragments coinciding)
+  ✓ example.com,／test -> HOST/HIGH (known_behavior: the comma stops the positive-extraction run before 'test', so the concatenated check just re-derives the left-hand domain and fires HOST rather than PATH; 'test' is silently dropped from consideration)
+
+[v0.5, known] Deferred tails — not fixed in this round
+  ✓ gоog／le.xn--zckzah -> FREE_TEXT/NONE (known_behavior: an already-punycode TLD label absent from the ACTIVE registry is a silent miss — a registry-completeness dependency, not a distinct detector bug; production risk is low since the real IANA registry carries current punycode ccTLDs, but a stale/narrow registry can still miss one)
+  ✓ -example.com／x -> PATH/MEDIUM (known_behavior: a leading hyphen on a label is RFC 952/1035-invalid but the per-label check only tests isalnum-or-hyphen membership, not position, so '-example' still validates as a domain label)
+
+================================================================
+TOTAL: 34 OK / 0 FAIL
+================================================================
+
+════════════════════════════════════════════════════════════════════
+END OF PACKET
+════════════════════════════════════════════════════════════════════
