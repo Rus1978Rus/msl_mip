@@ -1,0 +1,2257 @@
+CONVEYOR PACKET — SECOND ROUND — BARE-DOMAIN DETECTOR (G1) IN FULL, WITH SAFEGUARD
+DATE: 2026-07-12
+AUTHOR: Ruslan Malyavsky
+FORMAT: single .txt (no zip) — paste this whole file into the reviewer prompt.
+All code / cards / decisions below are BYTE-EXACT slices read from disk by a
+builder script, not transcribed from memory; a verify pass confirmed each
+embedded block is a substring of its source file.
+
+========================================================================
+HEADER — READ FIRST
+========================================================================
+SECOND ROUND — the bare-domain detector (informally "G1") in full assembly.
+Round 1 (4 reviewers) and the narrow circle on _domain_prefix (5 reviewers)
+each returned FIX_FIRST; both are closed:
+  - Round 1  -> AUTHOR_DECISION D-DET-1 (double mask), D-DET-2 (degraded TLD).
+  - Narrow   -> BLOCKER: _domain_prefix rewritten block-list -> positive
+               extraction; D-DET-3 (concatenation FPs documented); D-DET-4
+               (leading structural separator is a HARD_STOP).
+Since then a WATCHDOG was added against a silent sever of the mask verdict
+path (the audit found the relation/mask verdict reaches the final verdict
+through exactly one hand-wired path; the sequence integrator, the empty-pool
+exit and the serialized form all drop it). The watchdog is an independent
+finish-line invariant (D-GUARD-1) plus a revival of the dead
+validation_warnings field (D-GUARD-2); a 5-model conveyor converged on this
+design (honeycombs / HMAC / telemetry / event-sourcing / __del__ pills were
+rejected as over-engineering or Python non-determinism). A chaos gate proves
+the watchdog is alive. THE DETECTOR IN FULL, WITH THE WATCHDOG, HAS NOT BEEN
+REVIEWED BY ANYONE.
+
+STATUS: NEW_ARTIFACT / NOT_REVIEWED.
+The fullwidth-solidus card is DOCUMENT_STATUS: WORKING_DRAFT and travels as
+ONE package with the detector.
+
+NOTE ON SCOPE OF THIS PACKET: the requested item "_mask_token" does NOT exist
+as a separate function — token extraction (the whitespace-delimited unit
+around the mask) is INLINE at the top of _detect_context_at. It is included
+there, not omitted. Flagged so a reviewer does not hunt for a function that
+was never split out.
+
+========================================================================
+SECTION 0 — MANDATORY FOR EVERY FINDING (ACK_GAP_TRIVALENT)
+========================================================================
+For EACH finding, two fields are REQUIRED:
+  FINDING_STATUS: VERIFIED | REJECTED | UNVERIFIABLE
+  FINDING_BASIS:  what it rests on — a code trace with the EXACT input and
+                  the EXACT line/branch, OR a direct quote from this packet,
+                  OR an honest "could not verify".
+A verdict without BASIS is NOT accepted. An assertion is not a proof.
+UNVERIFIABLE is a legitimate answer; a guess dressed as verification is not.
+A bare "VERIFIED"/"checked"/"obvious" without METHOD+TARGET+OBSERVED = no
+FINDING_STATUS. (Two prior rounds had a voice pass a guess off as a check and
+another review non-existent code; this section exists to catch both.)
+
+========================================================================
+PART 1 — G1 DETECTOR BLOCK (sequence/sequence_engine.py, verbatim)
+========================================================================
+Contains, in file order: the block header comment (D-DET-1/2 + FIX_FIRST
+round 1/2 notes) — _tlds / _force_tld_state_for_test / _reset_tld_state_for_test
+(D-DET-2 health check) — _demask (D-DET-1) — _LEADING_STRUCTURAL_STOPS +
+_domain_prefix (positive extraction + D-DET-4 hard-stop) — _is_tld (P2 IDN +
+D-DET-2 degraded shape) — _looks_like_domain — _detect_context_at (inline
+token extraction + P4 scheme scope + G1 bare-domain, D-DET-1 all-mask strip)
+— _SCOPE_RISK — _downgrade — _assess_relation_risk (mask alphabet from cards).
+------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────
+# BARE-DOMAIN DETECTOR (boundary G1) — reconstructed 2026-07-12 from FIX_VERIFICATION
+# reviews (six runs) used AS A REQUIREMENTS SPEC. Status: NEW_ARTIFACT,
+# NOT_REVIEWED — the reviews are input, not sign-off. Two author decisions
+# are fixed here in code and in foundation_layer/
+# AUTHOR_DECISION_20260712_BARE_DOMAIN_DETECTOR_D-DET-1_2.md:
+#
+#   D-DET-1  Two or more masks in one token: remove ALL masks before the
+#            domain check (not just the current one — the P6 double-mask
+#            miss caught by DeepSeek-R1 and Qwen). If the remainder looks
+#            like a domain → HOST.
+#   D-DET-2  TLD registry unavailable: a domain-shaped token with a mask
+#            raises an alarm, NOT silence; the whole run is marked DEGRADED
+#            (fail-closed by BEHAVIOUR, not only by flag — the V3 concern
+#            raised by 5 of 6 reviewers).
+#
+# ARCHITECTURAL CONSTRAINT (ARCH_DECISION_HOMOGLYPH_VIA_CARD_ONLY): the set
+# of mask characters is taken from the cards (SIGN_RELATIONS -> visible_form),
+# never hardcoded. See run_mask_chars in _assess_relation_risk.
+#
+# FIX_FIRST round 1 (2026-07-12): _domain_prefix rewritten from a block-list
+# (_STRIP_OUTER, a fixed punctuation set) to a positive character allow-list.
+# Three reviewers found the block-list bypass — see _domain_prefix's own
+# docstring and foundation_layer/AUTHOR_DECISION_20260712_BARE_DOMAIN_
+# DETECTOR_FIX_FIRST_ROUND1.md, including AUTHOR_DECISION D-DET-3
+# (concatenation false positives documented, not fixed) and two v0.5 tails.
+#
+# FIX_FIRST round 2 (2026-07-12): the narrow-circle review of round 1 found
+# that the positive scan skipped a LEADING structural separator as if it
+# were a wrapper (@example.com, /example.com mis-read as bare domains).
+# AUTHOR_DECISION D-DET-4: leading / \\ ? # : @ are a HARD_STOP. Same round
+# corrected the "any script" docstring wording (combining marks fail
+# isalnum() — a pre-existing limitation) and added the mask-after-domain
+# concatenation FP as a D-DET-3 addendum. See FIX_FIRST_ROUND2.md.
+# ─────────────────────────────────────────────────────────────────────
+
+# TLD registry state (lazy, once per process). Health check mirrors the
+# reviews: a set with >= _TLD_MIN_HEALTHY entries is trusted; anything
+# smaller/broken is DEGRADED (D-DET-2). load_single_tlds() itself already
+# has a three-level fallback (live -> cache -> embedded ~200 entries), so
+# DEGRADED only fires on a genuinely empty/corrupt registry.
+_TLD_SET = None
+_TLD_SOURCE_DEGRADED = False
+_TLD_MIN_HEALTHY = 100
+
+
+def _tlds():
+    """Returns (frozenset_of_tlds, degraded_bool). Cached for the process
+    lifetime — the caller must not fetch on every mask."""
+    global _TLD_SET, _TLD_SOURCE_DEGRADED
+    if _TLD_SET is None:
+        try:
+            entries, _source = load_single_tlds()
+        except Exception:
+            entries = frozenset()
+        if not isinstance(entries, (set, frozenset)) or len(entries) < _TLD_MIN_HEALTHY:
+            _TLD_SET = frozenset(entries) if isinstance(entries, (set, frozenset)) else frozenset()
+            _TLD_SOURCE_DEGRADED = True
+        else:
+            _TLD_SET = frozenset(entries)
+            _TLD_SOURCE_DEGRADED = False
+    return _TLD_SET, _TLD_SOURCE_DEGRADED
+
+
+def _force_tld_state_for_test(tld_set, degraded: bool) -> None:
+    """Test hook only: pin the TLD registry state so a gate can exercise
+    the DEGRADED path (D-DET-2) without touching the network."""
+    global _TLD_SET, _TLD_SOURCE_DEGRADED
+    _TLD_SET = frozenset(tld_set)
+    _TLD_SOURCE_DEGRADED = bool(degraded)
+
+
+def _reset_tld_state_for_test() -> None:
+    """Test hook only: drop the cache so the next _tlds() reloads live."""
+    global _TLD_SET, _TLD_SOURCE_DEGRADED
+    _TLD_SET = None
+    _TLD_SOURCE_DEGRADED = False
+
+
+def _demask(s: str, mask_chars) -> str:
+    """D-DET-1: remove EVERY mask character from s (all occurrences, all
+    declared masks — not only the current one). mask_chars comes from the
+    cards, never hardcoded.
+
+    NOTE (documented boundary, not silently narrowed): the only masks in
+    the system today are structural separators (fullwidth solidus U+FF0F),
+    which a real domain string cannot contain — deleting them reconstructs
+    the domain. Should a LETTER-homoglyph mask ever be carded (e.g. a
+    Cyrillic letter masquerading as Latin 'o'), blanket deletion would
+    corrupt the label and D-DET-1 would need a follow-up AUTHOR_DECISION
+    (delete vs. canon substitution). Flagged in the foundation doc as an
+    open item."""
+    if not mask_chars:
+        return s
+    return "".join(ch for ch in s if ch not in mask_chars)
+
+
+# D-DET-4 (FIX_FIRST round 2, 2026-07-12): a LEADING structural separator
+# is not a wrapper. The positive scan below skips leading non-domain
+# characters to see past wrappers ((, ", *, …); but /, \, ?, #, :, @ carry
+# structural meaning (path, query, fragment, port, authority/email), and
+# silently skipping them made "@example.com", "/example.com" etc. mis-read
+# as bare domains (FREE_TEXT -> PATH). These are a HARD_STOP: hit one before
+# the domain block starts and the token has no bare-domain prefix at all.
+# This is NOT a return to the block-list — punctuation is unbounded, but the
+# set of structural separators is closed and already meaningful in the spec.
+_LEADING_STRUCTURAL_STOPS = frozenset("/\\?#:@")
+
+
+def _domain_prefix(token: str) -> str:
+    """POSITIVE extraction (FIX_FIRST 2026-07-12, blocker — three reviewers
+    found the bypass in the first conveyor round): return the first maximal
+    run of domain-shaped characters in the token — a character for which
+    str.isalnum() is True (any Unicode letter or digit, so IDN labels such
+    as a Cyrillic homoglyph attack still match — this is the thing we WANT
+    to catch, not exclude), plus '-' and '.' — and discard everything
+    outside that run.
+
+    PRECISION (a reviewer caught the docstring lying): "isalnum() is True"
+    is NOT the same as "any letter of any script". Unicode COMBINING MARKS
+    (categories Mn/Mc) return isalnum()=False — e.g. U+093E DEVANAGARI VOWEL
+    SIGN AA, Arabic diacritics, Hebrew niqqud, NFD-decomposed Latin. So an
+    IDN label carrying such a mark (भारत.भारत, …) has its run cut at the
+    mark and is dropped -> FREE_TEXT. This is a PRE-EXISTING limitation, not
+    a regression (the old block-list left the mark in the string but the
+    per-label isalnum-or-hyphen check then rejected it just the same);
+    documented, deferred (see the gate case and FIX_FIRST_ROUND1). Closing
+    it needs proper IDNA/NFC canonicalisation of the whole candidate, out of
+    this rough detector's scope.
+
+    Replaces the old block-list approach (strip a fixed punctuation set,
+    _STRIP_OUTER, off the token's outer edges). A block list only ever
+    covers the punctuation someone thought to enumerate: markdown '*', an
+    em dash, a tilde, a pipe, a fullwidth quotation mark and any other
+    wrapping character NOT in that specific list stuck to the domain,
+    made a label fail the isalnum-or-hyphen check in _looks_like_domain,
+    and silently downgraded a real HOST mask to FREE_TEXT (a fullwidth-
+    solidus mask domain wrapped in asterisks bypassed detection this way
+    — the asterisks were never in _STRIP_OUTER; see the gate for the
+    literal example). A positive allow-list closes the whole class at
+    once instead of chasing individual punctuation marks.
+
+    D-DET-4 (round 2): a LEADING structural separator (/ \\ ? # : @) is a
+    HARD_STOP, not a skippable wrapper — returns "" so the token has no
+    bare-domain prefix. Without this, the scan skipped a leading @ or /
+    and mis-read '@example.com' / '/example.com' as bare domains.
+
+    This also subsumes the old separate 'cut at the first /, ?, #, :,
+    space' step (P5): none of those characters are in the allow-list, so
+    the scan stops there on its own — no separate pass needed.
+
+    Deliberately NOT trimmed here (known, deferred — see AUTHOR_DECISION
+    D-DET-3 / FIX_FIRST_ROUND1 in foundation_layer): a leading/trailing
+    hyphen on the extracted run (RFC-invalid but not rejected — v0.5
+    tail), and the concatenation false positives this positive scan can
+    itself produce when two unrelated fragments glue into a domain-shaped
+    string once the mask is removed."""
+    token = token.strip()
+    n = len(token)
+    i = 0
+    while i < n and not (token[i].isalnum() or token[i] in ".-"):
+        if token[i] in _LEADING_STRUCTURAL_STOPS:
+            return ""  # D-DET-4: leading structural separator, not a wrapper
+        i += 1
+    j = i
+    while j < n and (token[j].isalnum() or token[j] in ".-"):
+        j += 1
+    return token[i:j]
+
+
+def _is_tld(label: str, tld_set, degraded: bool) -> bool:
+    """P2 (IDN): a label is a TLD if it is in the registry directly OR its
+    punycode A-label is (an IDN ccTLD label -> its A-label, e.g. xn--p1ai).
+    D-DET-2: when the registry is
+    DEGRADED, accept a TLD-SHAPED label (alphabetic, 2..63) rather than go
+    silent — alarm, not miss."""
+    label = label.lower()
+    if label in tld_set:
+        return True
+    try:
+        alabel = label.encode("idna").decode("ascii").lower()
+        if alabel in tld_set:
+            return True
+    except Exception:
+        pass
+    if degraded:
+        return label.isalpha() and 2 <= len(label) <= 63
+    return False
+
+
+def _looks_like_domain(raw: str, tld_set, degraded: bool) -> bool:
+    """A string looks like a bare domain: >= 2 labels, each a valid DNS
+    label (alnum or '-', non-empty, <= 63 chars), last label a TLD. The
+    tail (path/port/query) is trimmed by _domain_prefix first (P5)."""
+    s = _domain_prefix(raw)
+    if not s:
+        return False
+    labels = s.strip(".").split(".")
+    if len(labels) < 2:
+        return False
+    for lbl in labels:
+        if not lbl or len(lbl) > 63:
+            return False
+        if not all(ch.isalnum() or ch == "-" for ch in lbl):
+            return False
+    return _is_tld(labels[-1], tld_set, degraded)
+
+
+def _detect_context_at(text: str, offset: int, mask_chars=frozenset()) -> str:
+    """Context detector around the mask position (step 4, D2): URL / HOST /
+    PATH / FREE_TEXT.
+
+    Two passes:
+      1. SCHEME (P4): a 'scheme://' is honoured ONLY inside the mask's own
+         whitespace-delimited token, before the mask — a 'http://' earlier
+         in the sentence (a different token) must not lower a later bare
+         mask.
+      2. BARE DOMAIN (boundary G1): no scheme in the token — reconstruct
+         the domain by removing ALL masks (D-DET-1) and test the mask's sides.
+
+    mask_chars — the mask alphabet for this run, sourced from the cards
+    (SIGN_RELATIONS visible_form), never hardcoded."""
+    # token = the whitespace-delimited unit that contains the mask
+    left_bound = offset
+    while left_bound > 0 and not text[left_bound - 1].isspace():
+        left_bound -= 1
+    right_bound = offset
+    while right_bound < len(text) and not text[right_bound].isspace():
+        right_bound += 1
+    token = text[left_bound:right_bound]
+    rel = offset - left_bound  # mask index inside the token
+
+    # --- Pass 1: SCHEME_SCOPE (P4) — scheme only inside THIS token ---
+    scheme_at = token.rfind("://", 0, rel)
+    if scheme_at != -1:
+        after = token[scheme_at + 3:]
+        rel_s = rel - (scheme_at + 3)
+        host_end = len(after)
+        for sep in ("/", "?", "#"):
+            p = after.find(sep)
+            if p != -1:
+                host_end = min(host_end, p)
+        if 0 <= rel_s < host_end:
+            return "HOST"
+        if "/" in after[:rel_s]:
+            return "PATH"
+        return "URL"
+
+    # --- Pass 2: BARE DOMAIN (boundary G1), no scheme in the token ---
+    tld_set, degraded = _tlds()
+    left_part = _demask(token[:rel], mask_chars)       # D-DET-1: strip ALL masks,
+    right_part = _demask(token[rel + 1:], mask_chars)  # not only the current one
+
+    # host substitution — a domain on BOTH sides of the mask
+    # (a.com<mask>evil.com, incl. tails via _domain_prefix in _looks_like_domain)
+    if _looks_like_domain(left_part, tld_set, degraded) \
+            and _looks_like_domain(right_part, tld_set, degraded):
+        return "HOST"
+    # mask inserted INSIDE one domain (goog<mask>le.com -> google.com). D-DET-1
+    # makes the double-mask goog<mask>le.<mask>com collapse to google.com too.
+    if _looks_like_domain(left_part + right_part, tld_set, degraded):
+        return "HOST"
+    # a domain then the mask opens a tail -> path segment (readme.md<mask>x)
+    if _looks_like_domain(left_part, tld_set, degraded):
+        return "PATH"
+    return "FREE_TEXT"
+
+
+_SCOPE_RISK = {
+    "HOST": RiskLevel.HIGH,     # host substitution — the main case
+    "URL": RiskLevel.MEDIUM,
+    "PATH": RiskLevel.MEDIUM,
+    "FREE_TEXT": RiskLevel.NONE,
+}
+
+
+def _downgrade(level: RiskLevel) -> RiskLevel:
+    """A CANDIDATE edge downgrades risk by one step (D1): an
+    unverified relation must not hit as hard as VERIFIED."""
+    order = [RiskLevel.NONE, RiskLevel.LOW, RiskLevel.MEDIUM,
+             RiskLevel.HIGH, RiskLevel.CRITICAL]
+    i = order.index(level)
+    return order[max(0, i - 1)]
+
+
+def _assess_relation_risk(text: str, sign_statuses: list) -> list:
+    """STAGE_6b: verdict per active mask (D-REL-4/6).
+    Barrier N3: read ONLY active_relation_candidates."""
+    verdicts = []
+    # ARCH constraint: the mask alphabet for this run is taken from the
+    # cards (SIGN_RELATIONS -> visible_form), never hardcoded. D-DET-1
+    # strips exactly these characters when reconstructing a bare domain.
+    run_mask_chars = frozenset(
+        c.get("visible_form", "")
+        for st in sign_statuses
+        for c in getattr(st, "active_relation_candidates", [])
+        if c.get("visible_form")
+    )
+    _, tld_degraded = _tlds()  # D-DET-2: run-level DEGRADED signal
+    for st in sign_statuses:
+        for cand in getattr(st, "active_relation_candidates", []):
+            offset = cand.get("at_offset", 0)
+            scope_of_edge = set(cand.get("context_scope", []))
+            ctx = _detect_context_at(text, offset, run_mask_chars)
+
+            # PROTECTED_CONTEXT: the real context is in the edge scope
+            # (or the edge is ANY). Otherwise the mask is out of scope.
+            protected = ("ANY" in scope_of_edge) or (ctx in scope_of_edge)
+            if protected and ctx != "FREE_TEXT":
+                risk = _SCOPE_RISK.get(ctx, RiskLevel.MEDIUM)
+                # OBFUSCATION (D-REL-6): substituting a canon with a
+                # mask in protected context — already in the risk level.
+            else:
+                risk = RiskLevel.NONE  # RELATION_FOUND != THREAT
+
+            # verification_status of the edge as a modifier (D1)
+            if cand.get("verification_status", "").upper() == "CANDIDATE" \
+                    and risk != RiskLevel.NONE:
+                risk = _downgrade(risk)
+
+            verdicts.append({
+                "visible_form": cand.get("visible_form", ""),
+                "target": cand.get("target", ""),
+                "at_offset": offset,
+                "detected_context": ctx,
+                "protected": protected,
+                "risk_level": risk.value,
+                "canon_hypothesis": None,  # probe deferred (D3)
+                "relation_id": cand.get("relation_id", ""),
+                "tld_source_degraded": tld_degraded,  # D-DET-2
+            })
+    return verdicts
+------------------------------------------------------------------------
+
+========================================================================
+PART 2 — sequence/sequence_output.py: SequenceOutput (degraded field)
+========================================================================
+The `degraded` field (D-DET-2) and its DEGRADED serialization. NOTE the
+audit finding embedded here: as_dict() does NOT emit relation_verdicts — a
+serialization-based consumer loses mask verdicts (this is one of the three
+severs the chaos gate exercises).
+------------------------------------------------------------------------
+@dataclass
+class SequenceOutput:
+    """SEQUENCE_OUTPUT_STATUS — the result of the whole sequence STAGE_1-7."""
+    card_set: list = field(default_factory=list)        # PATCH_26: CODEPOINTs
+    matches: list = field(default_factory=list)          # list[SequenceMatch]
+    multiple_matches: bool = False                       # PATCH_26
+    source_sign_list: list = field(default_factory=list) # PATCH_25 (real)
+    source_occurrence_list: str = "NOT_AVAILABLE"        # PATCH_25 (honest stub)
+    check_unavailable: bool = False                      # PATCH_24 CHECK_UNAVAILABLE
+    warnings: list = field(default_factory=list)
+    relation_verdicts: list = field(default_factory=list)  # step 4 of the relation axis: mask verdicts (D-REL-4/6)
+    degraded: bool = False  # AUTHOR_DECISION D-DET-2: the whole run is marked
+                            # DEGRADED when the TLD source is unavailable and
+                            # bare-domain verdicts were computed fail-closed
+                            # (TLD-shaped labels accepted unverified, alarm not silence)
+
+    def aggregate_risk(self):
+        """Aggregated sequence-layer risk.
+
+        ENUM_GUARD (RULE_3A): max is taken ONLY over matches whose
+        risk_level is a real enum. Descriptive strings ('intensity-
+        dependent' etc.) do NOT join numeric maximisation — they are
+        returned as a separate non_enum_risks list for the integrator,
+        which decides by policy, not comparison.
+
+        Returns (enum_risk: RiskLevel, non_enum_risks: list[str])."""
+        enum_levels = []
+        non_enum = []
+        for m in self.matches:
+            if m.risk_is_enum:
+                lv = m.risk_level if isinstance(m.risk_level, RiskLevel) else RiskLevel(m.risk_level)
+                enum_levels.append(lv)
+            else:
+                non_enum.append(str(m.risk_level))
+        enum_risk = RiskLevel.max(*enum_levels) if enum_levels else RiskLevel.NONE
+        return enum_risk, non_enum
+
+    def as_dict(self) -> dict:
+        enum_risk, non_enum = self.aggregate_risk()
+        return {
+            "CARD_SET": list(self.card_set),
+            "MATCHES": [m.as_dict() for m in self.matches],
+            "MULTIPLE_MATCHES": "YES" if self.multiple_matches else "NO",
+            "AGGREGATE_ENUM_RISK": enum_risk.value,
+            "NON_ENUM_RISKS": non_enum,
+            "SOURCE_SIGN_LIST": list(self.source_sign_list),
+            "SOURCE_OCCURRENCE_LIST": self.source_occurrence_list,
+            "CHECK_UNAVAILABLE": "YES" if self.check_unavailable else "NO",
+            "WARNINGS": list(self.warnings),
+            "DEGRADED": "YES" if self.degraded else "NO",
+        }
+------------------------------------------------------------------------
+
+========================================================================
+PART 3 — WATCHDOG (msl_mip_runtime.py): D-GUARD-1 invariant + D-GUARD-2
+========================================================================
+3a. Module-level: _REL_ACTION table, _relation_actions() seam (extracted so
+    the chaos gate can sever the path WITHOUT touching relation_verdicts),
+    IntegrityViolation, and _integrity_check() (D-GUARD-1 conservation of
+    risk + D-GUARD-2 validation_warnings revival).
+------------------------------------------------------------------------
+# Relation (mask) verdict -> action map (relation axis, D-REL-4).
+# NONE->pass, LOW->log_only, MEDIUM->queue, HIGH/CRITICAL->hold.
+# Module-level (was inline in analyze) so the safeguard chaos gate can
+# monkey-patch the mapping to simulate a severed aggregation path.
+_REL_ACTION = {"NONE": "pass", "LOW": "log_only",
+               "MEDIUM": "queue_for_review",
+               "HIGH": "hold_pending_review",
+               "CRITICAL": "hold_pending_review"}
+
+
+def _relation_actions(seq_out) -> list:
+    """Derive runtime actions from the sequence layer's relation (mask)
+    verdicts. Extracted as a module-level seam so tests/gate_safeguard.py
+    can monkey-patch it to simulate a severed mask path WITHOUT touching
+    seq_out.relation_verdicts — the source of truth the invariant reads."""
+    actions = []
+    for v in seq_out.relation_verdicts:
+        act = _REL_ACTION.get(v["risk_level"])
+        if act is None:
+            # Unknown enum value must be visible, not silently mapped.
+            print(f"[WARNING] UNKNOWN_RISK_LEVEL in relation verdict: "
+                  f"{v['risk_level']!r} — falling back to queue_for_review")
+            act = "queue_for_review"
+        actions.append(act)
+    return actions
+
+
+class IntegrityViolation(Exception):
+    """Raised by the finish-line safeguard (D-GUARD-1) in STRICT mode when
+    the conservation-of-risk invariant is broken: a HIGH/CRITICAL mask
+    verdict coexisting with a PASS final verdict means the mask path was
+    severed. In production the verdict is NOT changed (the author is the
+    only authority to overturn it) — the violation is recorded and the run
+    is marked PASS_WITH_INTEGRITY_VIOLATION instead."""
+
+
+def _integrity_check(final_action: str, seq_out, cards: list):
+    """D-GUARD-1 + D-GUARD-2 — an INDEPENDENT check of the RESULT, run after
+    aggregation and before return. Reads ONLY the computed final_action, the
+    sequence layer's relation_verdicts (source of truth for the mask axis),
+    and the loaded cards' edge validation_warnings. It does NOT re-walk the
+    aggregation path, so it does not duplicate that path's fragility.
+
+    D-GUARD-1 (conservation of risk): a HIGH/CRITICAL relation verdict must
+    not coexist with a PASS final verdict — that can only mean the mask
+    verdict never reached the final action. A MEDIUM relation verdict with a
+    PASS final is the softer INTEGRITY_CONCERN, not a violation.
+
+    D-GUARD-2 revives validation_warnings (until now written by the parser
+    and read NOWHERE — dead code that manufactured a false sense of safety):
+    an ACTIVE edge that carried a load-time validation_warning AND whose
+    verdict contributed nothing (risk NONE) is flagged as a CONCERN — the
+    misconfigured edge is silently inert, exactly as its own warning
+    predicted.
+
+    Returns (violations, concerns) — lists of detail dicts."""
+    final_is_pass = (final_action == "pass")
+    violations = []
+    concerns = []
+
+    # D-GUARD-1
+    for v in seq_out.relation_verdicts:
+        rl = v.get("risk_level")
+        if rl in ("HIGH", "CRITICAL") and final_is_pass:
+            violations.append({
+                "rule": "D-GUARD-1",
+                "relation_id": v.get("relation_id", ""),
+                "visible_form": v.get("visible_form", ""),
+                "at_offset": v.get("at_offset"),
+                "detected_context": v.get("detected_context"),
+                "relation_risk": rl,
+                "final_action": final_action,
+                "detail": (f"relation verdict {rl} at offset {v.get('at_offset')} "
+                           f"(context={v.get('detected_context')}) but final_action=pass "
+                           f"-> mask path severed"),
+            })
+        elif rl == "MEDIUM" and final_is_pass:
+            concerns.append({
+                "rule": "D-GUARD-1-SOFT",
+                "relation_id": v.get("relation_id", ""),
+                "relation_risk": rl,
+                "final_action": final_action,
+                "detail": ("MEDIUM relation verdict with final pass -> "
+                           "INTEGRITY_CONCERN (not a violation)"),
+            })
+
+    # D-GUARD-2 — revive validation_warnings
+    warn_by_edge = {}
+    for c in cards:
+        for r in getattr(c, "relations", []):
+            if getattr(r, "is_active", False) and getattr(r, "validation_warnings", None):
+                warn_by_edge[(c.visible_form, r.relation_id)] = list(r.validation_warnings)
+    for v in seq_out.relation_verdicts:
+        w = warn_by_edge.get((v.get("visible_form"), v.get("relation_id")))
+        if w and v.get("risk_level") == "NONE":
+            concerns.append({
+                "rule": "D-GUARD-2",
+                "relation_id": v.get("relation_id", ""),
+                "visible_form": v.get("visible_form", ""),
+                "validation_warnings": w,
+                "relation_risk": "NONE",
+                "detail": ("active edge carried a load-time validation_warning and "
+                           "produced no verdict (risk NONE) -> misconfigured edge "
+                           "silently inert"),
+            })
+    return violations, concerns
+------------------------------------------------------------------------
+3b. Inside analyze(): the relation-actions seam, the final verdict, and the
+    FINISH-LINE SAFEGUARD (hybrid: annotate in production, raise in strict).
+------------------------------------------------------------------------
+    # --- Relation (mask) verdicts -> actions (relation axis, D-REL-4) ---
+    relation_actions = _relation_actions(seq_out)
+
+    # --- Final verdict ---
+    final_action = most_severe(single_actions + [seq_decision.runtime_action]
+                               + relation_actions)
+
+    # --- FINISH-LINE SAFEGUARD (D-GUARD-1/2) ---
+    # Independent conservation-of-risk check AFTER aggregation, reading only
+    # the RESULT (final_action + relation_verdicts + edge warnings). It does
+    # not re-walk the path, so it does not duplicate the path's fragility.
+    # HYBRID behaviour:
+    #   production  -> the verdict is NOT changed (the author is the only
+    #                  authority to overturn it); the violation is recorded
+    #                  and the run is marked PASS_WITH_INTEGRITY_VIOLATION.
+    #   strict mode -> the same violation RAISES, so a severed mask path
+    #                  fails a run in development (env MSL_MIP_GUARD_STRICT=1).
+    integrity_violations, integrity_concerns = _integrity_check(
+        final_action, seq_out, cards)
+    if integrity_violations:
+        integrity_status = "PASS_WITH_INTEGRITY_VIOLATION"
+        if os.environ.get("MSL_MIP_GUARD_STRICT") == "1":
+            raise IntegrityViolation(
+                "; ".join(v["detail"] for v in integrity_violations))
+    elif integrity_concerns:
+        integrity_status = "INTEGRITY_CONCERN"
+    else:
+        integrity_status = "OK"
+
+    return {
+        "text": text,
+        "sign_statuses": sign_statuses,
+        "single_sign_results": single_sign_results,
+        "sequence_output": seq_out,
+        "sequence_decision": seq_decision,
+        "final_action": final_action,
+        "integrity_status": integrity_status,
+        "integrity_violations": integrity_violations,
+        "integrity_concerns": integrity_concerns,
+    }
+------------------------------------------------------------------------
+3c. print_report(): surfaces the integrity status when not OK.
+------------------------------------------------------------------------
+    print(f"FINAL VERDICT: {report['final_action'].upper()}")
+    status = report.get("integrity_status", "OK")
+    if status != "OK":
+        print(f"INTEGRITY: {status}")
+        for viol in report.get("integrity_violations", []):
+            print(f"  [INTEGRITY_VIOLATION] {viol['detail']}")
+        for con in report.get("integrity_concerns", []):
+            print(f"  [{con['rule']}] {con['detail']}")
+    print("=" * 60)
+------------------------------------------------------------------------
+
+========================================================================
+PART 4 — tests/gate_bare_domain_detector.py (full, verbatim, 40/40)
+========================================================================
+------------------------------------------------------------------------
+#!/usr/bin/env python3
+"""
+GATE: bare-domain detector (Г1) — NEW_ARTIFACT reconstructed 2026-07-12
+from the six FIX_VERIFICATION runs used AS A REQUIREMENTS SPEC.
+
+Covers every reviewer finding, including the two that became author
+decisions:
+  D-DET-1  two+ masks in one token -> remove ALL masks before the domain
+           check; remainder domain-like -> HOST (the P6 double-mask miss).
+  D-DET-2  TLD registry unavailable -> domain-shaped token with a mask
+           raises an alarm, not silence; the whole run is marked DEGRADED.
+
+Plus the unanimously-passing patches (P2 IDN, P3 outer punctuation, P4
+scheme-scope, P5 right-domain tail), the glued-scheme V2 concern, a CJK
+false-positive guard, and the zero-width boundary (asserted as a KNOWN
+LIMITATION, shown explicitly — not hidden).
+
+FIX_FIRST (2026-07-12, first conveyor round — see foundation_layer/
+AUTHOR_DECISION_20260712_BARE_DOMAIN_DETECTOR_FIX_FIRST_ROUND1.md):
+  BLOCKER   _domain_prefix rewritten from a punctuation block-list to a
+            positive letter/digit/'-'/'.' extraction — three reviewers
+            found the block-list bypass (any wrapping character absent
+            from the list stuck to the domain and silently fell to
+            FREE_TEXT).
+  D-DET-3   concatenation false positives from the positive-extraction
+            heuristic are DOCUMENTED here as known/accepted, not fixed
+            (no full URL parser in scope).
+  v0.5      two further tails added as known, deferred: an
+            already-punycode TLD label absent from the active registry,
+            and a leading-hyphen label (RFC-invalid, currently accepted).
+
+Hermetic: the TLD registry is pinned via _force_tld_state_for_test, so
+the gate needs no network and can drive the DEGRADED path deterministically.
+
+Verified live via process_sign + process_sequence.
+"""
+
+import os
+import sys
+import tempfile
+
+# GATE_MUST_BE_HERMETIC: this gate already pins the TLD state in-process via
+# _force_tld_state_for_test (so sequence_engine._tlds() never fetches), but
+# set the env flag too so ANY public_suffix.load_*() reached by an
+# unforeseen path also returns the offline embedded set — belt and braces,
+# uniform with the other gates. No network required, deterministic.
+os.environ["MSL_MIP_HERMETIC_TLD"] = "1"
+
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(BASE, "core"))
+sys.path.insert(0, os.path.join(BASE, "single_sign"))
+sys.path.insert(0, os.path.join(BASE, "sequence"))
+
+from load_card import load_card
+from module_engine import process_sign
+from sequence_engine import (
+    process_sequence,
+    _detect_context_at,
+    _looks_like_domain,
+    _force_tld_state_for_test,
+    _reset_tld_state_for_test,
+)
+
+PASSED = 0
+FAILED = 0
+
+
+def check(label, cond, detail=""):
+    global PASSED, FAILED
+    if cond:
+        PASSED += 1
+        print(f"  ✓ {label}")
+    else:
+        FAILED += 1
+        print(f"  ✗ {label}  {detail}")
+
+
+def _card(text):
+    f = tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8")
+    f.write(text)
+    f.close()
+    return load_card(f.name)
+
+
+# VERIFIED mask card, scope URL/HOST/PATH — mirrors the real fullwidth
+# solidus card, so HOST->HIGH, PATH/URL->MEDIUM, FREE_TEXT->NONE.
+MASK_CARD = """CARD_UID: BD
+CODEPOINT: U+FF0F
+VISIBLE_FORM: ／
+UNICODE_NAME: FULLWIDTH SOLIDUS
+ZONE: ZONE_2
+DOCUMENT_STATUS: WORKING_DRAFT
+SIGN_RELATIONS:
+  RELATION_001:
+    RELATION_TYPE: NFKC_MAPS_TO
+    TARGET: U+002F
+    CONTEXT_SCOPE: URL, HOST, PATH
+    VERIFICATION_STATUS: VERIFIED
+    RUNTIME_EFFECT: RELATION_ONLY
+"""
+
+
+def _run(card, text):
+    """Process EVERY mask occurrence in the text (so double-mask tokens
+    produce a verdict per mask), then run the sequence layer."""
+    offs = [i for i, ch in enumerate(text) if ch == "／"]
+    sts = [process_sign(card, text, o) for o in offs]
+    return process_sequence(text, [card], sign_statuses=sts, known_signs={"／"})
+
+
+def _ctx(card, text):
+    """detected_context of the FIRST mask verdict."""
+    vd = _run(card, text).relation_verdicts
+    return vd[0]["detected_context"] if vd else None
+
+
+def _risk(card, text):
+    vd = _run(card, text).relation_verdicts
+    return vd[0]["risk_level"] if vd else None
+
+
+# A pinned, healthy TLD set — deterministic and offline. Includes the
+# punycode A-label for .рф so the IDN case does not depend on the live
+# IANA registry.
+_PINNED_TLDS = frozenset({"com", "org", "net", "md", "ru", "io", "xn--p1ai"})
+
+print("=" * 64)
+print("GATE: bare-domain detector (Г1) — NEW_ARTIFACT, NOT_REVIEWED")
+print("=" * 64)
+
+card = _card(MASK_CARD)
+_force_tld_state_for_test(_PINNED_TLDS, degraded=False)
+
+# --- V1/P3: outer punctuation trimmed, domain still recognised ---
+print("\n[P3] Outer punctuation around a bare domain -> HOST")
+check("(gоog／le.com) -> HOST", _ctx(card, "(gоog／le.com)") == "HOST", _ctx(card, "(gоog／le.com)"))
+check('"gоog／le.com" -> HOST', _ctx(card, '"gоog／le.com"') == "HOST")
+check("gоog／le.com, -> HOST", _ctx(card, "gоog／le.com,") == "HOST")
+check("bare gоog／le.com -> HOST/HIGH", _risk(card, "gоog／le.com") == "HIGH", _risk(card, "gоog／le.com"))
+
+# --- V1/P4: scheme counts only inside the mask's own token ---
+print("\n[P4] Scheme scope is token-local")
+check("http://safe.com/path then gоog／le.com -> HOST",
+      _ctx(card, "http://safe.com/path then gоog／le.com") == "HOST",
+      _ctx(card, "http://safe.com/path then gоog／le.com"))
+check("http://safe.com then readme.md／x -> PATH",
+      _ctx(card, "http://safe.com then readme.md／x") == "PATH",
+      _ctx(card, "http://safe.com then readme.md／x"))
+check("http://gоog／le.com -> HOST (in-scheme host)", _ctx(card, "http://gоog／le.com") == "HOST")
+check("http://ok.com/a／b -> PATH (in-scheme path)", _ctx(card, "http://ok.com/a／b") == "PATH")
+
+# --- V1/P5: right domain with a tail (path/port/query) ---
+print("\n[P5] Domain on both sides with a tail -> HOST")
+check("a.com／evil.com/path -> HOST", _ctx(card, "a.com／evil.com/path") == "HOST")
+check("a.com／evil.com:443 -> HOST", _ctx(card, "a.com／evil.com:443") == "HOST")
+check("a.com／evil.com?x=1 -> HOST", _ctx(card, "a.com／evil.com?x=1") == "HOST")
+
+# --- V4/P2: IDN / punycode ---
+print("\n[P2] IDN / punycode")
+check("приме／р.рф -> HOST", _ctx(card, "приме／р.рф") == "HOST", _ctx(card, "приме／р.рф"))
+check("_looks_like_domain(пример.рф) True",
+      _looks_like_domain("пример.рф", _PINNED_TLDS, False) is True)
+
+# --- D-DET-1: two+ masks in one token ---
+print("\n[D-DET-1] Double mask in one token -> HOST (all masks stripped)")
+out = _run(card, "gоog／le.／com")
+check("gоog／le.／com yields 2 verdicts (one per mask)", len(out.relation_verdicts) == 2,
+      len(out.relation_verdicts))
+check("both masks -> HOST",
+      all(v["detected_context"] == "HOST" for v in out.relation_verdicts),
+      [v["detected_context"] for v in out.relation_verdicts])
+
+# --- V2 concern: glued scheme without a space -> conservative HOST ---
+print("\n[V2] Glued scheme (no space) is not downgraded")
+check("http://safe.comgоog／le.com -> HOST",
+      _ctx(card, "http://safe.comgоog／le.com") == "HOST",
+      _ctx(card, "http://safe.comgоog／le.com"))
+
+# --- False-positive guard: CJK fullwidth date is NOT a domain ---
+print("\n[FP-guard] CJK fullwidth date stays FREE_TEXT")
+out = _run(card, "2026／07／11")
+check("2026／07／11 -> all FREE_TEXT/NONE",
+      all(v["detected_context"] == "FREE_TEXT" and v["risk_level"] == "NONE"
+          for v in out.relation_verdicts),
+      [(v["detected_context"], v["risk_level"]) for v in out.relation_verdicts])
+
+# --- FREE_TEXT: a lone mask is not a threat ---
+print("\n[FREE_TEXT] Lone mask -> NONE, not protected")
+vd = _run(card, "just ／ text").relation_verdicts
+check("just ／ text -> FREE_TEXT/NONE", vd and vd[0]["detected_context"] == "FREE_TEXT"
+      and vd[0]["risk_level"] == "NONE")
+check("just ／ text -> protected=False", vd and vd[0]["protected"] is False)
+
+# --- Known boundary (shown, not hidden): zero-width between labels ---
+print("\n[BOUNDARY] Zero-width between labels defeats detection (documented)")
+zw = "gоog​／le.com"
+check("gоog<ZWSP>／le.com -> FREE_TEXT (KNOWN LIMITATION, D-DET doc)",
+      _ctx(card, zw) == "FREE_TEXT", _ctx(card, zw))
+
+# --- D-DET-2: TLD registry unavailable -> alarm, not silence; DEGRADED ---
+print("\n[D-DET-2] Degraded TLD registry -> HOST + run marked DEGRADED")
+_force_tld_state_for_test(frozenset(), degraded=True)
+out = _run(card, "gоog／le.com")
+check("degraded: gоog／le.com -> HOST (not silent FREE_TEXT)",
+      out.relation_verdicts and out.relation_verdicts[0]["detected_context"] == "HOST",
+      out.relation_verdicts and out.relation_verdicts[0]["detected_context"])
+check("degraded: verdict carries tld_source_degraded=True",
+      out.relation_verdicts and out.relation_verdicts[0]["tld_source_degraded"] is True)
+check("degraded: SequenceOutput.degraded=True", out.degraded is True)
+check("degraded: TLD_SOURCE_DEGRADED warning present",
+      any("TLD_SOURCE_DEGRADED" in w for w in out.warnings), out.warnings)
+
+# healthy source must NOT mark the run degraded
+_force_tld_state_for_test(_PINNED_TLDS, degraded=False)
+out = _run(card, "gоog／le.com")
+check("healthy: run not marked degraded", out.degraded is False)
+
+# --- FIX_FIRST blocker (2026-07-12, first conveyor round): the old
+# _STRIP_OUTER block-list only trimmed punctuation someone thought to
+# enumerate. Wrapping the domain in ANY character absent from that list
+# (markdown asterisk, an em dash, a tilde, a pipe, a fullwidth quotation
+# mark) stuck to the domain, failed the per-label isalnum-or-hyphen check,
+# and silently fell to FREE_TEXT. _domain_prefix now does a POSITIVE
+# extraction (letter/digit/'-'/'.') instead of a block-list, closing the
+# whole class at once. ---
+print("\n[FIX_FIRST] Block-list punctuation bypass is closed (positive extraction)")
+for wrapped in ("*gоog／le.com*", "gоog／le.com—x", "~gоog／le.com~",
+                "|gоog／le.com|", "＂gоog／le.com＂"):
+    check(f"{wrapped!r} -> HOST/HIGH (was a silent FREE_TEXT bypass)",
+          _ctx(card, wrapped) == "HOST" and _risk(card, wrapped) == "HIGH",
+          (_ctx(card, wrapped), _risk(card, wrapped)))
+
+# --- AUTHOR_DECISION D-DET-4 (2026-07-12, FIX_FIRST round 2): a LEADING
+# structural separator is NOT a wrapper. The round-1 positive scan skipped
+# everything before the first domain char, so a leading '@' (email/mention)
+# or '/' (path) vanished and '@example.com／x' / '/example.com／x' mis-read
+# as bare domains -> PATH/MEDIUM. D-DET-4 makes leading / \ ? # : @ a
+# HARD_STOP (_domain_prefix returns ""), so these are FREE_TEXT again — the
+# structural character keeps its meaning instead of being discarded as
+# framing. The five wrapper bypasses above must still be HOST/HIGH (a
+# wrapper is not a structural separator). ---
+print("\n[D-DET-4] Leading structural separator is a HARD_STOP, not a wrapper")
+for lead in ("#example.com／x", "/example.com／x", "@example.com／x", ":example.com／x"):
+    check(f"{lead!r} -> FREE_TEXT (leading structural char kept, not skipped; "
+          f"was PATH/MEDIUM before D-DET-4)",
+          _ctx(card, lead) == "FREE_TEXT",
+          _ctx(card, lead))
+
+# --- AUTHOR_DECISION D-DET-3 (2026-07-12): concatenation false positives
+# are DOCUMENTED here, not fixed. The positive-extraction fix above is
+# necessarily a heuristic without a full URL parser: once masks are
+# stripped, two unrelated fragments sitting either side of the mask can
+# glue into something domain-shaped even when nothing is actually being
+# spoofed. Recorded as known/accepted behaviour — see
+# foundation_layer/AUTHOR_DECISION_20260712_BARE_DOMAIN_DETECTOR_
+# FIX_FIRST_ROUND1.md. These assertions pin down the OBSERVED verdict so
+# a future change to the heuristic surfaces here instead of drifting
+# silently. ---
+print("\n[D-DET-3, known] Concatenation false positives — documented, not fixed")
+check("my-host／name.com -> HOST/HIGH (known_behavior: 'my-host'+'name.com' "
+      "glues into 'my-hostname.com', a syntactically valid domain — no real "
+      "attack here, just two hyphenated/dotted fragments coinciding)",
+      _ctx(card, "my-host／name.com") == "HOST" and _risk(card, "my-host／name.com") == "HIGH",
+      (_ctx(card, "my-host／name.com"), _risk(card, "my-host／name.com")))
+check("example.com,／test -> HOST/HIGH (known_behavior: the comma stops the "
+      "positive-extraction run before 'test', so the concatenated check "
+      "just re-derives the left-hand domain and fires HOST rather than "
+      "PATH; 'test' is silently dropped from consideration)",
+      _ctx(card, "example.com,／test") == "HOST" and _risk(card, "example.com,／test") == "HIGH",
+      (_ctx(card, "example.com,／test"), _risk(card, "example.com,／test")))
+# D-DET-3 addendum (round 2): a mask AFTER the domain reads as HOST, not
+# PATH. 'gоogle.com*／path' — the '*' ends the positive run at 'gоogle.com',
+# and both the left-only check and the concat check re-derive that domain
+# and fire HOST; the ／ mask actually sits in the PATH segment. Kin to the
+# concatenation FPs (same rough-heuristic root), but a distinct mechanism
+# (trailing wrapper, not gluing). Documented/accepted, pinned, not fixed.
+check("gоogle.com*／path -> HOST/HIGH (known_behavior: mask AFTER the domain; "
+      "the trailing '*' ends the run at gоogle.com so it reads HOST, not the "
+      "PATH the mask position would suggest — D-DET-3 addendum)",
+      _ctx(card, "gоogle.com*／path") == "HOST" and _risk(card, "gоogle.com*／path") == "HIGH",
+      (_ctx(card, "gоogle.com*／path"), _risk(card, "gоogle.com*／path")))
+
+# --- Deferred to v0.5 (known, not fixed in this round) ---
+print("\n[v0.5, known] Deferred tails — not fixed in this round")
+check("gоog／le.xn--zckzah -> FREE_TEXT/NONE (known_behavior: an "
+      "already-punycode TLD label absent from the ACTIVE registry is a "
+      "silent miss — a registry-completeness dependency, not a distinct "
+      "detector bug; production risk is low since the real IANA registry "
+      "carries current punycode ccTLDs, but a stale/narrow registry can "
+      "still miss one)",
+      _ctx(card, "gоog／le.xn--zckzah") == "FREE_TEXT",
+      _ctx(card, "gоog／le.xn--zckzah"))
+check("-example.com／x -> PATH/MEDIUM (known_behavior: a leading hyphen on "
+      "a label is RFC 952/1035-invalid but the per-label check only tests "
+      "isalnum-or-hyphen membership, not position, so '-example' still "
+      "validates as a domain label)",
+      _ctx(card, "-example.com／x") == "PATH",
+      _ctx(card, "-example.com／x"))
+# Combining-mark IDN (round 2, corrects a docstring that claimed "any
+# script"): U+093E DEVANAGARI VOWEL SIGN AA is a combining mark (category
+# Mc) and returns isalnum()=False, so the positive run is cut at the base
+# letter and the label is dropped. FREE_TEXT. NOT a regression (the old
+# block-list kept the mark but the per-label check rejected it just the
+# same); a pre-existing limitation for combining marks / diacritics /
+# niqqud / NFD Latin. Closing it needs IDNA/NFC canonicalisation of the
+# candidate — out of this rough detector's scope. The test string is
+# built from escapes so its bytes are unambiguous: bha + VOWEL SIGN AA +
+# fullwidth solidus mask + ra + ta + "." + bha + VOWEL SIGN AA + ra + ta.
+_DEVA_COMBINING = (
+    "\u092d\u093e\uff0f\u0930\u0924\u002e\u092d\u093e\u0930\u0924"
+)  # भा／रत.भारत (bharat.bharat, masked after the first syllable)
+check("Devanagari label with a combining vowel sign -> FREE_TEXT "
+      "(known_limitation: the vowel sign is a combining mark, "
+      "isalnum()=False, so the run is cut; documents that 'isalnum()' "
+      "!= 'any letter of any script')",
+      _ctx(card, _DEVA_COMBINING) == "FREE_TEXT",
+      _ctx(card, _DEVA_COMBINING))
+
+_reset_tld_state_for_test()
+
+print("\n" + "=" * 64)
+print(f"TOTAL: {PASSED} OK / {FAILED} FAIL")
+print("=" * 64)
+sys.exit(1 if FAILED else 0)
+------------------------------------------------------------------------
+
+========================================================================
+PART 5 — tests/gate_safeguard.py (full, verbatim, chaos gate, 15/15)
+========================================================================
+------------------------------------------------------------------------
+#!/usr/bin/env python3
+"""
+CHAOS GATE for the finish-line safeguard (D-GUARD-1 / D-GUARD-2).
+
+This gate tests the WATCHDOG, not the detector. It deliberately SEVERS the
+mask aggregation path (monkey-patch) and asserts that the conservation-of-
+risk invariant in analyze() CATCHES the mismatch. A watchdog that died
+quietly is worse than no watchdog — so if a severed path returns a clean
+PASS with the guard silent, THIS GATE FAILS.
+
+Each chaos case:
+  1. a phishing input with a mask whose relation verdict is HOST/HIGH,
+  2. the aggregation path is intentionally broken (monkey-patch), leaving
+     seq_out.relation_verdicts (the source of truth the guard reads) intact,
+  3. analyze() is run in STRICT mode (MSL_MIP_GUARD_STRICT=1),
+  4. expectation: the invariant raises IntegrityViolation.
+
+Hermetic: the TLD set is pinned offline (no network / cache / clock /
+randomness). Deterministic across runs.
+
+Homoglyph specimens are written as \\u escapes (Cyrillic 'o' = U+043E,
+fullwidth solidus = U+FF0F) so this file stays literally ASCII and needs
+no english-only allowlist entry.
+
+Run: py -3 tests/gate_safeguard.py
+"""
+import os
+import sys
+import tempfile
+
+os.environ["MSL_MIP_HERMETIC_TLD"] = "1"
+
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+for p in ("core", "single_sign", "sequence"):
+    sys.path.insert(0, os.path.join(BASE, p))
+sys.path.insert(0, BASE)  # for msl_mip_runtime
+
+import msl_mip_runtime as rt
+from load_card import load_card
+from sequence_engine import _force_tld_state_for_test, _reset_tld_state_for_test
+
+# Pin the TLD set offline — deterministic, no network (memory: GATE_MUST_BE_HERMETIC).
+_PINNED = frozenset({"com", "org", "net", "ru", "io", "xn--p1ai"})
+_force_tld_state_for_test(_PINNED, degraded=False)
+
+_MASK = "\uff0f"   # FULLWIDTH SOLIDUS (the carded mask)
+_CYR_O = "\u043e"  # Cyrillic small o (homoglyph of Latin o)
+# Phishing: a bare masked domain -> relation verdict HOST/HIGH.
+PHISH = "g" + _CYR_O + "og" + _MASK + "le.com"   # goog/le.com with homoglyphs
+
+PASSED = 0
+FAILED = 0
+
+
+def check(label, cond, detail=""):
+    global PASSED, FAILED
+    if cond:
+        PASSED += 1
+        print(f"  ✓ {label}")
+    else:
+        FAILED += 1
+        print(f"  ✗ {label}  {detail}")
+
+
+def _card(scope="URL, HOST, PATH"):
+    txt = ("CARD_UID: BD\nCODEPOINT: U+FF0F\nVISIBLE_FORM: " + _MASK + "\n"
+           "UNICODE_NAME: FULLWIDTH SOLIDUS\nZONE: ZONE_2\n"
+           "DOCUMENT_STATUS: WORKING_DRAFT\nSIGN_RELATIONS:\n"
+           "  RELATION_001:\n    RELATION_TYPE: NFKC_MAPS_TO\n"
+           "    TARGET: U+002F\n    CONTEXT_SCOPE: " + scope + "\n"
+           "    VERIFICATION_STATUS: VERIFIED\n    RUNTIME_EFFECT: RELATION_ONLY\n")
+    f = tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8")
+    f.write(txt)
+    f.close()
+    return load_card(f.name)
+
+
+MASK = _card()
+
+
+def run(text, cards, strict):
+    """Run analyze() with/without strict mode; return ('report', dict) or
+    ('raised', message)."""
+    if strict:
+        os.environ["MSL_MIP_GUARD_STRICT"] = "1"
+    else:
+        os.environ.pop("MSL_MIP_GUARD_STRICT", None)
+    try:
+        return ("report", rt.analyze(text, cards))
+    except rt.IntegrityViolation as e:
+        return ("raised", str(e))
+    finally:
+        os.environ.pop("MSL_MIP_GUARD_STRICT", None)
+
+
+print("=" * 64)
+print("CHAOS GATE — finish-line safeguard (D-GUARD-1/2)")
+print("=" * 64)
+
+# --- SANITY: intact path -> guard silent, phishing -> HOLD ---
+print("\n[sanity] Intact path: guard silent, masked phishing -> HOLD")
+kind, res = run(PHISH, [MASK], strict=True)
+check("intact path does NOT raise in strict mode", kind == "report", kind)
+if kind == "report":
+    rv = [(v["detected_context"], v["risk_level"])
+          for v in res["sequence_output"].relation_verdicts]
+    check("relation verdict is HOST/HIGH", ("HOST", "HIGH") in rv, rv)
+    check("final verdict is hold_pending_review",
+          res["final_action"] == "hold_pending_review", res["final_action"])
+    check("integrity_status OK on intact path",
+          res["integrity_status"] == "OK", res["integrity_status"])
+
+_ORIG_REL_ACTION = dict(rt._REL_ACTION)
+_ORIG_REL_FN = rt._relation_actions
+
+# --- CHAOS A: integrator/mapping returns PASS at a HIGH relation (main) ---
+print("\n[chaos A] Mapping corrupted: HIGH relation -> 'pass' action")
+try:
+    rt._REL_ACTION = dict(_ORIG_REL_ACTION)
+    rt._REL_ACTION["HIGH"] = "pass"
+    kind, res = run(PHISH, [MASK], strict=True)
+    check("severed path (HIGH->pass) RAISES IntegrityViolation in strict",
+          kind == "raised", (kind, res))
+finally:
+    rt._REL_ACTION = dict(_ORIG_REL_ACTION)
+
+# --- CHAOS B: relation_verdicts lost at serialization (empty where HIGH was) ---
+print("\n[chaos B] Serialization loss: actions derived from as_dict (drops verdicts)")
+
+
+def _severed_serialize(seq_out):
+    # a consumer that reads the SERIALIZED form; as_dict() omits
+    # relation_verdicts entirely (finding S4) -> empty action list
+    return [rt._REL_ACTION.get(v.get("RISK_LEVEL"), "pass")
+            for v in seq_out.as_dict().get("RELATION_VERDICTS", [])]
+
+
+try:
+    rt._relation_actions = _severed_serialize
+    kind, res = run(PHISH, [MASK], strict=True)
+    check("severed path (serialized/empty verdicts) RAISES in strict",
+          kind == "raised", (kind, res))
+finally:
+    rt._relation_actions = _ORIG_REL_FN
+
+# --- CHAOS C: empty-pool exit before mask accounting ---
+print("\n[chaos C] Empty-pool exit: mask accounting skipped on check_unavailable")
+
+
+def _severed_emptypool(seq_out):
+    if seq_out.check_unavailable:   # regression: forgot masks on the early exit
+        return []
+    return _ORIG_REL_FN(seq_out)
+
+
+try:
+    rt._relation_actions = _severed_emptypool
+    kind, res = run(PHISH, [MASK], strict=True)   # mask-only -> check_unavailable True
+    check("severed path (empty-pool skip) RAISES in strict",
+          kind == "raised", (kind, res))
+finally:
+    rt._relation_actions = _ORIG_REL_FN
+
+# --- HYBRID: production (non-strict) leaves the verdict but FLAGS it ---
+print("\n[hybrid] Non-strict: verdict unchanged (pass) but flagged")
+try:
+    rt._REL_ACTION = dict(_ORIG_REL_ACTION)
+    rt._REL_ACTION["HIGH"] = "pass"
+    kind, res = run(PHISH, [MASK], strict=False)
+    check("non-strict does NOT raise", kind == "report", kind)
+    if kind == "report":
+        check("verdict left as pass (author is the sole authority)",
+              res["final_action"] == "pass", res["final_action"])
+        check("report marked PASS_WITH_INTEGRITY_VIOLATION",
+              res["integrity_status"] == "PASS_WITH_INTEGRITY_VIOLATION",
+              res["integrity_status"])
+        check("violation detail names the relation risk + final",
+              any(v["relation_risk"] == "HIGH" and v["final_action"] == "pass"
+                  for v in res["integrity_violations"]),
+              res["integrity_violations"])
+finally:
+    rt._REL_ACTION = dict(_ORIG_REL_ACTION)
+
+# --- D-GUARD-2: a validation_warning on an active inert edge is revived ---
+print("\n[D-GUARD-2] validation_warning on an inert edge -> INTEGRITY_CONCERN")
+TYPO = _card(scope="HSOT")   # unknown scope -> load warning + verdict NONE
+kind, res = run(PHISH, [TYPO], strict=True)   # concerns never raise, only violations do
+check("typo-scope run does NOT raise (concern, not violation)", kind == "report", kind)
+if kind == "report":
+    dg2 = [c for c in res["integrity_concerns"] if c["rule"] == "D-GUARD-2"]
+    check("D-GUARD-2 concern raised for the warned inert edge",
+          len(dg2) >= 1, res["integrity_concerns"])
+    check("concern carries the load-time validation_warning",
+          bool(dg2) and any("UNKNOWN_CONTEXT_SCOPE" in w
+                            for w in dg2[0]["validation_warnings"]),
+          dg2)
+    check("integrity_status is INTEGRITY_CONCERN",
+          res["integrity_status"] == "INTEGRITY_CONCERN", res["integrity_status"])
+
+_reset_tld_state_for_test()
+
+print("\n" + "=" * 64)
+print(f"TOTAL: {PASSED} OK / {FAILED} FAIL")
+print("=" * 64)
+sys.exit(1 if FAILED else 0)
+------------------------------------------------------------------------
+
+========================================================================
+PART 6 — AUTHOR_DECISIONS (verbatim; D-DET files are RU, safeguard RU)
+========================================================================
+--- 6a. D-DET-1 / D-DET-2 (round 1) -----------------------------------
+ЧАСТНЫЙ АВТОРСКИЙ ПРОЕКТ / COMMERCIAL USE PROHIBITED
+
+DOCUMENT_ID: AUTHOR_DECISION_20260712_BARE_DOMAIN_DETECTOR_D-DET-1_2
+DOCUMENT_TYPE: AUTHOR_DECISION (принято)
+STATUS: ACCEPTED (решение автора) — при этом КОД, реализующий решение,
+        имеет статус NEW_ARTIFACT, NOT_REVIEWED (ждёт конвейера)
+AUTHOR: Руслан Малявский (AUTHOR_DECISION_STATUS_AUTHORITY)
+DATE: 2026-07-12
+BASIS: шесть прогонов FIX_VERIFICATION (Kimi K2.6, DeepSeek-R1, Qwen,
+       ASCII-trace, all-PASS, развёрнутое RU-ревью) над предложенным
+       набором из 7 патчей детектора голого домена (Г1).
+       См. РЕЗУЛЬТАТЫ ПРОГОНОВ.txt.
+
+════════════════════════════════════════════════════════════════
+СТАТУС АРТЕФАКТА (честная рамка)
+════════════════════════════════════════════════════════════════
+Это НЕ применение патчей. Исходников патчей P1–P7 не существует —
+код детектора голого домена написан ЗАНОВО по шести ревью,
+использованным КАК СПЕЦИФИКАЦИЯ ТРЕБОВАНИЙ. Шесть ревью — источник
+требований, НЕ одобрение. Поэтому:
+
+  - реализация в sequence/sequence_engine.py: NEW_ARTIFACT, NOT_REVIEWED;
+  - надёжной она считается ТОЛЬКО после прохождения конвейера и
+    присвоения AUTHOR_DECISION по самому коду (та же дисциплина, что
+    WORKING_DRAFT-предупреждения по карточкам).
+
+Совокупный вердикт шести ревью по предложенному набору был РАСКОЛОТ:
+три READY_TO_SAVE, три FIX_AGAIN/FIX_FIRST, разногласие по V5 (двойная
+маска) и V3 (fail-closed). Разбор V5 показал: вердикты PASS содержали
+арифметическую ошибку (полагали, что left+right сворачивается в
+«google.com»; на деле остаётся вторая маска). Две находки признаны
+реальными и закрыты настоящими решениями.
+
+════════════════════════════════════════════════════════════════
+D-DET-1 — НЕСКОЛЬКО МАСОК В ОДНОМ ТОКЕНЕ
+════════════════════════════════════════════════════════════════
+РЕШЕНИЕ. При проверке «рвёт ли маска домен» из токена убираются ВСЕ
+маски (все вхождения всех объявленных масок), а не только текущая.
+Если остаток похож на домен → HOST.
+
+ПОЧЕМУ. Предложенный P6 проверял _looks_like_domain(left_part +
+right_part), где left/right всё ещё содержали ДРУГИЕ маски. Для
+«gоog／le.／com» обе маски давали FREE_TEXT (молчаливый пропуск того,
+что на деле google.com). Это реальный обход: вторая маска в том же
+токене подавляла детекцию первой (DeepSeek-R1, Qwen — FAIL по V5).
+
+РЕАЛИЗАЦИЯ. _demask(s, mask_chars) в sequence_engine.py удаляет все
+mask_chars из строки; вызывается для обеих сторон маски перед
+_looks_like_domain. «gоog／le.／com» → «gоogle.com» → HOST.
+
+ГРАНИЦА (не сузить решение молча). Сегодня единственная маска —
+структурный разделитель ／ (fullwidth solidus), которого в настоящем
+домене быть не может; удаление реконструирует домен. Если когда-нибудь
+будет заведена БУКВЕННАЯ гомоглиф-маска (напр. кириллическая ‘о’ как
+VISUAL_MIMIC_OF латинской ‘o’), сплошное удаление испортило бы метку —
+там нужна не деляция, а подстановка канона. Это ОТКРЫТЫЙ вопрос,
+требующий отдельного AUTHOR_DECISION; в текущем scope он не возникает
+(таких карточек нет). Зафиксировано, а не спрятано.
+
+════════════════════════════════════════════════════════════════
+D-DET-2 — TLD-СПРАВОЧНИК НЕДОСТУПЕН → ТРЕВОГА, НЕ ТИШИНА
+════════════════════════════════════════════════════════════════
+РЕШЕНИЕ. Если TLD-справочник недоступен (пустой/битый набор),
+домено-подобный токен с маской даёт ТРЕВОГУ, а не молчание; весь
+прогон помечается DEGRADED.
+
+ПОЧЕМУ. В предложенном P1 при деградации набор TLD становился пустым,
+_looks_like_domain всегда давал False, и голый домен с маской проходил
+как FREE_TEXT — молча. Флаг выставлялся, но ПОВЕДЕНИЕ не менялось:
+fail-closed по метке, fail-OPEN по поведению (V3, CONCERN у 5 из 6).
+«Fail-closed» обязано означать «при ошибке — консервативно, не
+пропускать».
+
+РЕАЛИЗАЦИЯ.
+  - _tlds() проверяет здоровье набора (>= 100 записей); иначе
+    _TLD_SOURCE_DEGRADED = True. load_single_tlds() и так имеет
+    трёхуровневый резерв (live → cache → embedded ~200), поэтому
+    DEGRADED срабатывает лишь при действительно битом источнике.
+  - В degraded-режиме _is_tld принимает TLD-ПОДОБНУЮ метку
+    (буквенная, длина 2..63) как TLD → домен распознаётся → HOST/PATH,
+    а не FREE_TEXT.
+  - Каждый вердикт несёт tld_source_degraded; SequenceOutput.degraded
+    и предупреждение TLD_SOURCE_DEGRADED помечают ВЕСЬ прогон.
+    Вердикты по голым доменам в этом режиме — provisional (метка +
+    поведение вместе).
+
+════════════════════════════════════════════════════════════════
+АРХИТЕКТУРНОЕ ТРЕБОВАНИЕ — СПИСОК МАСОК ИЗ КАРТОЧЕК
+════════════════════════════════════════════════════════════════
+Список масок берётся из карточек (SIGN_RELATIONS → visible_form),
+НЕ зашивается в код. Модули работают только с готовыми карточками
+(ARCH_DECISION_HOMOGLYPH_VIA_CARD_ONLY). В коде: run_mask_chars в
+_assess_relation_risk собирается из active_relation_candidates всех
+sign_statuses прогона. Ни один mask-символ не появляется в детекторе
+литералом; ／ нигде не захардкожен.
+
+════════════════════════════════════════════════════════════════
+ЧТО ЗАКРЫТО / ЧТО ОСТАЁТСЯ ГРАНИЦЕЙ
+════════════════════════════════════════════════════════════════
+ЗАКРЫТО (проверяется gate_bare_domain_detector.py):
+  - внешняя пунктуация вокруг домена (P3): (gоog／le.com) и т.п. → HOST;
+  - схема учитывается только в своём токене (P4): «http://safe.com/path
+    then gоog／le.com» → HOST у второй маски;
+  - домен с хвостом справа (P5): a.com／evil.com/path|:443|?x=1 → HOST;
+  - IDN/punycode (P2): приме／р.рф → HOST; _looks_like_domain(пример.рф);
+  - двойная маска (D-DET-1): gоog／le.／com → HOST;
+  - деградация TLD (D-DET-2): при пустом наборе gоog／le.com → HOST +
+    прогон DEGRADED.
+
+ОСТАЁТСЯ ГРАНИЦЕЙ (честно, вне scope этого решения):
+  - EMAIL-контекст (вне первого захода оси «отношение»);
+  - zero-width между метками (напр. gоog​／le.com): невидимые
+    символы — отдельный вектор нормализации; они НЕ объявлены масками
+    в карточках, поэтому их удаление здесь нарушило бы «маски только из
+    карточек». Зафиксировано как известная граница, gate это показывает
+    явно, а не прячет.
+
+СВЯЗЬ: STEP0_SIGN_RELATIONS_STRUCTURE_v0_2_RU (D-REL-1..6),
+ARCH_DECISION_HOMOGLYPH_VIA_CARD_ONLY, карточка
+SIGN_CORE_CARD_FULLWIDTH_SOLIDUS_UFF0F. Её LIMITATION_STATEMENT и
+RISK_CASE_005 обновлены 2026-07-12 в соответствие с детектором
+(карточка WORKING_DRAFT / RUN_CARD_STATUS: NOT_STARTED — конвейер
+она не проходила, защищать было нечего). Карточка и детектор идут
+на конвейер ОДНИМ пакетом, не двумя.
+--- 6b. D-DET-3 (FIX_FIRST round 1) -----------------------------------
+ЧАСТНЫЙ АВТОРСКИЙ ПРОЕКТ / COMMERCIAL USE PROHIBITED
+
+DOCUMENT_ID: AUTHOR_DECISION_20260712_BARE_DOMAIN_DETECTOR_FIX_FIRST_ROUND1
+DOCUMENT_TYPE: AUTHOR_DECISION (D-DET-3) + FIX_FIRST-протокол первого круга
+STATUS: ACCEPTED (решение автора по D-DET-3); код детектора остаётся
+        NEW_ARTIFACT, NOT_REVIEWED — идёт на ВТОРОЙ круг конвейера
+AUTHOR: Руслан Малявский (AUTHOR_DECISION_STATUS_AUTHORITY)
+DATE: 2026-07-12
+BASIS: FIX_FIRST по итогам первого круга конвейера над детектором
+       голого домена (см. AUTHOR_DECISION_20260712_BARE_DOMAIN_
+       DETECTOR_D-DET-1_2.md — тот заход и его basis). Один блокер от
+       трёх ревьюеров, одно новое решение автора (D-DET-3), два хвоста
+       отложены на v0.5.
+
+════════════════════════════════════════════════════════════════
+БЛОКЕР — _domain_prefix: чёрный список → позитивная выборка
+════════════════════════════════════════════════════════════════
+НАХОДКА (три ревьюера, первый круг). _domain_prefix обрезал обрамление
+домена по чёрному списку _STRIP_OUTER (фиксированный набор пунктуации).
+Любой символ ВНЕ этого списка — markdown-звёздочка *, тире U+2014,
+тильда ~, pipe |, полноширинная кавычка U+FF02 и т.п. — прилипал к
+домену. Пример: `*gоog／le.com*` — после снятия маски label становится
+`*gоogle.com*` (или после старой логики — `*gоog` / `le.com*` по
+частям), в любом случае лишний символ остаётся ВНУТРИ метки, проверка
+`ch.isalnum() or ch == "-"` на этот символ проваливается → домен не
+распознаётся → тихий FREE_TEXT. Реальный обход HOST/HIGH-вердикта, не
+краевой случай — блокирует READY_TO_SAVE.
+
+РЕШЕНИЕ (не AUTHOR_DECISION в строгом смысле — обязательное
+исправление корректности, не решение по вкусу). _domain_prefix
+переписан с чёрного списка на ПОЗИТИВНУЮ выборку: находит первый
+максимальный непрерывный блок домено-подобных символов — буква
+ЛЮБОГО алфавита (Unicode-осведомлённая проверка `ch.isalnum()`,
+поэтому IDN/гомоглиф-атака кириллицей по-прежнему ловится — это то,
+что детектор ДОЛЖЕН ловить, а не исключать), цифра, дефис, точка — и
+отбрасывает всё остальное. Закрывает весь класс обхода одним
+изменением, а не патчами по символу.
+
+Побочный эффект: этот же позитивный скан САМ ПО СЕБЕ подхватывает
+старую функцию отреза хвоста (P5: `/`, `?`, `#`, `:`, пробел) — ни
+один из этих символов не входит в allow-list, скан останавливается на
+них естественным образом. Отдельный цикл `for sep in (...)` убран как
+избыточный.
+
+ПРОВЕРКА. Весь предыдущий gate (25 прежних кейсов: P2/P3/P4/P5,
+D-DET-1, D-DET-2, FP-guard, zero-width boundary) прогнан ПОСЛЕ правки
+— 25/25 без изменений в ожидаемых вердиктах. Плюс 5 новых кейсов на
+сам обход (звёздочка, тире, тильда, pipe, полноширинная кавычка) — все
+теперь дают HOST/HIGH вместо прежнего тихого FREE_TEXT.
+
+════════════════════════════════════════════════════════════════
+D-DET-3 — ЛОЖНЯКИ СКЛЕЙКИ: ДОКУМЕНТИРОВАТЬ, НЕ ЧИНИТЬ
+════════════════════════════════════════════════════════════════
+РЕШЕНИЕ АВТОРА. Позитивная выборка выше — эвристика, не полноценный
+URL-парсер. Склейка левой и правой части токена вокруг маски
+(left_part + right_part, механика D-DET-1) может дать ложный HOST на
+двух НЕ связанных фрагментах, если результат синтаксически похож на
+домен. Это признаётся и документируется как известное поведение
+эвристики, НЕ как дефект, требующий немедленного исправления.
+
+ПРИМЕРЫ (реальный вывод детектора, не предположение — прогнано
+07-12):
+  - `my-host／name.com` → HOST/HIGH. «my-host» и «name.com» — два
+    самостоятельных фрагмента (например, из разных предложений или
+    случайно соседствующих слов), которые после снятия маски
+    склеиваются в синтаксически корректный `my-hostname.com`.
+    Настоящей подмены домена здесь может не быть.
+  - `example.com,／test` → HOST/HIGH (НЕ HOST/PATH — уточнено прогоном:
+    запятая останавливает позитивный скан ДО «test», поэтому проверка
+    «склеенное = домен» просто заново находит левый домен
+    `example.com` и даёт HOST; «test» молча выпадает из рассмотрения).
+
+ПОЧЕМУ НЕ ЧИНИТЬ СЕЙЧАС. Убрать этот класс ложняков означало бы
+полноценный URL/токен-парсер с пониманием границ «слово / слово»
+против «домен», что выходит за рамки текущего грубого детектора (Г1
+исторически и есть «грубый», см. исходный докстринг
+`_detect_context_at`). Правильный инструмент — отдельная итерация
+детектора, не патч поверх позитивной выборки.
+
+ЗАКРЕПЛЕНО В GATE. `tests/gate_bare_domain_detector.py`, секция
+`[D-DET-3, known] Concatenation false positives — documented, not
+fixed` — оба примера закреплены ассёршенами на НАБЛЮДАЕМЫЙ вердикт
+(не на «правильный»), чтобы будущее изменение эвристики проявилось
+здесь явно, а не расползлось незамеченным.
+
+ДОПОЛНЕНИЕ 2026-07-12 (второй круг, узкий круг по _domain_prefix).
+Родственный, но отдельный по механизму класс: маска ПОСЛЕ домена.
+  - `gоogle.com*／path` → HOST/HIGH (ожидался бы PATH — ／ физически
+    стоит в path-сегменте). Трейлинг-обёртка `*` обрывает позитивный
+    run на `gоogle.com`, и проверка left-only (и concat) заново находит
+    этот домен → HOST. Отличие от склейки выше: правый фрагмент и
+    сшивка тут не нужны, домен даёт сама левая часть; но корень тот же
+    — грубая эвристика без полного URL-парсера, которая не отслеживает,
+    внутри домена маска или после него. Решение автора (D-DET-4 круг):
+    ДОКУМЕНТИРОВАТЬ, не чинить (детектор консервативен, HOST вместо
+    PATH — не тихий пропуск). Закреплено gate-ассёршеном в той же
+    секции [D-DET-3, known]. Полный разбор — FIX_FIRST_ROUND2.md.
+
+════════════════════════════════════════════════════════════════
+ДВА ХВОСТА — ОТЛОЖЕНЫ НА v0.5, ДОБАВЛЕНЫ В GATE КАК KNOWN
+════════════════════════════════════════════════════════════════
+ХВОСТ 1 — уже-punycode вход вне активного справочника.
+  Пример: `gоog／le.xn--zckzah` → FREE_TEXT/NONE (тихий пропуск) —
+  проверено на пришпиленном тестовом TLD-наборе, НЕ содержащем
+  `xn--zckzah`. `_is_tld` сперва проверяет метку как есть (не найдена),
+  затем пробует `.encode("idna")` (для уже-ASCII `xn--...` строки не
+  меняет её), тоже не находит. Это зависимость от ПОЛНОТЫ активного
+  справочника, а не отдельный баг детектора: в проде (live IANA fetch
+  или встроенный fallback ~200 записей) современные punycode ccTLD
+  почти наверняка присутствуют. Помечено как известное, не чинится в
+  этом круге.
+
+ХВОСТ 2 — дефис на краю метки.
+  Пример: `-example.com／x` → PATH/MEDIUM. Проверка метки
+  `all(ch.isalnum() or ch == "-" for ch in lbl)` не учитывает ПОЗИЦИЮ
+  дефиса — RFC 952/1035 запрещают дефис в начале/конце метки, текущий
+  код это не проверяет, поэтому `-example` проходит как валидная
+  метка. Не чинится в этом круге — записано как известное отклонение
+  от строгого RFC.
+
+ЗАКРЕПЛЕНО В GATE. `tests/gate_bare_domain_detector.py`, секция
+`[v0.5, known] Deferred tails — not fixed in this round`.
+
+════════════════════════════════════════════════════════════════
+СТАТУС ПОСЛЕ ЭТОГО КРУГА
+════════════════════════════════════════════════════════════════
+Код детектора: NEW_ARTIFACT, NOT_REVIEWED — этот FIX_FIRST не меняет
+статус, он готовит артефакт ко ВТОРОМУ кругу конвейера (первый круг
+дал FIX_FIRST по блокеру; блокер закрыт этим документом и коммитом).
+gate_bare_domain_detector.py: 34/34 (было 25, добавлено 5 на блокер +
+2 на D-DET-3 + 2 на v0.5-хвосты). Полная регрессия: gate_relation_
+verdict_step4 12/12, gate_solidus_scheme 28/28, gate_english_only
+CLEAN — все прогнаны ПОСЛЕ правки _domain_prefix, не только до.
+
+Карточка SIGN_CORE_CARD_FULLWIDTH_SOLIDUS_UFF0F: VERSION v0_3,
+LIMITATION_STATEMENT дополнен строками ИСПРАВЛЕНО (блокер) и ИЗВЕСТНО
+И НЕ ЧИНИТСЯ (D-DET-3) и ОТЛОЖЕНО (v0.5-хвосты). Карточка и детектор
+по-прежнему идут на конвейер ОДНИМ пакетом.
+
+СВЯЗЬ: AUTHOR_DECISION_20260712_BARE_DOMAIN_DETECTOR_D-DET-1_2.md
+(первый заход — D-DET-1, D-DET-2), SIGN_CORE_CARD_FULLWIDTH_SOLIDUS_
+UFF0F v0_3, ARCH_DECISION_HOMOGLYPH_VIA_CARD_ONLY (Unicode-буква любого
+алфавита в позитивной выборке — это ЧТЕНИЕ формы символа, не заведение
+нового знака мимо карточки; список масок по-прежнему только из
+SIGN_RELATIONS, позитивная выборка не расширяет и не сужает этот
+список — она лишь решает, что «похоже на домен» ВНУТРИ уже demask-нутой
+строки).
+--- 6c. D-DET-4 (FIX_FIRST round 2) -----------------------------------
+ЧАСТНЫЙ АВТОРСКИЙ ПРОЕКТ / COMMERCIAL USE PROHIBITED
+
+DOCUMENT_ID: AUTHOR_DECISION_20260712_BARE_DOMAIN_DETECTOR_FIX_FIRST_ROUND2
+DOCUMENT_TYPE: AUTHOR_DECISION (D-DET-4) + FIX_FIRST-протокол второго круга
+STATUS: ACCEPTED (решение автора по D-DET-4); код детектора остаётся
+        NEW_ARTIFACT, NOT_REVIEWED — идёт на следующий круг
+AUTHOR: Руслан Малявский (AUTHOR_DECISION_STATUS_AUTHORITY)
+DATE: 2026-07-12
+BASIS: узкий круг ревью по одной функции _domain_prefix (переписанной
+       в первом круге, FIX_FIRST_ROUND1). Шесть приложенных ревью, два
+       ОТСЕЯНЫ (см. conveyor_runs/RUN_004_domain_prefix_narrow_RESULTS.md):
+       один рецензировал несуществующий код («P1–P7», «V5
+       CURRENT_MASK_ONLY» — мёртвая прошлая сессия), другой не смог
+       прочитать пакет и предложил сочинить отчёт. Живых пять: пять
+       READY, шестой (в числе живых) нашёл реальный новый ложняк — он
+       прав, блокер принят.
+
+════════════════════════════════════════════════════════════════
+БЛОКЕР → D-DET-4 — ВЕДУЩИЙ СТРУКТУРНЫЙ СИМВОЛ ПРОГЛАТЫВАЕТСЯ
+════════════════════════════════════════════════════════════════
+НАХОДКА (узкий круг). Позитивная выборка (FIX_FIRST_ROUND1) пропускает
+ВСЁ до первого доменного символа и НЕ различает обёртку от структурного
+разделителя. Ведущий @ (email/mention) и / (путь) исчезают бесследно.
+
+Измерено (старое чёрным списком → новое позитивной выборкой без D-DET-4):
+  #example.com／x   FREE_TEXT → PATH/MEDIUM
+  /example.com／x   FREE_TEXT → PATH/MEDIUM
+  @example.com／x   FREE_TEXT → PATH/MEDIUM
+  :example.com／x   FREE_TEXT → PATH/MEDIUM
+
+Нарушенный принцип: WRAPPER ≠ STRUCTURAL_SEPARATOR. Позитивная выборка
+имела право пропустить обёртку (скобка, кавычка, звёздочка), но НЕ имела
+права молча отбросить структурную границу.
+
+РЕШЕНИЕ АВТОРА D-DET-4. Ведущие / \ ? # : @ — HARD_STOP: если такой
+символ встречен ДО начала доменного блока, _domain_prefix возвращает
+пустую строку (у токена нет доменного префикса). Остальную внешнюю
+пунктуацию (обёртки) по-прежнему пропускаем.
+
+  _LEADING_STRUCTURAL_STOPS = frozenset("/\\?#:@")
+  while i < n and not (token[i].isalnum() or token[i] in ".-"):
+      if token[i] in _LEADING_STRUCTURAL_STOPS:
+          return ""
+      i += 1
+
+Это НЕ возврат чёрного списка: список пунктуации бесконечен, список
+структурных границ — ЗАКРЫТ и уже имеет смысл в спецификации (path,
+query, fragment, port, authority/email). Мы не гадаем «что добавит
+атакующий», мы называем «что структурно значимо».
+
+ПРОВЕРКА (измерено ПОСЛЕ правки, escape-строки где нужна однозначность
+байтов):
+  - четыре структурных кейса #, /, @, : → FREE_TEXT (были PATH/MEDIUM);
+  - пять обходов-обёрток *, тире, ~, |, ＂ → HOST/HIGH (целы, обёртка ≠
+    структурный разделитель);
+  - базовые gоog／le.com, приме／р.рф → HOST/HIGH (не задеты).
+Добавлено 4 gate-кейса (секция [D-DET-4]).
+
+════════════════════════════════════════════════════════════════
+1.2 — ИСПРАВЛЕНИЕ ФОРМУЛИРОВКИ (документация врала, код верен)
+════════════════════════════════════════════════════════════════
+НАХОДКА (узкий круг). Везде, где написано «буква ЛЮБОГО алфавита» —
+это ложь. Правда: «символы, для которых str.isalnum() = True».
+Combining marks (Unicode-категории Mn/Mc) её НЕ проходят: IDN-домен на
+деванагари с огласовкой (bharat.bharat, кодпоинты базовых букв U+092D
+U+0930 U+0924 с огласовкой U+093E) под маской -> FREE_TEXT, потому что
+U+093E DEVANAGARI VOWEL SIGN AA (категория Mc) даёт isalnum()=False, и
+позитивная выборка обрывается сразу после базовой буквы. То же для
+арабских диакритик, ивритских огласовок, NFD-разложенной латиницы.
+
+СТАТУС. Это НЕ регрессия и НЕ баг кода: старый чёрный список оставлял
+combining mark в строке, но неизменённая проверка метки
+(all(ch.isalnum() or ch == "-")) всё равно её отвергала — итог тот же
+FREE_TEXT. Меняется ТОЛЬКО документация: она обещала больше, чем код
+делает.
+
+РЕШЕНИЕ. Формулировка исправлена в: докстринге _domain_prefix
+(sequence_engine.py), заголовочном комментарии детектора,
+AUTHOR_DECISION FIX_FIRST_ROUND1 (через настоящий документ — см. ниже),
+карточке (LIMITATION_STATEMENT). Точная формулировка везде:
+«поддерживаются символы, для которых str.isalnum() истинно (буквы и
+цифры Unicode), плюс дефис и точка; combining marks — НЕ поддерживаются
+(isalnum()=False), это известное ограничение». Закрытие combining marks
+требует полноценной IDNA/NFC-канонизации кандидата целиком — вне scope
+грубого детектора, отдельное будущее решение.
+
+ЗАКРЕПЛЕНО В GATE. Кейс с деванагари+огласовка (строка построена из
+escape-последовательностей ради однозначности байтов) как
+known_limitation → FREE_TEXT.
+
+════════════════════════════════════════════════════════════════
+1.3 — ДОПОЛНЕНИЕ К D-DET-3 (маска ПОСЛЕ домена)
+════════════════════════════════════════════════════════════════
+Отдельный, но родственный D-DET-3 класс (тот же корень — грубая
+эвристика без полного URL-парсера):
+
+  gоogle.com*／path → HOST (ожидался бы PATH — маска в path-сегменте).
+
+Механизм иной, чем у склейки D-DET-3: трейлинг-обёртка `*` обрывает
+позитивный run на `gоogle.com`, и проверка left-only (и concat)
+заново находит этот домен → HOST, хотя ／ физически стоит после домена.
+Решение автора: ДОКУМЕНТИРОВАТЬ, не чинить (детектор консервативен,
+HOST вместо PATH — не тихий пропуск). Дополнение вписано в секцию
+D-DET-3 файла FIX_FIRST_ROUND1 и закреплено gate-ассёршеном.
+
+════════════════════════════════════════════════════════════════
+ОТКЛОНЁННЫЕ / НЕ-В-SCOPE НАХОДКИ ЖИВЫХ РЕВЬЮ (для провенанса)
+════════════════════════════════════════════════════════════════
+- «Дефис по краю метки запретить» (несколько ревьюеров): УЖЕ отложено
+  на v0.5 в первом круге (FIX_FIRST_ROUND1), gate это пиннит. Не
+  открывается этим кругом.
+- «Zero-width нормализовать/удалять перед разбором»: вне scope узкого
+  круга и противоречит ARCH_DECISION_HOMOGLYPH_VIA_CARD_ONLY (zero-width
+  не объявлен маской ни в одной карточке; удалять хардкодом нельзя).
+  Уже зафиксировано как граница в D-DET-1/2 доке и карточке. ОТКЛОНЕНО
+  в этом круге.
+- «Второй проход: искать наибольший валидный доменный run, а не первый»
+  (ONE_QUESTION нескольких ревьюеров, вход junk_prefix_gоog／le.com):
+  измерено — старый код на таком входе тоже давал FREE_TEXT, это НЕ
+  новая регрессия. Кандидат на v0.5, не блокер. ОТКЛОНЕНО в этом круге
+  как немедленная правка.
+- «Логировать IDNA-исключения», «IDNA-нормализация всех меток»:
+  улучшения устойчивости, не корректность узкого круга. ОТЛОЖЕНО.
+
+════════════════════════════════════════════════════════════════
+СТАТУС ПОСЛЕ ЭТОГО КРУГА
+════════════════════════════════════════════════════════════════
+Код детектора: NEW_ARTIFACT, NOT_REVIEWED. gate_bare_domain_detector.py:
+40/40 (было 34: +4 D-DET-4, +1 D-DET-3 addendum, +1 combining-mark
+known_limitation). Полная регрессия ПОСЛЕ правки: gate_relation_verdict_
+step4 12/12, gate_solidus_scheme 28/28, gate_english_only CLEAN.
+
+Карточка SIGN_CORE_CARD_FULLWIDTH_SOLIDUS_UFF0F: VERSION → v0_4,
+LIMITATION_STATEMENT дополнен D-DET-4, combining-mark ограничением и
+дополнением к D-DET-3; формулировка «любой алфавит» исправлена;
+RUN_CARD_REFERENCE указывает на conveyor_runs/RUN_20260712_domain_
+prefix_narrow.md (был PENDING). Карточка и детектор идут на конвейер
+ОДНИМ пакетом.
+
+СВЯЗЬ: FIX_FIRST_ROUND1 (D-DET-3, v0.5 tails), D-DET-1_2 (D-DET-1/2),
+ARCH_DECISION_HOMOGLYPH_VIA_CARD_ONLY, шаблон конвейерного пакета
+(templates/CONVEYOR_PACKET_TEMPLATE_v0_1.md — обязательные поля
+FINDING_STATUS/FINDING_BASIS, заведён этим кругом по протоколу
+ACK_GAP_TRIVALENT), conveyor_runs/RUN_004_domain_prefix_narrow_RESULTS.md.
+--- 6d. D-GUARD-1 (finish-line invariant) -----------------------------
+ЧАСТНЫЙ АВТОРСКИЙ ПРОЕКТ / COMMERCIAL USE PROHIBITED
+
+DOCUMENT_ID: AUTHOR_DECISION_20260712_MASK_PATH_SAFEGUARD_D-GUARD-1
+DOCUMENT_TYPE: AUTHOR_DECISION (принято)
+STATUS: ACCEPTED (решение автора)
+AUTHOR: Руслан Малявский (AUTHOR_DECISION_STATUS_AUTHORITY)
+DATE: 2026-07-12
+BASIS: аудит тихих путей (audit_silent_paths_2026-07-12.md) — кластер
+       швов S1/S2/S4: вердикт маски доходит до финала РОВНО ОДНИМ ручным
+       путём в analyze(); sequence-интегратор, выход по пустому пулу и
+       сериализация его роняют. Одна регрессия = тихий PASS на фишинге.
+       Конвейер (5 моделей) сошёлся на: инвариант на финише + chaos-гейт.
+       Соты, HMAC, телеметрия, event-sourcing, __del__-пилюли — ОТСЕЯНЫ
+       конвейером (оверинжиниринг либо недетерминизм в Python). Соты и
+       семантическая трассировка отложены отдельными задачами.
+
+════════════════════════════════════════════════════════════════
+РЕШЕНИЕ D-GUARD-1 — ИНВАРИАНТ НА ФИНИШЕ (ЗАКОН СОХРАНЕНИЯ РИСКА)
+════════════════════════════════════════════════════════════════
+В analyze(), ПОСЛЕ most_severe и ПЕРЕД возвратом, выполняется НЕЗАВИСИМАЯ
+проверка РЕЗУЛЬТАТА. Она читает только: финальное действие,
+seq_out.relation_verdicts (источник истины оси маски) и — по D-GUARD-2 —
+validation_warnings карточных рёбер. Она НЕ повторяет путь агрегации,
+поэтому НЕ дублирует его хрупкость (это принципиально: второй ручной
+путь агрегации был бы вторым местом, где всё может сломаться так же).
+
+ИНВАРИАНТ. Если в relation_verdicts есть хоть один risk_level HIGH или
+CRITICAL — финальный вердикт НЕ может быть PASS. Нарушение означает, что
+вердикт маски не дошёл до финального действия: путь оборван.
+
+МЯГКОЕ ПРАВИЛО. MEDIUM relation-вердикт при финале PASS — это метка
+INTEGRITY_CONCERN, НЕ violation (не роняет, не блокирует; сигнал к
+вниманию).
+
+ПОВЕДЕНИЕ ПРИ НАРУШЕНИИ — ГИБРИД (осознанный):
+  - В БОЮ (обычный прогон): вердикт НЕ меняется. Автор — единственная
+    инстанция, имеющая право переопределить вердикт; сторож НЕ
+    самоуправствует. В отчёт добавляется запись INTEGRITY_VIOLATION с
+    деталью (какое ребро/relation_id, какой контекст, какой risk_level,
+    какой финал), и прогон помечается PASS_WITH_INTEGRITY_VIOLATION.
+  - В СТРОГОМ РЕЖИМЕ (env MSL_MIP_GUARD_STRICT=1, для гейтов/разработки):
+    то же нарушение РОНЯЕТ прогон исключением IntegrityViolation.
+    Регрессия, обрывающая путь маски, не проходит в разработке молча.
+
+ПОЧЕМУ ГИБРИД, А НЕ АВТО-ПОВЫШЕНИЕ. Автоматически поднять вердикт до
+HOLD в бою означало бы дать сторожу право переписывать вывод системы на
+основании эвристики о самом себе. Это нарушает
+AUTHOR_DECISION_STATUS_AUTHORITY. Сторож обязан КРИЧАТЬ, а не ТИХО
+ЧИНИТЬ: в бою он делает нарушение видимым (метка + деталь), в разработке
+— не пропускает регрессию (падение). Решение о смене вердикта остаётся
+за автором.
+
+РЕАЛИЗАЦИЯ (msl_mip_runtime.py):
+  - _relation_actions(seq_out) — путь маска→действие вынесен в
+    модуль-уровневый шов (был инлайн), чтобы chaos-гейт мог имитировать
+    обрыв, НЕ трогая relation_verdicts.
+  - _integrity_check(final_action, seq_out, cards) — сам инвариант
+    (D-GUARD-1 + D-GUARD-2). Возвращает (violations, concerns).
+  - class IntegrityViolation — исключение строгого режима.
+  - analyze() зовёт проверку после most_severe; в строгом режиме и при
+    наличии violations — raise; иначе кладёт integrity_status
+    (OK / INTEGRITY_CONCERN / PASS_WITH_INTEGRITY_VIOLATION) и списки в
+    отчёт. print_report печатает статус, если он не OK.
+
+ГРАНИЦЫ (что НЕ сделано этим решением):
+  - Детектор Г1, карточка ／, существующие гейты — НЕ тронуты.
+  - Инвариант ловит «relation_verdicts говорят HIGH, а финал PASS». Он
+    СЛЕП к «relation_verdicts были ошибочно опустошены ДО analyze()»
+    (тогда читать нечего). Это честная граница: сторож проверяет
+    сохранение риска от источника истины к финалу, а не целостность
+    самого источника. Обрыв, опустошающий сам список, — предмет
+    отдельного механизма (отложено).
+
+ПРОВЕРКА. chaos-гейт tests/gate_safeguard.py (D-GUARD-1 chaos-часть):
+интактный путь — сторож молчит, фишинг → HOLD, integrity OK; три
+обрыва (мэппинг HIGH→pass; сериализация роняет verdicts; пропуск маски
+на пустом пуле) — каждый ловится, строгий режим падает; в бою тот же
+обрыв не меняет вердикт, но помечает PASS_WITH_INTEGRITY_VIOLATION.
+15/15, 20/20 герметично. Полная регрессия: 40/40, 12/12, 28/28,
+English CLEAN — не тронуты.
+
+СВЯЗЬ: AUTHOR_DECISION_20260712_MASK_PATH_SAFEGUARD_D-GUARD-2.md
+(validation_warnings), audit_silent_paths_2026-07-12.md (S1/S2/S4),
+ACK_GAP_TRIVALENT (дисциплина «утверждение ≠ доказательство»:
+инвариант — это машинная проверка результата, не заявление о нём).
+--- 6e. D-GUARD-2 (revive validation_warnings) ------------------------
+ЧАСТНЫЙ АВТОРСКИЙ ПРОЕКТ / COMMERCIAL USE PROHIBITED
+
+DOCUMENT_ID: AUTHOR_DECISION_20260712_MASK_PATH_SAFEGUARD_D-GUARD-2
+DOCUMENT_TYPE: AUTHOR_DECISION (принято)
+STATUS: ACCEPTED (решение автора)
+AUTHOR: Руслан Малявский (AUTHOR_DECISION_STATUS_AUTHORITY)
+DATE: 2026-07-12
+BASIS: аудит тихих путей (audit_silent_paths_2026-07-12.md), находка S5:
+       поле validation_warnings заполняется парсером (core/load_card.py)
+       и НЕ ЧИТАЕТСЯ НИГДЕ — мёртвый код, создающий ложное чувство
+       защиты. Парсер честно пишет предупреждение «ребро молча не даёт
+       вердикта», после чего это предупреждение никто не читает.
+
+════════════════════════════════════════════════════════════════
+РЕШЕНИЕ D-GUARD-2 — ОЖИВИТЬ validation_warnings (НЕ УДАЛЯТЬ)
+════════════════════════════════════════════════════════════════
+Поле validation_warnings НЕ удаляется — оно ПОДКЛЮЧАЕТСЯ к инварианту
+на финише (D-GUARD-1). Мёртвое поле, молча создающее видимость защиты,
+хуже отсутствия поля; правильный ответ — оживить его, а не вычистить.
+
+ПРАВИЛО. В _integrity_check строится карта активных рёбер, несущих
+load-time validation_warning (по ключу visible_form + relation_id из
+загруженных карточек). Если у активного ребра стоит validation_warning
+И его relation-вердикт дал risk NONE (ребро молча инертно) — поднимается
+INTEGRITY_CONCERN с деталью и самим текстом предупреждения. Это ровно
+то, что предсказывало собственное предупреждение ребра: «не совпадёт ни
+с одним контекстом и молча не даст вердикта».
+
+СТАТУС. Это CONCERN, не violation: неверно-сконфигурированное ребро —
+не обрыв пути и не угроза сама по себе; это сигнал, что карточка обещает
+защиту, которой код не даёт (класс SC1/SC2 аудита — например опечатка в
+CONTEXT_SCOPE или скоуп, который детектор не производит). Concern НЕ
+роняет прогон даже в строгом режиме; роняют только violations D-GUARD-1.
+
+ПОЧЕМУ НА ФИНИШЕ, А НЕ В ПАРСЕРЕ. Парсер уже пишет предупреждение —
+проблема не в его отсутствии, а в том, что его никто не потребляет.
+Подключение на финише (в analyze) делает предупреждение видимым в
+РЕЗУЛЬТАТЕ прогона, там же, где живёт инвариант, и по той же гибридной
+дисциплине (метка в бою). Это НЕ меняет ни парсер, ни карточку, ни
+детектор — только оживляет уже записанные данные.
+
+РЕАЛИЗАЦИЯ (msl_mip_runtime.py, _integrity_check):
+  warn_by_edge[(card.visible_form, r.relation_id)] = r.validation_warnings
+    для каждого активного ребра с непустыми предупреждениями;
+  для каждого relation-вердикта с risk NONE и совпавшим ключом —
+    concern {"rule":"D-GUARD-2", validation_warnings, detail}.
+
+ГРАНИЦЫ:
+  - Ловит только рёбра, которые парсер УЖЕ пометил (опечатка скоупа,
+    неизвестный тип, пустой scope, effect != RELATION_ONLY). НЕ ловит
+    скоуп, который валиден по загрузчику, но не производится детектором
+    без предупреждения (напр. PORT/EMAIL/IDN/CODE/IDENTIFIER — находка
+    SC1): у такого ребра нет validation_warning, значит D-GUARD-2 молчит.
+    SC1 — отдельная задача (рассогласование spec↔детектор), не этот заход.
+  - Поле НЕ удалено и остаётся у SignRelation как было; изменено только
+    его потребление.
+
+ПРОВЕРКА. chaos-гейт tests/gate_safeguard.py, секция [D-GUARD-2]: карточка
+со скоупом-опечаткой (HSOT) → парсер пишет UNKNOWN_CONTEXT_SCOPE, вердикт
+NONE → на финише поднимается D-GUARD-2 concern с тем же текстом
+предупреждения; прогон НЕ падает (concern, не violation); integrity_status
+= INTEGRITY_CONCERN. Герметично, 20/20.
+
+СВЯЗЬ: AUTHOR_DECISION_20260712_MASK_PATH_SAFEGUARD_D-GUARD-1.md
+(инвариант, к которому подключено поле), audit_silent_paths_2026-07-12.md
+(S5 — мёртвое поле; SC1/SC2 — рёбра, которые оно теперь освещает).
+--- 6f. PRINCIPLE_GATE_MUST_BE_HERMETIC -------------------------------
+ЧАСТНЫЙ АВТОРСКИЙ ПРОЕКТ / COMMERCIAL USE PROHIBITED
+
+DOCUMENT_ID: PRINCIPLE_GATE_MUST_BE_HERMETIC
+LAYER: FOUNDATION_LAYER
+DOCUMENT_TYPE: ENGINEERING_PRINCIPLE (дисциплина гейтов)
+NAME: GATE_MUST_BE_HERMETIC
+STATUS: ACCEPTED
+AUTHOR_DECISION: Руслан Малявский, 2026-07-12
+BASIS: gate_solidus_scheme дал 27/28, затем дважды 28/28 при НЕИЗМЕННОМ
+       коде. Разбор показал не «шум», а недопустимую зависимость гейта
+       от внешнего сетевого источника.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ПРИНЦИП
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+GATE_MUST_BE_HERMETIC:
+  Гейт НЕ имеет права зависеть от внешних источников (сеть, живой
+  реестр, изменяемый кэш, часы, случайность). Один и тот же код на одном
+  и том же входе обязан давать один и тот же вердикт КАЖДЫЙ раз,
+  независимо от того, доступна ли сеть и что она вернула.
+
+  Живой справочник — для РАНТАЙМА. Пришпиленный — для ГЕЙТА.
+
+  Гейт, зависящий от сети, — не гейт: он даст зелёный на СЛОМАННОМ
+  коде, если сеть «подсказала» правильный ответ, и красный на РАБОЧЕМ
+  коде, если сеть подвела. Это молчаливая деградация, а не тестовый
+  сигнал. «Зелёный 20 раз» при живой сети НЕ доказывает корректность —
+  доказывает лишь, что сеть в тот момент отвечала.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ДОКАЗАННАЯ ПРИЧИНА (не гипотеза)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Цепочка касания сети:
+  gate_solidus_scheme.py спавнит msl_mip_runtime.py на КАЖДЫЙ кейс →
+  runtime при старте зовёт dot_matcher.get_compound_suffix_source() и
+  get_single_tld_source() → public_suffix.load_compound_suffixes() /
+  load_single_tlds() → urllib.request.urlopen(publicsuffix.org /
+  data.iana.org, timeout=3). Плюс gate_relation_verdict_step4.py →
+  process_sequence → _assess_relation_risk → sequence_engine._tlds() →
+  та же load_single_tlds().
+
+Конкретный флип-кейс (измерено, не предположено):
+  «paypal.com.security-check.ru» (gate_solidus_scheme, «dot substitution»)
+    TLD-набор С 'ru'    → domain_separator + RISK_CASE_002 → HOLD (верно)
+    TLD-набор БЕЗ 'ru'  → file_extension, без риска        → PASS (тихий
+                          зелёный на том, что должно флагироваться)
+  Частичный/битый/протухший ответ IANA, где 'ru' выпал, молча красит
+  гейт зелёным. Это и есть молчаливая деградация.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+МЕХАНИЗМ ГЕРМЕТИЗАЦИИ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Флаг окружения MSL_MIP_HERMETIC_TLD (public_suffix.py): при установке
+load_compound_suffixes() и load_single_tlds() ПРОПУСКАЮТ сеть и кэш и
+возвращают встроенные (in-repo) EMBEDDED-наборы — детерминированный,
+offline, пришпиленный источник (source = "EMBEDDED_HERMETIC"). Поведение
+по умолчанию (флаг снят) не меняется: live → cache → embedded, как в
+проде. Рантайм честно печатает HERMETIC-режим (не врёт про «нет сети»).
+
+Способы пришпиливания по гейтам:
+  - подпроцессный гейт (spawns runtime): MSL_MIP_HERMETIC_TLD="1" в env
+    подпроцесса (gate_solidus_scheme);
+  - in-process гейт: os.environ до первого вызова, ИЛИ прямой пин
+    состояния (gate_bare_domain_detector: _force_tld_state_for_test с
+    _PINNED_TLDS — ещё жёстче, задаёт конкретный набор);
+  - gate_relation_verdict_step4: os.environ в шапке до импортов.
+
+Гейт без внешних источников вовсе (gate_english_only — только чтение
+файлов) герметичен по построению, флаг не нужен.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ПОДТВЕРЖДЕНИЕ (воспроизводимость = измерение)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+После герметизации каждый гейт прогнан 20 раз подряд:
+  gate_bare_domain_detector  20/20  40 OK / 0 FAIL
+  gate_english_only          20/20  CLEAN
+  gate_relation_verdict_step4 20/20  12 OK / 0 FAIL
+  gate_solidus_scheme        20/20  28/28
+Offline-доказательство: под флагом runtime печатает
+"EMBEDDED_HERMETIC" (сеть/кэш пропущены), спорный кейс остаётся HOLD.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ПРАВИЛО ДЛЯ БУДУЩИХ ГЕЙТОВ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Новый гейт ОБЯЗАН быть герметичным до включения в набор. Если он
+   касается TLD/суффиксов — MSL_MIP_HERMETIC_TLD или прямой пин.
+2. Любой новый внешний источник (сеть, БД, часы, случайность) в пути
+   гейта требует такого же offline-пришпиливания. Если пришпилить
+   нельзя — это не гейт, а мониторинг; выносить отдельно.
+3. Приёмка гейта включает прогон N≥20 раз с идентичным результатом.
+   Заявление «стабильно» без измерения не принимается (ср.
+   ACK_GAP_TRIVALENT: утверждение ≠ доказательство).
+
+СВЯЗЬ: SIGN_CORE_CARD_CONVEYOR_RULES (этап SIMULATION_GATE_PASSED — гейт
+должен быть герметичным, чтобы его PASS что-то значил),
+CONVEYOR_RUN_PACKET_TEMPLATE (FINDING_BASIS: то же требование измерять,
+а не заявлять), public_suffix.py (флаг MSL_MIP_HERMETIC_TLD),
+gate_bare_domain_detector.py (_PINNED_TLDS — образец прямого пина).
+
+═══════════════════════════════════
+
+========================================================================
+PART 7 — CARD /  v0_4 (changed sections; RU verbatim from disk)
+========================================================================
+Card header: VERSION: v0_4
+--- RISK_CASE_005 ---------------------------------------------------
+  RISK_CASE_005:
+    CONTEXT: голый домен без схемы
+    EXAMPLE: gоog／le.com без http:// (маска рвёт домен)
+    INTERPRETATION: schemeless_domain_masking
+    RISK: HIGH
+    RULE: покрыт детектором голого домена Г1 (реконструкция
+      2026-07-12, AUTHOR_DECISION D-DET-1/2): маска внутри домена или
+      между двумя доменами → HOST; двойная маска в токене закрыта
+      D-DET-1 (перед проверкой убираются ВСЕ маски); недоступный
+      TLD-справочник → тревога + прогон DEGRADED (D-DET-2). Код
+      детектора — NEW_ARTIFACT, NOT_REVIEWED; карточка и детектор
+      идут на конвейер одним пакетом
+
+--- 9. LIMITATION_STATEMENT -----------------------------------------
+===========
+9. LIMITATION_STATEMENT  [ОБЯЗАТЕЛЬНО]
+============================================================
+
+- ПОКРЫТО с 2026-07-12 (детектор Г1, AUTHOR_DECISION D-DET-1/2):
+  голые домены без схемы (gоog／le.com → HOST), внешняя пунктуация
+  вокруг домена, хвосты справа (path/порт/query), IDN/punycode
+  (приме／р.рф → HOST), двойная маска в одном токене (D-DET-1),
+  деградация TLD-справочника → тревога + прогон DEGRADED (D-DET-2).
+  Код детектора: NEW_ARTIFACT, NOT_REVIEWED — карточка и детектор
+  идут на конвейер ОДНИМ пакетом.
+- ИСПРАВЛЕНО с 2026-07-12 (FIX_FIRST, первый круг конвейера): обрезка
+  пунктуации переписана с чёрного списка (_STRIP_OUTER) на позитивную
+  выборку домено-подобных символов (символы, для которых isalnum()
+  истинно — буквы и цифры Unicode, НЕ «любой алфавит»: см. ниже про
+  combining marks — плюс дефис и точка). Три ревьюера нашли обход:
+  обрамление домена символом ВНЕ
+  чёрного списка (markdown *, тире, тильда, pipe, полноширинная
+  кавычка) прилипало к домену → тихий FREE_TEXT. Позитивная выборка
+  закрывает весь класс обхода, не по символу.
+- ИСПРАВЛЕНО с 2026-07-12 (FIX_FIRST, второй/узкий круг, AUTHOR_DECISION
+  D-DET-4): ведущий структурный разделитель (/ \ ? # : @) перед
+  доменным блоком — HARD_STOP (позитивная выборка возвращает пустую
+  строку), а не пропускаемая обёртка. Без этого @example.com／x,
+  /example.com／x читались как голые домены → PATH; теперь → FREE_TEXT
+  (структурный символ сохраняет смысл; обёртки *, тире и пр. по-прежнему
+  пропускаются). Закрытый список структурных границ ≠ бесконечный чёрный
+  список пунктуации.
+- ИЗВЕСТНОЕ ОГРАНИЧЕНИЕ combining marks (2026-07-12, второй круг):
+  isalnum() ложен для combining marks (Unicode Mn/Mc), поэтому IDN-метка
+  с огласовкой/диакритикой (деванагари U+093E DEVANAGARI VOWEL SIGN AA,
+  арабские диакритики, ивритские огласовки, NFD-разложенная латиница)
+  обрывает позитивную выборку на базовой букве → FREE_TEXT. Это НЕ
+  регрессия (старый чёрный список тоже отвергал такую метку проверкой
+  isalnum-or-hyphen), но формулировка «любой алфавит» была ложной и
+  исправлена. Закрытие требует IDNA/NFC-канонизации кандидата — вне
+  scope грубого детектора. Закреплено gate-кейсом (escape-строка).
+- ИЗВЕСТНО и НЕ ЧИНИТСЯ (AUTHOR_DECISION D-DET-3, 2026-07-12): сама
+  позитивная выборка — эвристика без полного URL-парсера, поэтому
+  склейка левой и правой части через маску может дать ложное HOST на
+  двух не связанных фрагментах, если результат синтаксически похож на
+  домен (my-host／name.com → HOST; example.com,／test → HOST, «test»
+  теряется). ДОПОЛНЕНИЕ (второй круг): маска ПОСЛЕ домена тоже читается
+  как HOST, а не PATH (gоogle.com*／path → HOST — трейлинг-обёртка
+  обрывает run на домене; ／ физически в path-сегменте). Задокументировано
+  в gate_bare_domain_detector.py, не считается дефектом — см. файлы
+  AUTHOR_DECISION FIX_FIRST_ROUND1/ROUND2 в foundation_layer.
+- ОТЛОЖЕНО на v0.5 (известно, не чинится в этом круге): уже-punycode
+  TLD-метка, отсутствующая в АКТИВНОМ справочнике (gоog／le.xn--zckzah
+  → тихий FREE_TEXT — зависимость от полноты справочника, не
+  самостоятельный баг детектора); дефис на краю метки (RFC 952/1035
+  запрещает, текущая проверка метки этого не требует —
+  -example.com／x → PATH, домен с ведущим дефисом проходит).
+- Карточка НЕ ловит: EMAIL-контекст (вне scope первого захода);
+  zero-width символы между метками домена (не объявлены масками ни в
+  одной карточке — отдельный вектор нормализации, gate показывает
+  границу явно); порт как отдельную зону (порт считается частью
+  HOST — консервативно, риск не занижается).
+- Карточка НЕ решает: агрегацию при будущих нескольких рёбрах,
+  различие силы NFKC vs CONFUSABLE (тип ребра пока не влияет на риск
+  — открытый вопрос проекта).
+- Статус WORKING_DRAFT: до прохождения конвейера и присвоения
+  AUTHOR_DECISION результаты по знаку не считаются надёжными
+  (рантайм печатает CARD_WARNING — это правильно).
+
+=================================================
+
+--- 10. KNOWN_OPEN_QUESTIONS / OPEN_QUESTION_001 --------------------
+===========
+10. KNOWN_OPEN_QUESTIONS
+============================================================
+
+ALL_OPEN_QUESTIONS_CLOSED: NO
+
+OPEN_QUESTION_001:
+  NAME: MASK_BREAKS_NEIGHBOR_CONTEXT
+  DATE_RAISED: 2026-07-12
+  STATEMENT: маска рвёт контекст СОСЕДНЕМУ ASCII-знаку. Пример:
+    src/utils／main.py — ось маски корректно даёт FREE_TEXT/NONE,
+    но легаси solidus_matcher теряет path-субстрат у первого «/»
+    («src/utils» без продолжения пути) и падает в fallback
+    RISK_CASE_008 (path_or_choice_separator, MEDIUM) →
+    QUEUE_FOR_REVIEW. Базовая линия: тот же текст целиком в ASCII
+    (src/utils/main.py) → filesystem_path, PASS.
+  SOURCE: обнаружено 2026-07-12 при FP-прогоне детектора Г1;
+    вердикт даёт НЕ ось маски (она чиста), а сосед по токену.
+  STATUS: не баг, но неназванный шов. Требует решения:
+    уместная настороженность (замаскированный путь ЗАСЛУЖИВАЕТ
+    взгляда — маска в машинной строке аномальна сама по себе)
+    или ложняк (легитимный CJK-пользователь в path-строке получит
+    QUEUE на ровном месте). Решение — AUTHOR_DECISION, не код
+    по-тихому: затрагивает и solidus_matcher (single-sign слой),
+    и, возможно, будущий канал «маска в токене» → соседним
+    матчерам (данные, не вердикт — по образцу D-REL-5).
+
+========================================================================
+PART 8 — RAW RUN OUTPUT (measured, not asserted)
+========================================================================
+Elision note: identical "[CARD_WARNING] ... WORKING_DRAFT ..." boilerplate
+lines (one per process_sign call — correct, the card is WORKING_DRAFT) are
+removed; every check / TOTAL line is verbatim. All runs hermetic (pinned TLD
+set, MSL_MIP_HERMETIC_TLD).
+
+--- gate_bare_domain_detector.py -----------------------------------
+﻿================================================================
+GATE: bare-domain detector (Г1) — NEW_ARTIFACT, NOT_REVIEWED
+================================================================
+
+[P3] Outer punctuation around a bare domain -> HOST
+  ✓ (gоog／le.com) -> HOST
+  ✓ "gоog／le.com" -> HOST
+  ✓ gоog／le.com, -> HOST
+  ✓ bare gоog／le.com -> HOST/HIGH
+
+[P4] Scheme scope is token-local
+  ✓ http://safe.com/path then gоog／le.com -> HOST
+  ✓ http://safe.com then readme.md／x -> PATH
+  ✓ http://gоog／le.com -> HOST (in-scheme host)
+  ✓ http://ok.com/a／b -> PATH (in-scheme path)
+
+[P5] Domain on both sides with a tail -> HOST
+  ✓ a.com／evil.com/path -> HOST
+  ✓ a.com／evil.com:443 -> HOST
+  ✓ a.com／evil.com?x=1 -> HOST
+
+[P2] IDN / punycode
+  ✓ приме／р.рф -> HOST
+  ✓ _looks_like_domain(пример.рф) True
+
+[D-DET-1] Double mask in one token -> HOST (all masks stripped)
+  ✓ gоog／le.／com yields 2 verdicts (one per mask)
+  ✓ both masks -> HOST
+
+[V2] Glued scheme (no space) is not downgraded
+  ✓ http://safe.comgоog／le.com -> HOST
+
+[FP-guard] CJK fullwidth date stays FREE_TEXT
+  ✓ 2026／07／11 -> all FREE_TEXT/NONE
+
+[FREE_TEXT] Lone mask -> NONE, not protected
+  ✓ just ／ text -> FREE_TEXT/NONE
+  ✓ just ／ text -> protected=False
+
+[BOUNDARY] Zero-width between labels defeats detection (documented)
+  ✓ gоog<ZWSP>／le.com -> FREE_TEXT (KNOWN LIMITATION, D-DET doc)
+
+[D-DET-2] Degraded TLD registry -> HOST + run marked DEGRADED
+  ✓ degraded: gоog／le.com -> HOST (not silent FREE_TEXT)
+  ✓ degraded: verdict carries tld_source_degraded=True
+  ✓ degraded: SequenceOutput.degraded=True
+  ✓ degraded: TLD_SOURCE_DEGRADED warning present
+  ✓ healthy: run not marked degraded
+
+[FIX_FIRST] Block-list punctuation bypass is closed (positive extraction)
+  ✓ '*gоog／le.com*' -> HOST/HIGH (was a silent FREE_TEXT bypass)
+  ✓ 'gоog／le.com—x' -> HOST/HIGH (was a silent FREE_TEXT bypass)
+  ✓ '~gоog／le.com~' -> HOST/HIGH (was a silent FREE_TEXT bypass)
+  ✓ '|gоog／le.com|' -> HOST/HIGH (was a silent FREE_TEXT bypass)
+  ✓ '＂gоog／le.com＂' -> HOST/HIGH (was a silent FREE_TEXT bypass)
+
+[D-DET-4] Leading structural separator is a HARD_STOP, not a wrapper
+  ✓ '#example.com／x' -> FREE_TEXT (leading structural char kept, not skipped; was PATH/MEDIUM before D-DET-4)
+  ✓ '/example.com／x' -> FREE_TEXT (leading structural char kept, not skipped; was PATH/MEDIUM before D-DET-4)
+  ✓ '@example.com／x' -> FREE_TEXT (leading structural char kept, not skipped; was PATH/MEDIUM before D-DET-4)
+  ✓ ':example.com／x' -> FREE_TEXT (leading structural char kept, not skipped; was PATH/MEDIUM before D-DET-4)
+
+[D-DET-3, known] Concatenation false positives — documented, not fixed
+  ✓ my-host／name.com -> HOST/HIGH (known_behavior: 'my-host'+'name.com' glues into 'my-hostname.com', a syntactically valid domain — no real attack here, just two hyphenated/dotted fragments coinciding)
+  ✓ example.com,／test -> HOST/HIGH (known_behavior: the comma stops the positive-extraction run before 'test', so the concatenated check just re-derives the left-hand domain and fires HOST rather than PATH; 'test' is silently dropped from consideration)
+  ✓ gоogle.com*／path -> HOST/HIGH (known_behavior: mask AFTER the domain; the trailing '*' ends the run at gоogle.com so it reads HOST, not the PATH the mask position would suggest — D-DET-3 addendum)
+
+[v0.5, known] Deferred tails — not fixed in this round
+  ✓ gоog／le.xn--zckzah -> FREE_TEXT/NONE (known_behavior: an already-punycode TLD label absent from the ACTIVE registry is a silent miss — a registry-completeness dependency, not a distinct detector bug; production risk is low since the real IANA registry carries current punycode ccTLDs, but a stale/narrow registry can still miss one)
+  ✓ -example.com／x -> PATH/MEDIUM (known_behavior: a leading hyphen on a label is RFC 952/1035-invalid but the per-label check only tests isalnum-or-hyphen membership, not position, so '-example' still validates as a domain label)
+  ✓ Devanagari label with a combining vowel sign -> FREE_TEXT (known_limitation: the vowel sign is a combining mark, isalnum()=False, so the run is cut; documents that 'isalnum()' != 'any letter of any script')
+
+================================================================
+TOTAL: 40 OK / 0 FAIL
+================================================================
+
+--- gate_safeguard.py (chaos gate) ---------------------------------
+﻿================================================================
+CHAOS GATE — finish-line safeguard (D-GUARD-1/2)
+================================================================
+
+[sanity] Intact path: guard silent, masked phishing -> HOLD
+  ✓ intact path does NOT raise in strict mode
+  ✓ relation verdict is HOST/HIGH
+  ✓ final verdict is hold_pending_review
+  ✓ integrity_status OK on intact path
+
+[chaos A] Mapping corrupted: HIGH relation -> 'pass' action
+  ✓ severed path (HIGH->pass) RAISES IntegrityViolation in strict
+
+[chaos B] Serialization loss: actions derived from as_dict (drops verdicts)
+  ✓ severed path (serialized/empty verdicts) RAISES in strict
+
+[chaos C] Empty-pool exit: mask accounting skipped on check_unavailable
+  ✓ severed path (empty-pool skip) RAISES in strict
+
+[hybrid] Non-strict: verdict unchanged (pass) but flagged
+  ✓ non-strict does NOT raise
+  ✓ verdict left as pass (author is the sole authority)
+  ✓ report marked PASS_WITH_INTEGRITY_VIOLATION
+  ✓ violation detail names the relation risk + final
+
+[D-GUARD-2] validation_warning on an inert edge -> INTEGRITY_CONCERN
+  ✓ typo-scope run does NOT raise (concern, not violation)
+  ✓ D-GUARD-2 concern raised for the warned inert edge
+  ✓ concern carries the load-time validation_warning
+  ✓ integrity_status is INTEGRITY_CONCERN
+
+================================================================
+TOTAL: 15 OK / 0 FAIL
+================================================================
+
+--- gate_relation_verdict_step4.py ---------------------------------
+﻿============================================================
+GATE: step 4 — mask verdict (relation axis)
+============================================================
+
+[1] Risk scale by context (VERIFIED edge)
+  ✓ HOST -> HIGH
+  ✓ HOST -> detected_context=HOST
+  ✓ PATH -> MEDIUM
+  ✓ FREE_TEXT -> NONE (RELATION_FOUND != THREAT)
+  ✓ FREE_TEXT -> protected=False
+
+[2] A CANDIDATE edge downgrades risk one step
+  ✓ CANDIDATE in HOST -> MEDIUM (not HIGH)
+
+[3] Canon probe deferred
+  ✓ canon_hypothesis = None
+
+[4] Barrier N3 — a disabled edge yields no verdict
+  ✓ ALL edges in the candidate (debug): 2
+  ✓ active_relation_candidates: only 1
+  ✓ exactly 1 verdict (from the active U+002F edge)
+  ✓ the disabled U+2044 edge is ABSENT from verdicts
+
+[5] D1 — legacy cards without relations yield no verdicts
+  ✓ an ordinary / produces no relation_verdicts
+
+============================================================
+TOTAL: 12 OK / 0 FAIL
+============================================================
+
+--- gate_solidus_scheme.py -----------------------------------------
+﻿=== SOLIDUS_SCHEME_PATCH gate ===
+  ✓ [PASS/PASS] clean URL — // noise removed
+  ✓ [PASS/PASS] clean https
+  ✓ [PASS/PASS] ftp scheme
+  ✓ [HOLD/HOLD] @ phishing with a scheme
+  ✓ [PASS/PASS] federated handle
+  ✓ [PASS/PASS] ordinary email
+  ✓ [HOLD/HOLD] brand+IP @
+  ✓ [HOLD/HOLD] @ HIGH — the flag did NOT lower the neighbour
+  ✓ [HOLD/HOLD] // without a scheme = HIGH
+  ✓ [HOLD/HOLD] Q1: pseudo-scheme (no letter) NOT lowered
+  ✓ [HOLD/HOLD] ':// at start — idx boundary, no crash, HIGH
+  ✓ [HOLD/HOLD] a scheme starting with a digit is invalid (RFC) -> HIGH
+  ✓ [HOLD/HOLD] Q4: scheme // + path // — enum max without a crash
+  ✓ [HOLD/HOLD] triple slash — the second // without a scheme HIGH
+  ✓ [PASS/PASS] uppercase scheme (case-insensitive)
+  ✓ [PASS/PASS] mixed-case scheme
+  ✓ [PASS/PASS] a scheme with '+' is valid
+  ✓ [PASS/PASS] a scheme with '-' is valid
+  ✓ [HOLD/HOLD] scheme + dot substitution
+  ✓ [HOLD/HOLD] dot substitution without a scheme (regression)
+  ✓ [HOLD/HOLD] ☠ threat — control
+
+  verdicts: 21/21
+
+=== the 'does not crash' class (Q4) ===
+  ✓ 'http://a//b//c'
+  ✓ 'scheme://///'
+  ✓ ':////'
+  ✓ 'http://a//b//c//d'
+  ✓ '://'
+  ✓ '//'
+  ✓ ':'
+
+  no crashes: 7/7
+
+=== TOTAL: 28/28 ===
+
+--- gate_english_only.py -------------------------------------------
+﻿============================================================
+GATE: English-only code
+============================================================
+checked .py files: 23
+allowlisted data lines: 63 (in 5 data-bearing files)
+
+TOTAL: CLEAN — no Cyrillic outside functional data
+
+--- DETERMINISM: every gate run 20x, distribution of the TOTAL line -
+﻿[gate_bare_domain_detector.py]  20x  exit=0 :: TOTAL: 40 OK / 0 FAIL
+[gate_english_only.py]  20x  exit=0 :: TOTAL: CLEAN — no Cyrillic outside functional data
+[gate_relation_verdict_step4.py]  20x  exit=0 :: TOTAL: 12 OK / 0 FAIL
+[gate_safeguard.py]  20x  exit=0 :: TOTAL: 15 OK / 0 FAIL
+[gate_solidus_scheme.py]  20x  exit=0 :: === TOTAL: 28/28 ===
+
+--- RUNTIME SAFEGUARD DEMONSTRATION (analyze end-to-end) ------------
+﻿### normal masked phishing (non-strict) — path intact
+
+  [4] ／ -> U+002F context=HOST risk=HIGH protected=True
+FINAL VERDICT: HOLD_PENDING_REVIEW
+  (exit=0)
+
+### strict mode on the SAME intact input — must NOT crash
+FINAL VERDICT: HOLD_PENDING_REVIEW
+  (exit=0)
+
+### benign masked inputs under strict — no false violation
+input: 2026／07／11
+FINAL VERDICT: PASS
+  (exit=0)
+input: src/utils／main.py
+FINAL VERDICT: QUEUE_FOR_REVIEW
+  (exit=0)
+
+========================================================================
+QUESTIONS TO REVIEWERS
+========================================================================
+R1. BYPASSES. Find an input classified FREE_TEXT or PATH that IS a mask in a
+    domain and should be HOST — trace the WHOLE path (process_sign ->
+    _assess_relation_risk -> _detect_context_at -> _domain_prefix /
+    _looks_like_domain / _is_tld). Give the exact input and the exact
+    line/branch. Push on: leading/trailing punctuation not covered, port,
+    email, tab boundary, glued scheme, already-punycode label, mixed case,
+    label > 63, double dot, edge hyphen, combining marks, three+ masks.
+
+R2. INTERACTION OF FIXES. D-DET-1 (strip ALL masks), the positive-extraction
+    rewrite, and D-DET-4 (leading structural HARD_STOP) were made in
+    different rounds. Do they cancel or mask each other? e.g. does the
+    HARD_STOP ever fire on a demasked string it shouldn't, or does the
+    all-mask strip ever reconstruct a domain the HARD_STOP would have
+    rejected? Trace a concrete input through all three.
+
+R3. THE WATCHDOG. The invariant catches "HIGH in relation_verdicts -> final
+    not PASS". Is there a way to defeat the watchdog itself? Any blind zone
+    OTHER than the one named honestly in D-GUARD-1 (relation_verdicts being
+    emptied BEFORE analyze reads them)? Consider: a HIGH verdict whose
+    risk_level string is not literally "HIGH"/"CRITICAL"; the guard reading
+    cards vs the verdicts by (visible_form, relation_id) key; strict-mode
+    env not set in a real deployment.
+
+R4. SILENT PASSES. Early returns, except:pass, default NONE/PASS anywhere in
+    the embedded code. (The audit already named many system-wide; here focus
+    on the G1 block + the watchdog as embedded.)
+
+R5. FALSE POSITIVES. Does gate_bare_domain_detector cover the benign cases
+    (CJK dates, file paths, plain text, IDN)? What screams for no reason?
+    Does the watchdog ever raise INTEGRITY_VIOLATION on a legitimate PASS?
+
+R6. CARD vs CODE. The v0_4 card (Part 7) promises coverage in RISK_CASE_005 /
+    LIMITATION_STATEMENT. Does the code (Part 1) actually deliver each claim?
+    Trace each card EXAMPLE by hand against the code; report overstatements.
+
+========================================================================
+MY OWN MISTAKES (this assembly, unpolished)
+========================================================================
+1. The packet request listed "_mask_token" as a function to include. There
+   is no such function — I did not invent one or silently drop the item;
+   token extraction is inline in _detect_context_at. But it means an earlier
+   description of mine (or the request derived from it) implied a split that
+   the code never had. Named, not papered over.
+2. In the safeguard gate I first wrote the homoglyph specimens as LITERAL
+   characters (_MASK = "/", _CYR_O = "o"-cyrillic) contradicting my own
+   docstring that claimed they were \u escapes — the literal Cyrillic would
+   have tripped the english-only gate. Caught after writing, fixed via a
+   surgery script. Should have been escapes from the first line.
+3. When first showing the chaos gate's raw output I filtered stdout with a
+   grep that matched "WARNING" and silently ate a legitimate result line
+   ("concern carries the load-time WARNING"). The check passed (15 total
+   reconciled) but a raw-output section must not hide result lines behind an
+   over-broad filter.
+4. This packet is assembled by a builder that slices files by ASCII anchors.
+   That is only as trustworthy as the anchors; I mitigated by a verify pass
+   (each embedded code block asserted to be a substring of its source file),
+   but a reviewer should still spot-check any block against the repo.
+
+========================================================================
+END OF PACKET
+========================================================================
