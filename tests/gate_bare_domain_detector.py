@@ -15,6 +15,20 @@ scheme-scope, P5 right-domain tail), the glued-scheme V2 concern, a CJK
 false-positive guard, and the zero-width boundary (asserted as a KNOWN
 LIMITATION, shown explicitly — not hidden).
 
+FIX_FIRST (2026-07-12, first conveyor round — see foundation_layer/
+AUTHOR_DECISION_20260712_BARE_DOMAIN_DETECTOR_FIX_FIRST_ROUND1.md):
+  BLOCKER   _domain_prefix rewritten from a punctuation block-list to a
+            positive letter/digit/'-'/'.' extraction — three reviewers
+            found the block-list bypass (any wrapping character absent
+            from the list stuck to the domain and silently fell to
+            FREE_TEXT).
+  D-DET-3   concatenation false positives from the positive-extraction
+            heuristic are DOCUMENTED here as known/accepted, not fixed
+            (no full URL parser in scope).
+  v0.5      two further tails added as known, deferred: an
+            already-punycode TLD label absent from the active registry,
+            and a leading-hyphen label (RFC-invalid, currently accepted).
+
 Hermetic: the TLD registry is pinned via _force_tld_state_for_test, so
 the gate needs no network and can drive the DEGRADED path deterministically.
 
@@ -193,6 +207,61 @@ check("degraded: TLD_SOURCE_DEGRADED warning present",
 _force_tld_state_for_test(_PINNED_TLDS, degraded=False)
 out = _run(card, "gоog／le.com")
 check("healthy: run not marked degraded", out.degraded is False)
+
+# --- FIX_FIRST blocker (2026-07-12, first conveyor round): the old
+# _STRIP_OUTER block-list only trimmed punctuation someone thought to
+# enumerate. Wrapping the domain in ANY character absent from that list
+# (markdown asterisk, an em dash, a tilde, a pipe, a fullwidth quotation
+# mark) stuck to the domain, failed the per-label isalnum-or-hyphen check,
+# and silently fell to FREE_TEXT. _domain_prefix now does a POSITIVE
+# extraction (letter/digit/'-'/'.') instead of a block-list, closing the
+# whole class at once. ---
+print("\n[FIX_FIRST] Block-list punctuation bypass is closed (positive extraction)")
+for wrapped in ("*gоog／le.com*", "gоog／le.com—x", "~gоog／le.com~",
+                "|gоog／le.com|", "＂gоog／le.com＂"):
+    check(f"{wrapped!r} -> HOST/HIGH (was a silent FREE_TEXT bypass)",
+          _ctx(card, wrapped) == "HOST" and _risk(card, wrapped) == "HIGH",
+          (_ctx(card, wrapped), _risk(card, wrapped)))
+
+# --- AUTHOR_DECISION D-DET-3 (2026-07-12): concatenation false positives
+# are DOCUMENTED here, not fixed. The positive-extraction fix above is
+# necessarily a heuristic without a full URL parser: once masks are
+# stripped, two unrelated fragments sitting either side of the mask can
+# glue into something domain-shaped even when nothing is actually being
+# spoofed. Recorded as known/accepted behaviour — see
+# foundation_layer/AUTHOR_DECISION_20260712_BARE_DOMAIN_DETECTOR_
+# FIX_FIRST_ROUND1.md. These assertions pin down the OBSERVED verdict so
+# a future change to the heuristic surfaces here instead of drifting
+# silently. ---
+print("\n[D-DET-3, known] Concatenation false positives — documented, not fixed")
+check("my-host／name.com -> HOST/HIGH (known_behavior: 'my-host'+'name.com' "
+      "glues into 'my-hostname.com', a syntactically valid domain — no real "
+      "attack here, just two hyphenated/dotted fragments coinciding)",
+      _ctx(card, "my-host／name.com") == "HOST" and _risk(card, "my-host／name.com") == "HIGH",
+      (_ctx(card, "my-host／name.com"), _risk(card, "my-host／name.com")))
+check("example.com,／test -> HOST/HIGH (known_behavior: the comma stops the "
+      "positive-extraction run before 'test', so the concatenated check "
+      "just re-derives the left-hand domain and fires HOST rather than "
+      "PATH; 'test' is silently dropped from consideration)",
+      _ctx(card, "example.com,／test") == "HOST" and _risk(card, "example.com,／test") == "HIGH",
+      (_ctx(card, "example.com,／test"), _risk(card, "example.com,／test")))
+
+# --- Deferred to v0.5 (known, not fixed in this round) ---
+print("\n[v0.5, known] Deferred tails — not fixed in this round")
+check("gоog／le.xn--zckzah -> FREE_TEXT/NONE (known_behavior: an "
+      "already-punycode TLD label absent from the ACTIVE registry is a "
+      "silent miss — a registry-completeness dependency, not a distinct "
+      "detector bug; production risk is low since the real IANA registry "
+      "carries current punycode ccTLDs, but a stale/narrow registry can "
+      "still miss one)",
+      _ctx(card, "gоog／le.xn--zckzah") == "FREE_TEXT",
+      _ctx(card, "gоog／le.xn--zckzah"))
+check("-example.com／x -> PATH/MEDIUM (known_behavior: a leading hyphen on "
+      "a label is RFC 952/1035-invalid but the per-label check only tests "
+      "isalnum-or-hyphen membership, not position, so '-example' still "
+      "validates as a domain label)",
+      _ctx(card, "-example.com／x") == "PATH",
+      _ctx(card, "-example.com／x"))
 
 _reset_tld_state_for_test()
 

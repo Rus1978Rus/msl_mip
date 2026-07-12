@@ -203,11 +203,16 @@ def _attach_source_offsets(matches: list, sign_statuses: list) -> None:
 # ARCHITECTURAL CONSTRAINT (ARCH_DECISION_HOMOGLYPH_VIA_CARD_ONLY): the set
 # of mask characters is taken from the cards (SIGN_RELATIONS -> visible_form),
 # never hardcoded. See run_mask_chars in _assess_relation_risk.
+#
+# FIX_FIRST (2026-07-12, first conveyor round): _domain_prefix rewritten from
+# a block-list (_STRIP_OUTER, a fixed punctuation set) to a positive
+# character allow-list. Three reviewers found the block-list bypass — see
+# _domain_prefix's own docstring for the mechanism and foundation_layer/
+# AUTHOR_DECISION_20260712_BARE_DOMAIN_DETECTOR_FIX_FIRST_ROUND1.md for the
+# full writeup, including AUTHOR_DECISION D-DET-3 (concatenation false
+# positives are documented, not fixed) and two v0.5-deferred tails
+# (already-punycode input, edge-hyphen labels).
 # ─────────────────────────────────────────────────────────────────────
-
-# Outer punctuation trimmed off a token before the domain check (P3). A
-# domain wrapped in brackets/quotes/trailing comma is still a domain.
-_STRIP_OUTER = "()[]{}<>\"'`,;!?»«“”‘’"
 
 # TLD registry state (lazy, once per process). Health check mirrors the
 # reviews: a set with >= _TLD_MIN_HEALTHY entries is trusted; anything
@@ -271,16 +276,44 @@ def _demask(s: str, mask_chars) -> str:
 
 
 def _domain_prefix(token: str) -> str:
-    """P3 + P5: trim outer punctuation, then cut the tail at the first
-    structural separator (path/query/fragment/port/space). Returns the bare
-    domain candidate — 'evil.com/path' -> 'evil.com', '(a.com)' -> 'a.com'."""
-    token = token.strip().strip(_STRIP_OUTER)
-    cut = len(token)
-    for sep in ("/", "?", "#", ":", " "):
-        p = token.find(sep)
-        if p != -1:
-            cut = min(cut, p)
-    return token[:cut].strip(_STRIP_OUTER)
+    """POSITIVE extraction (FIX_FIRST 2026-07-12, blocker — three reviewers
+    found the bypass in the first conveyor round): return the first maximal
+    run of domain-shaped characters in the token — a Unicode letter (any
+    script, so IDN labels such as a Cyrillic homoglyph attack still match —
+    this is the thing we WANT to catch, not exclude), a digit, '-', or '.' —
+    and discard everything outside that run.
+
+    Replaces the old block-list approach (strip a fixed punctuation set,
+    _STRIP_OUTER, off the token's outer edges). A block list only ever
+    covers the punctuation someone thought to enumerate: markdown '*', an
+    em dash, a tilde, a pipe, a fullwidth quotation mark and any other
+    wrapping character NOT in that specific list stuck to the domain,
+    made a label fail the isalnum-or-hyphen check in _looks_like_domain,
+    and silently downgraded a real HOST mask to FREE_TEXT (a fullwidth-
+    solidus mask domain wrapped in asterisks bypassed detection this way
+    — the asterisks were never in _STRIP_OUTER; see the gate for the
+    literal example). A positive allow-list closes the whole class at
+    once instead of chasing individual punctuation marks.
+
+    This also subsumes the old separate 'cut at the first /, ?, #, :,
+    space' step (P5): none of those characters are in the allow-list, so
+    the scan stops there on its own — no separate pass needed.
+
+    Deliberately NOT trimmed here (known, deferred — see AUTHOR_DECISION
+    D-DET-3 / FIX_FIRST_ROUND1 in foundation_layer): a leading/trailing
+    hyphen on the extracted run (RFC-invalid but not rejected — v0.5
+    tail), and the concatenation false positives this positive scan can
+    itself produce when two unrelated fragments glue into a domain-shaped
+    string once the mask is removed."""
+    token = token.strip()
+    n = len(token)
+    i = 0
+    while i < n and not (token[i].isalnum() or token[i] in ".-"):
+        i += 1
+    j = i
+    while j < n and (token[j].isalnum() or token[j] in ".-"):
+        j += 1
+    return token[i:j]
 
 
 def _is_tld(label: str, tld_set, degraded: bool) -> bool:
