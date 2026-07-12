@@ -94,7 +94,7 @@ def run(text, cards, strict):
 
 
 print("=" * 64)
-print("CHAOS GATE — finish-line safeguard (D-GUARD-1/2)")
+print("CHAOS GATE — finish-line safeguard (D-GUARD-1..4)")
 print("=" * 64)
 
 # --- SANITY: intact path -> guard silent, phishing -> HOLD ---
@@ -105,8 +105,10 @@ if kind == "report":
     rv = [(v["detected_context"], v["risk_level"])
           for v in res["sequence_output"].relation_verdicts]
     check("relation verdict is HOST/HIGH", ("HOST", "HIGH") in rv, rv)
-    check("final verdict is hold_pending_review",
-          res["final_action"] == "hold_pending_review", res["final_action"])
+    check("semantic verdict is hold_pending_review",
+          res["semantic_action"] == "hold_pending_review", res["semantic_action"])
+    check("effective == semantic on intact path",
+          res["effective_action"] == res["semantic_action"], res["effective_action"])
     check("integrity_status OK on intact path",
           res["integrity_status"] == "OK", res["integrity_status"])
 
@@ -161,28 +163,66 @@ try:
 finally:
     rt._relation_actions = _ORIG_REL_FN
 
-# --- HYBRID: production (non-strict) leaves the verdict but FLAGS it ---
-print("\n[hybrid] Non-strict: verdict unchanged (pass) but flagged")
+# --- D-GUARD-3: severity comparison, not literal PASS. A HIGH relation that
+#     ends up log_only / queue_for_review is under-escalated -> VIOLATION ---
+print("\n[D-GUARD-3] Under-escalation caught (HIGH -> log_only / queue), not only pass")
+for weak in ("log_only", "queue_for_review"):
+    try:
+        rt._REL_ACTION = dict(_ORIG_REL_ACTION)
+        rt._REL_ACTION["HIGH"] = weak
+        kind, res = run(PHISH, [MASK], strict=True)
+        check(f"HIGH -> {weak} (below hold) RAISES in strict",
+              kind == "raised", (kind, res))
+    finally:
+        rt._REL_ACTION = dict(_ORIG_REL_ACTION)
+
+# --- D-GUARD-3: form-robustness — risk_level "high" (lowercase) is caught ---
+print("\n[D-GUARD-3] Form-robust: risk_level 'high' / ' HIGH ' compares equal")
+
+
+class _Stub:
+    def __init__(self, verdicts):
+        self.relation_verdicts = verdicts
+
+
+for form in ("high", " HIGH ", "High"):
+    stub = _Stub([{"risk_level": form, "relation_id": "R", "visible_form": "x",
+                   "at_offset": 0, "detected_context": "HOST"}])
+    viols, cons = rt._integrity_check("pass", stub, [])
+    check(f"risk_level {form!r} + semantic pass -> violation",
+          len(viols) == 1 and viols[0]["required_action"] == "hold_pending_review",
+          (viols, cons))
+# unknown risk_level -> CONCERN, never a silent skip
+stub = _Stub([{"risk_level": "SUPER", "relation_id": "R", "visible_form": "x",
+               "at_offset": 0, "detected_context": "HOST"}])
+viols, cons = rt._integrity_check("pass", stub, [])
+check("unknown risk_level -> CONCERN (not silent)",
+      not viols and any(c["rule"] == "D-GUARD-3-UNKNOWN" for c in cons), (viols, cons))
+
+# --- D-GUARD-4: three fields — semantic stays, effective raised to safe ---
+print("\n[D-GUARD-4] Non-strict: semantic unchanged, effective raised to HOLD")
 try:
     rt._REL_ACTION = dict(_ORIG_REL_ACTION)
     rt._REL_ACTION["HIGH"] = "pass"
     kind, res = run(PHISH, [MASK], strict=False)
     check("non-strict does NOT raise", kind == "report", kind)
     if kind == "report":
-        check("verdict left as pass (author is the sole authority)",
-              res["final_action"] == "pass", res["final_action"])
-        check("report marked PASS_WITH_INTEGRITY_VIOLATION",
-              res["integrity_status"] == "PASS_WITH_INTEGRITY_VIOLATION",
-              res["integrity_status"])
-        check("violation detail names the relation risk + final",
-              any(v["relation_risk"] == "HIGH" and v["final_action"] == "pass"
+        check("semantic_action left as pass (author is the sole authority)",
+              res["semantic_action"] == "pass", res["semantic_action"])
+        check("effective_action raised to hold_pending_review",
+              res["effective_action"] == "hold_pending_review", res["effective_action"])
+        check("integrity_status is VIOLATION",
+              res["integrity_status"] == "VIOLATION", res["integrity_status"])
+        check("violation names risk + semantic + required",
+              any(v["relation_risk"] == "HIGH" and v["semantic_action"] == "pass"
+                  and v["required_action"] == "hold_pending_review"
                   for v in res["integrity_violations"]),
               res["integrity_violations"])
 finally:
     rt._REL_ACTION = dict(_ORIG_REL_ACTION)
 
 # --- D-GUARD-2: a validation_warning on an active inert edge is revived ---
-print("\n[D-GUARD-2] validation_warning on an inert edge -> INTEGRITY_CONCERN")
+print("\n[D-GUARD-2] validation_warning on an inert edge -> CONCERN")
 TYPO = _card(scope="HSOT")   # unknown scope -> load warning + verdict NONE
 kind, res = run(PHISH, [TYPO], strict=True)   # concerns never raise, only violations do
 check("typo-scope run does NOT raise (concern, not violation)", kind == "report", kind)
@@ -194,8 +234,8 @@ if kind == "report":
           bool(dg2) and any("UNKNOWN_CONTEXT_SCOPE" in w
                             for w in dg2[0]["validation_warnings"]),
           dg2)
-    check("integrity_status is INTEGRITY_CONCERN",
-          res["integrity_status"] == "INTEGRITY_CONCERN", res["integrity_status"])
+    check("integrity_status is CONCERN",
+          res["integrity_status"] == "CONCERN", res["integrity_status"])
 
 _reset_tld_state_for_test()
 

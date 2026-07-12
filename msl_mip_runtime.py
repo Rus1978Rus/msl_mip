@@ -138,42 +138,73 @@ def _relation_actions(seq_out) -> list:
 
 
 class IntegrityViolation(Exception):
-    """Raised by the finish-line safeguard (D-GUARD-1) in STRICT mode when
-    the conservation-of-risk invariant is broken: a HIGH/CRITICAL mask
-    verdict coexisting with a PASS final verdict means the mask path was
-    severed. In production the verdict is NOT changed (the author is the
-    only authority to overturn it) — the violation is recorded and the run
-    is marked PASS_WITH_INTEGRITY_VIOLATION instead."""
+    """Raised by the finish-line safeguard in STRICT mode when the
+    conservation-of-severity invariant is broken: the main-path verdict is
+    weaker than a relation (mask) verdict requires. In production the run is
+    NOT stopped — the SEMANTIC verdict (the main path's decision) is left
+    unchanged, and a separate EFFECTIVE verdict is raised to the safe minimum
+    (D-GUARD-4); strict mode (gates) raises so a regression fails in dev."""
 
 
-def _integrity_check(final_action: str, seq_out, cards: list):
-    """D-GUARD-1 + D-GUARD-2 — an INDEPENDENT check of the RESULT, run after
-    aggregation and before return. Reads ONLY the computed final_action, the
-    sequence layer's relation_verdicts (source of truth for the mask axis),
-    and the loaded cards' edge validation_warnings. It does NOT re-walk the
-    aggregation path, so it does not duplicate that path's fragility.
+# D-GUARD-3: minimum acceptable action per relation risk level. The invariant
+# is conservation of SEVERITY, not a literal "not PASS": a HIGH verdict that
+# ends up log_only or queue_for_review is under-escalated just as much as one
+# that ends up pass. NONE/LOW carry no minimum.
+_REL_MIN_ACTION = {
+    "MEDIUM": "queue_for_review",
+    "HIGH": "hold_pending_review",
+    "CRITICAL": "hold_pending_review",
+}
 
-    D-GUARD-1 (conservation of risk): a HIGH/CRITICAL relation verdict must
-    not coexist with a PASS final verdict — that can only mean the mask
-    verdict never reached the final action. A MEDIUM relation verdict with a
-    PASS final is the softer INTEGRITY_CONCERN, not a violation.
 
-    D-GUARD-2 revives validation_warnings (until now written by the parser
-    and read NOWHERE — dead code that manufactured a false sense of safety):
-    an ACTIVE edge that carried a load-time validation_warning AND whose
-    verdict contributed nothing (risk NONE) is flagged as a CONCERN — the
+def _integrity_check(semantic_action: str, seq_out, cards: list):
+    """D-GUARD-1/2/3 — an INDEPENDENT check of the RESULT, run after
+    aggregation and before return. Reads ONLY the main-path verdict
+    (semantic_action), the sequence layer's relation_verdicts (source of
+    truth for the mask axis), and the loaded cards' edge validation_warnings.
+    It does NOT re-walk the aggregation path, so it does not duplicate that
+    path's fragility.
+
+    D-GUARD-1/3 (conservation of severity): each relation verdict imposes a
+    MINIMUM final action (MEDIUM->queue, HIGH/CRITICAL->hold). If the
+    main-path verdict is WEAKER than that minimum, the mask risk was
+    under-escalated -> VIOLATION (each violation records the required_action
+    so analyze() can raise the EFFECTIVE verdict). This catches HIGH->pass
+    AND HIGH->log_only AND HIGH->queue, not only literal PASS.
+
+    Form-robustness (D-GUARD-3): risk_level is normalised (str, strip, upper)
+    so "high"/" HIGH "/enum all compare equal; an UNKNOWN risk_level is a
+    CONCERN, never a silent skip.
+
+    D-GUARD-2 revives validation_warnings (written by the parser, read
+    NOWHERE — dead code that manufactured a false sense of safety): an ACTIVE
+    edge that carried a load-time validation_warning AND whose verdict
+    contributed nothing (risk NONE) is flagged as a CONCERN — the
     misconfigured edge is silently inert, exactly as its own warning
     predicted.
 
     Returns (violations, concerns) — lists of detail dicts."""
-    final_is_pass = (final_action == "pass")
+    sem_sev = _SEVERITY.get(semantic_action, 0)
     violations = []
     concerns = []
 
-    # D-GUARD-1
+    # D-GUARD-1/3 — conservation of severity, form-robust
     for v in seq_out.relation_verdicts:
-        rl = v.get("risk_level")
-        if rl in ("HIGH", "CRITICAL") and final_is_pass:
+        rl = str(v.get("risk_level", "")).strip().upper()
+        if rl in ("NONE", "LOW"):
+            continue
+        required = _REL_MIN_ACTION.get(rl)
+        if required is None:
+            concerns.append({
+                "rule": "D-GUARD-3-UNKNOWN",
+                "relation_id": v.get("relation_id", ""),
+                "relation_risk": v.get("risk_level"),
+                "detail": (f"relation verdict has an UNKNOWN risk_level "
+                           f"{v.get('risk_level')!r} -> cannot check severity; "
+                           f"flagged rather than silently skipped"),
+            })
+            continue
+        if sem_sev < _SEVERITY[required]:
             violations.append({
                 "rule": "D-GUARD-1",
                 "relation_id": v.get("relation_id", ""),
@@ -181,19 +212,12 @@ def _integrity_check(final_action: str, seq_out, cards: list):
                 "at_offset": v.get("at_offset"),
                 "detected_context": v.get("detected_context"),
                 "relation_risk": rl,
-                "final_action": final_action,
+                "semantic_action": semantic_action,
+                "required_action": required,
                 "detail": (f"relation verdict {rl} at offset {v.get('at_offset')} "
-                           f"(context={v.get('detected_context')}) but final_action=pass "
-                           f"-> mask path severed"),
-            })
-        elif rl == "MEDIUM" and final_is_pass:
-            concerns.append({
-                "rule": "D-GUARD-1-SOFT",
-                "relation_id": v.get("relation_id", ""),
-                "relation_risk": rl,
-                "final_action": final_action,
-                "detail": ("MEDIUM relation verdict with final pass -> "
-                           "INTEGRITY_CONCERN (not a violation)"),
+                           f"(context={v.get('detected_context')}) requires at least "
+                           f"{required}, but the main-path verdict is "
+                           f"{semantic_action} -> mask risk under-escalated"),
             })
 
     # D-GUARD-2 — revive validation_warnings
@@ -204,7 +228,7 @@ def _integrity_check(final_action: str, seq_out, cards: list):
                 warn_by_edge[(c.visible_form, r.relation_id)] = list(r.validation_warnings)
     for v in seq_out.relation_verdicts:
         w = warn_by_edge.get((v.get("visible_form"), v.get("relation_id")))
-        if w and v.get("risk_level") == "NONE":
+        if w and str(v.get("risk_level", "")).strip().upper() == "NONE":
             concerns.append({
                 "rule": "D-GUARD-2",
                 "relation_id": v.get("relation_id", ""),
@@ -240,31 +264,37 @@ def analyze(text: str, cards: list) -> dict:
     # --- Relation (mask) verdicts -> actions (relation axis, D-REL-4) ---
     relation_actions = _relation_actions(seq_out)
 
-    # --- Final verdict ---
-    final_action = most_severe(single_actions + [seq_decision.runtime_action]
-                               + relation_actions)
+    # --- SEMANTIC verdict (the main path's decision — the author's) ---
+    semantic_action = most_severe(single_actions + [seq_decision.runtime_action]
+                                  + relation_actions)
 
-    # --- FINISH-LINE SAFEGUARD (D-GUARD-1/2) ---
-    # Independent conservation-of-risk check AFTER aggregation, reading only
-    # the RESULT (final_action + relation_verdicts + edge warnings). It does
-    # not re-walk the path, so it does not duplicate the path's fragility.
-    # HYBRID behaviour:
-    #   production  -> the verdict is NOT changed (the author is the only
-    #                  authority to overturn it); the violation is recorded
-    #                  and the run is marked PASS_WITH_INTEGRITY_VIOLATION.
-    #   strict mode -> the same violation RAISES, so a severed mask path
-    #                  fails a run in development (env MSL_MIP_GUARD_STRICT=1).
+    # --- FINISH-LINE SAFEGUARD (D-GUARD-1..4) ---
+    # Independent conservation-of-severity check AFTER aggregation, reading
+    # only the RESULT (semantic_action + relation_verdicts + edge warnings).
+    # It does not re-walk the path, so it does not duplicate the path's
+    # fragility. THREE fields are reported (D-GUARD-4) so the integrity signal
+    # cannot itself be lost the way a single mislabelled field could:
+    #   semantic_action  — what the main path decided (unchanged; author's).
+    #   integrity_status — OK / VIOLATION / CONCERN.
+    #   effective_action — on VIOLATION, raised to the safe minimum; else the
+    #                      semantic_action. print_report shows BOTH so the
+    #                      human sees "system said X, integrity broken -> Y".
+    # Strict mode (gates) RAISES on a violation so a regression fails in dev.
     integrity_violations, integrity_concerns = _integrity_check(
-        final_action, seq_out, cards)
+        semantic_action, seq_out, cards)
     if integrity_violations:
-        integrity_status = "PASS_WITH_INTEGRITY_VIOLATION"
+        integrity_status = "VIOLATION"
+        effective_action = most_severe(
+            [semantic_action] + [v["required_action"] for v in integrity_violations])
         if os.environ.get("MSL_MIP_GUARD_STRICT") == "1":
             raise IntegrityViolation(
                 "; ".join(v["detail"] for v in integrity_violations))
     elif integrity_concerns:
-        integrity_status = "INTEGRITY_CONCERN"
+        integrity_status = "CONCERN"
+        effective_action = semantic_action
     else:
         integrity_status = "OK"
+        effective_action = semantic_action
 
     return {
         "text": text,
@@ -272,7 +302,8 @@ def analyze(text: str, cards: list) -> dict:
         "single_sign_results": single_sign_results,
         "sequence_output": seq_out,
         "sequence_decision": seq_decision,
-        "final_action": final_action,
+        "semantic_action": semantic_action,
+        "effective_action": effective_action,
         "integrity_status": integrity_status,
         "integrity_violations": integrity_violations,
         "integrity_concerns": integrity_concerns,
@@ -318,14 +349,20 @@ def print_report(report: dict) -> None:
                   f"protected={v['protected']}")
 
     print("\n" + "=" * 60)
-    print(f"FINAL VERDICT: {report['final_action'].upper()}")
+    sem = report["semantic_action"]
+    eff = report["effective_action"]
     status = report.get("integrity_status", "OK")
-    if status != "OK":
+    if status == "OK":
+        print(f"FINAL VERDICT: {sem.upper()}")
+    else:
+        # D-GUARD-4: show BOTH so the human sees the discrepancy in the window.
+        print(f"SEMANTIC VERDICT (main path): {sem.upper()}")
         print(f"INTEGRITY: {status}")
         for viol in report.get("integrity_violations", []):
             print(f"  [INTEGRITY_VIOLATION] {viol['detail']}")
         for con in report.get("integrity_concerns", []):
             print(f"  [{con['rule']}] {con['detail']}")
+        print(f"EFFECTIVE VERDICT (integrity-adjusted): {eff.upper()}")
     print("=" * 60)
 
 

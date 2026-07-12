@@ -316,6 +316,42 @@ check("Devanagari label with a combining vowel sign -> FREE_TEXT "
       _ctx(card, _DEVA_COMBINING) == "FREE_TEXT",
       _ctx(card, _DEVA_COMBINING))
 
+# --- FIX_FIRST round 3, Blocker 1: a LEADING structural separator + a
+# domain-WITH-mask must be HOST, not FREE_TEXT. D-DET-4 hard-stopped the
+# whole token on a leading / \ ? # : @ and only tested the mask-AFTER-domain
+# shape; that silenced the mask-INSIDE-domain shape. The fix demotes only the
+# mask-after-domain PATH case, never a HOST. ---
+print("\n[Blocker1] Leading structural char + domain-with-mask -> HOST")
+for lead in ("#", "@", ":", "/", "?", "\\"):
+    t = lead + "gоog／le.com"
+    check(f"{t!r} -> HOST (was FREE_TEXT: D-DET-4 self-bypass)",
+          _ctx(card, t) == "HOST", _ctx(card, t))
+# regression guard: mask AFTER the whole domain must stay FREE_TEXT
+print("\n[Blocker1-regression] Mask AFTER a whole domain stays FREE_TEXT")
+for t in ("#example.com／x", "/example.com／x", "@example.com／x", ":example.com／x"):
+    check(f"{t!r} -> FREE_TEXT (unchanged; leading structural demotes PATH)",
+          _ctx(card, t) == "FREE_TEXT", _ctx(card, t))
+
+# --- FIX_FIRST round 3, Blocker 2: fullwidth / ideographic domain dots
+# canonicalised to '.'. The masked target is itself fullwidth (／ U+FF0F), so
+# an attacker pairs it with a fullwidth full stop. Dots given as escapes so
+# the bytes are unambiguous: U+FF0E (．), U+3002 (。), U+FF61 (｡). ---
+print("\n[Blocker2] Fullwidth / ideographic domain dot -> HOST")
+for dot, name in (("．", "U+FF0E fullwidth"), ("。", "U+3002 ideographic"),
+                  ("｡", "U+FF61 halfwidth ideographic")):
+    t = "gоog／le" + dot + "com"
+    check(f"gоog／le<{name} dot>com -> HOST", _ctx(card, t) == "HOST", _ctx(card, t))
+check("ASCII-dot control still HOST", _ctx(card, "gоog／le.com") == "HOST")
+
+# --- Known limitation (first-run-only), pinned to observed behaviour, NOT
+# fixed: the detector inspects only the FIRST domain-shaped run in the token,
+# so a domain after a non-structural separator (| = & +) is not reached. ---
+print("\n[first-run-only, known] Domain after | is not reached -> FREE_TEXT")
+check("tag|gоog／le.com -> FREE_TEXT (known limitation; detector sees only "
+      "the first domain-shaped run in the token)",
+      _ctx(card, "tag|gоog／le.com") == "FREE_TEXT",
+      _ctx(card, "tag|gоog／le.com"))
+
 _reset_tld_state_for_test()
 
 print("\n" + "=" * 64)

@@ -326,10 +326,15 @@ def _domain_prefix(token: str) -> str:
     literal example). A positive allow-list closes the whole class at
     once instead of chasing individual punctuation marks.
 
-    D-DET-4 (round 2): a LEADING structural separator (/ \\ ? # : @) is a
-    HARD_STOP, not a skippable wrapper — returns "" so the token has no
-    bare-domain prefix. Without this, the scan skipped a leading @ or /
-    and mis-read '@example.com' / '/example.com' as bare domains.
+    D-DET-4 (round 2) originally HARD-STOPPED here (returned "" on a leading
+    / \\ ? # : @) so '@example.com/x' would not read as a bare domain. FIX_
+    FIRST round 3 (blocker 1) MOVED that logic up into _detect_context_at:
+    the hard-stop-to-"" also silenced a domain-WITH-mask after the prefix
+    ('#goog<mask>le.com' -> FREE_TEXT, a real bypass). _domain_prefix is back to
+    pure positive extraction (leading non-domain chars, structural or not,
+    are skipped); _detect_context_at now remembers whether a LEADING
+    structural separator was present and uses it ONLY to demote the mask-
+    after-domain PATH case to FREE_TEXT — never to suppress a HOST.
 
     This also subsumes the old separate 'cut at the first /, ?, #, :,
     space' step (P5): none of those characters are in the allow-list, so
@@ -345,8 +350,6 @@ def _domain_prefix(token: str) -> str:
     n = len(token)
     i = 0
     while i < n and not (token[i].isalnum() or token[i] in ".-"):
-        if token[i] in _LEADING_STRUCTURAL_STOPS:
-            return ""  # D-DET-4: leading structural separator, not a wrapper
         i += 1
     j = i
     while j < n and (token[j].isalnum() or token[j] in ".-"):
@@ -374,10 +377,29 @@ def _is_tld(label: str, tld_set, degraded: bool) -> bool:
     return False
 
 
+# Blocker 2 (FIX_FIRST round 3): fullwidth / ideographic domain-separator
+# dots canonicalised to ASCII '.' before label analysis. The masked target
+# is itself a fullwidth character (／ = U+FF0F), so an attacker naturally
+# pairs it with a fullwidth full stop (．U+FF0E), an ideographic full stop
+# (。U+3002) or its halfwidth form (｡U+FF61). NFKC maps all three to '.';
+# without this the positive scan stops at the fullwidth dot and the domain
+# is dropped -> FREE_TEXT. Applied to the candidate BEFORE the '.' split.
+_DOMAIN_DOT_CANON = {"。": ".", "．": ".", "｡": "."}
+
+
+def _canon_domain_seps(s: str) -> str:
+    for k, v in _DOMAIN_DOT_CANON.items():
+        if k in s:
+            s = s.replace(k, v)
+    return s
+
+
 def _looks_like_domain(raw: str, tld_set, degraded: bool) -> bool:
     """A string looks like a bare domain: >= 2 labels, each a valid DNS
     label (alnum or '-', non-empty, <= 63 chars), last label a TLD. The
-    tail (path/port/query) is trimmed by _domain_prefix first (P5)."""
+    tail (path/port/query) is trimmed by _domain_prefix first (P5).
+    Fullwidth/ideographic dots are canonicalised to '.' first (Blocker 2)."""
+    raw = _canon_domain_seps(raw)
     s = _domain_prefix(raw)
     if not s:
         return False
@@ -434,7 +456,22 @@ def _detect_context_at(text: str, offset: int, mask_chars=frozenset()) -> str:
 
     # --- Pass 2: BARE DOMAIN (boundary G1), no scheme in the token ---
     tld_set, degraded = _tlds()
-    left_part = _demask(token[:rel], mask_chars)       # D-DET-1: strip ALL masks,
+
+    # Blocker 1 (FIX_FIRST round 3): a LEADING structural separator
+    # (/ \ ? # : @) is not part of a bare domain, but it must NOT blank the
+    # whole token — a domain-WITH-mask AFTER the prefix is still the attack
+    # (#goog<mask>le.com -> HOST). Strip a leading non-domain prefix, remember
+    # whether it contained a structural separator, and use that ONLY to
+    # demote the mask-after-domain PATH case to FREE_TEXT (D-DET-4's
+    # conservative call for '#example.com／x') — never to suppress a HOST.
+    had_leading_structural = False
+    lead = 0
+    while lead < rel and not (token[lead].isalnum() or token[lead] in ".-"):
+        if token[lead] in _LEADING_STRUCTURAL_STOPS:
+            had_leading_structural = True
+        lead += 1
+
+    left_part = _demask(token[lead:rel], mask_chars)   # D-DET-1: strip ALL masks,
     right_part = _demask(token[rel + 1:], mask_chars)  # not only the current one
 
     # host substitution — a domain on BOTH sides of the mask
@@ -446,9 +483,10 @@ def _detect_context_at(text: str, offset: int, mask_chars=frozenset()) -> str:
     # makes the double-mask goog<mask>le.<mask>com collapse to google.com too.
     if _looks_like_domain(left_part + right_part, tld_set, degraded):
         return "HOST"
-    # a domain then the mask opens a tail -> path segment (readme.md<mask>x)
+    # a domain then the mask opens a tail -> path segment (readme.md<mask>x);
+    # a LEADING structural separator demotes this PATH to FREE_TEXT (D-DET-4).
     if _looks_like_domain(left_part, tld_set, degraded):
-        return "PATH"
+        return "FREE_TEXT" if had_leading_structural else "PATH"
     return "FREE_TEXT"
 
 
