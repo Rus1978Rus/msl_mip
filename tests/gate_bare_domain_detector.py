@@ -39,6 +39,13 @@ import os
 import sys
 import tempfile
 
+# GATE_MUST_BE_HERMETIC: this gate already pins the TLD state in-process via
+# _force_tld_state_for_test (so sequence_engine._tlds() never fetches), but
+# set the env flag too so ANY public_suffix.load_*() reached by an
+# unforeseen path also returns the offline embedded set — belt and braces,
+# uniform with the other gates. No network required, deterministic.
+os.environ["MSL_MIP_HERMETIC_TLD"] = "1"
+
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(BASE, "core"))
 sys.path.insert(0, os.path.join(BASE, "single_sign"))

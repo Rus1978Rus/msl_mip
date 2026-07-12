@@ -14,7 +14,17 @@ import subprocess, sys, os
 # cross-platform run: the runtime prints UTF-8 (Cyrillic in interp,
 # emoji ☠), but Windows decodes subprocess as cp1251 by default ->
 # the verdict is not found in a mangled string. Force UTF-8 everywhere.
-_ENV = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
+#
+# GATE_MUST_BE_HERMETIC (2026-07-12): MSL_MIP_HERMETIC_TLD=1 makes the
+# runtime subprocess use the in-repo EMBEDDED TLD/suffix sets instead of
+# fetching them LIVE from data.iana.org / publicsuffix.org at startup.
+# Proven necessary: the "dot substitution" cases (paypal.com.security-
+# check.ru -> HOLD) depend on 'ru' being a recognised TLD; a live fetch
+# that dropped/garbled it silently flipped that case to PASS (the 27/28
+# flake). The pinned embedded set contains 'ru', so the verdict is now
+# deterministic and offline — no network required for the gate.
+_ENV = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1",
+            MSL_MIP_HERMETIC_TLD="1")
 
 def _run(text):
     return subprocess.run(

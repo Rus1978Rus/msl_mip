@@ -17,6 +17,14 @@ import os
 import sys
 import tempfile
 
+# GATE_MUST_BE_HERMETIC (2026-07-12): process_sequence -> _assess_relation_
+# risk -> sequence_engine._tlds() -> public_suffix.load_single_tlds() would
+# otherwise fetch the IANA registry LIVE. Force the pinned offline embedded
+# set before any import triggers it. This gate's verdicts do not depend on
+# TLD content (its cases are scheme/free-text), but a gate must not require
+# the network at all — no silent degradation, deterministic every run.
+os.environ["MSL_MIP_HERMETIC_TLD"] = "1"
+
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(BASE, "core"))
 sys.path.insert(0, os.path.join(BASE, "single_sign"))

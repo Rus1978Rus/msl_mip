@@ -217,6 +217,10 @@ def main():
         cached_at = suffix_source.replace("CACHE_FROM_", "")
         print(f"[!] Compound suffix list (PSL): could not update, "
               f"using cached copy from {cached_at}")
+    elif suffix_source == "EMBEDDED_HERMETIC":
+        print("[!] Compound suffix list (PSL): HERMETIC mode "
+              "(MSL_MIP_HERMETIC_TLD set) — network and cache deliberately "
+              "skipped, using the pinned built-in list (for gates, not prod)")
     else:
         print("[!] Compound suffix list (PSL): no network and no cached copy — "
               "using built-in minimal list (may not know "
@@ -231,6 +235,10 @@ def main():
         cached_at = tld_source.replace("CACHE_FROM_", "")
         print(f"[!] Single TLD list (IANA): could not update, "
               f"using cached copy from {cached_at}")
+    elif tld_source == "EMBEDDED_HERMETIC":
+        print("[!] Single TLD list (IANA): HERMETIC mode "
+              "(MSL_MIP_HERMETIC_TLD set) — network and cache deliberately "
+              "skipped, using the pinned built-in list (for gates, not prod)")
     else:
         print("[!] Single TLD list (IANA): no network and no cached copy — "
               "using built-in minimal list (may not know "

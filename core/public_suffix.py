@@ -41,6 +41,21 @@ from datetime import datetime, timezone
 CANONICAL_URL = "https://publicsuffix.org/list/public_suffix_list.dat"
 FETCH_TIMEOUT_SECONDS = 3
 
+# GATE_MUST_BE_HERMETIC (2026-07-12): when MSL_MIP_HERMETIC_TLD is set (to
+# anything other than ""/"0"/"false"), load_compound_suffixes() and
+# load_single_tlds() SKIP the network and the on-disk cache entirely and
+# return the in-repo EMBEDDED fallbacks — a deterministic, offline, pinned
+# set. This exists so gates never depend on an external source: a live
+# registry is for the RUNTIME, a pinned one for GATES. A gate that green-
+# lights on a network hint is silent degradation, not test signal. Default
+# (env unset) is unchanged: live fetch -> cache -> embedded, as production.
+_HERMETIC_ENV = "MSL_MIP_HERMETIC_TLD"
+
+
+def _hermetic_tlds() -> bool:
+    return os.environ.get(_HERMETIC_ENV, "").strip().lower() not in ("", "0", "false", "no", "off")
+
+
 _CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "cache")
 _CACHE_FILE = os.path.join(_CACHE_DIR, "public_suffix_compound_cache.txt")
 
@@ -199,6 +214,8 @@ def load_single_tlds():
     """Same as load_compound_suffixes() but for single TLDs from the
     IANA root zone. Same discipline — three levels, explicit source.
     returned to the caller."""
+    if _hermetic_tlds():
+        return EMBEDDED_TLD_FALLBACK, "EMBEDDED_HERMETIC"
     try:
         entries = _fetch_single_tlds_from_iana()
         if entries:
@@ -269,6 +286,8 @@ def load_compound_suffixes():
     'EMBEDDED_FALLBACK'. The caller MUST surface the source to the
     user when it is not LIVE_FETCH (see module docstring,
     the HONESTY section)."""
+    if _hermetic_tlds():
+        return EMBEDDED_FALLBACK, "EMBEDDED_HERMETIC"
     try:
         entries = _fetch_from_canonical_source()
         if entries:
