@@ -61,6 +61,8 @@ CARD_FILENAMES = [
     "SIGN_CORE_CARD_SKULL_U1F480_GEN3_v0_3_RU__1_.md",
     "SIGN_CORE_CARD_SKULL_CROSSBONES_U2620_GEN3_v0_3_RU.md",
     "SIGN_CORE_CARD_AT_U0040_GEN3_v0_3_RU.md",
+    # Mask card (relation axis): no matcher — relations only.
+    "SIGN_CORE_CARD_FULLWIDTH_SOLIDUS_UFF0F_GEN3_v0_3_RU.md",
 ]
 
 
@@ -127,8 +129,26 @@ def analyze(text: str, cards: list) -> dict:
                                known_signs=known_signs)
     seq_decision = process_sequence_output(seq_out)
 
+    # --- Relation (mask) verdicts -> actions (relation axis, D-REL-4) ---
+    # Aligned with integrator DEFAULT_ACTION_MAP (review finding):
+    # NONE->pass, LOW->log_only, MEDIUM->queue, HIGH/CRITICAL->hold.
+    _REL_ACTION = {"NONE": "pass", "LOW": "log_only",
+                   "MEDIUM": "queue_for_review",
+                   "HIGH": "hold_pending_review",
+                   "CRITICAL": "hold_pending_review"}
+    relation_actions = []
+    for v in seq_out.relation_verdicts:
+        act = _REL_ACTION.get(v["risk_level"])
+        if act is None:
+            # Unknown enum value must be visible, not silently mapped.
+            print(f"[WARNING] UNKNOWN_RISK_LEVEL in relation verdict: "
+                  f"{v['risk_level']!r} — falling back to queue_for_review")
+            act = "queue_for_review"
+        relation_actions.append(act)
+
     # --- Final verdict ---
-    final_action = most_severe(single_actions + [seq_decision.runtime_action])
+    final_action = most_severe(single_actions + [seq_decision.runtime_action]
+                               + relation_actions)
 
     return {
         "text": text,
@@ -170,6 +190,13 @@ def print_report(report: dict) -> None:
     print(f"  -> action={seq_dec.runtime_action} ({seq_dec.action_rationale})")
     for w in seq_out.warnings:
         print(f"  [!] {w}")
+
+    if seq_out.relation_verdicts:
+        print("\n--- RELATION (MASK) VERDICTS ---")
+        for v in seq_out.relation_verdicts:
+            print(f"  [{v['at_offset']}] {v['visible_form']} -> {v['target']} "
+                  f"context={v['detected_context']} risk={v['risk_level']} "
+                  f"protected={v['protected']}")
 
     print("\n" + "=" * 60)
     print(f"FINAL VERDICT: {report['final_action'].upper()}")
