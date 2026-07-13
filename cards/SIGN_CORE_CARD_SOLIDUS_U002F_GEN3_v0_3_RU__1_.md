@@ -5,6 +5,23 @@ DOCUMENT_TYPE: SIGN_CORE_CARD
 TEMPLATE_LINE: GEN3_v0_3
 DOCUMENT_STATUS: ARTIFACT_CONFIRMED
 STATUS: ARTIFACT_CONFIRMED / NOT_LOCKED / NOT_RUNTIME / NOT_VALIDATOR / NOT_PRODUCTION
+
+RUNTIME_COMPATIBILITY (added 2026-07-13, principle Q7 — ARTIFACT_CONFIRMED is
+  bound to a TOOL VERSION; the tool changed, so the status must be re-checked,
+  not silently trusted):
+  CARD_CONTENT_STATUS: ARTIFACT_CONFIRMED
+    [NOT downgraded — the card CONTENT has not changed]
+  RUNTIME_COMPATIBILITY_STATUS: REVALIDATION_REQUIRED
+  REASON: the shared host-span context detector changed (F-NEW-2, commit
+    9188759). Observed drift on the fullwidth solidus ／ (U+FF0F, a
+    CONFUSABLE_OF this U+002F): example.com,／test and gоogle.com*／path now
+    read PATH, not HOST (2 documented D-DET-3 over-reads corrected). The ASCII
+    U+002F single-sign matcher is a SEPARATE path and is likely unaffected, but
+    "likely" is not "verified" — this card's runtime must be re-validated with
+    today's tool (BY_CODE), same as ZWSP was.
+  RESOLUTION: NOT run here (artefact re-validation is its own task). Status
+    marked honestly; the BY_CODE re-run of the solidus battery comes later.
+    See OQ-SOLIDUS-DRIFT in the ZWSP card.
 SOURCE_TEMPLATE: SIGN_CORE_CARD_TEMPLATE_GEN3_v0_3_RU
 BASED_ON_RULESET: SIGN_CORE_CARD_CONVEYOR_RULES_GEN3_v0_3_RU
 

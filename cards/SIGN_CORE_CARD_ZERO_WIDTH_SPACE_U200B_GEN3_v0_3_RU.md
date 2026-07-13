@@ -164,6 +164,19 @@ SAFE_CASES:
     EXPECTED: INFO
     RISK: NONE
     GUARD: ZWSP_PRESENCE ≠ WORD_BOUNDARY_MEANING
+    SEMANTIC_STATUS: LEGITIMATE_USE
+      [U+200B — класс переноса строки ZW (UAX#14); в CJK/тайском это законный
+       сегментатор слов, семантически безопасен]
+    IMPLEMENTATION_STATUS: NOT_RECOGNIZED_WITHOUT_EXTERNAL_TYPOGRAPHY_CONTEXT
+      [детектор НЕ различает типографику от машинной строки без внешнего
+       typography-контекста; чинить кодом нельзя — эвристика «CJK=безопасно»
+       откроет пропуск маски в CJK-ДОМЕНЕ (gоog<ZWSP>le.中国). Честность
+       карточки, не эвристика — решение конвейера 5/5.]
+    CURRENT_RUNTIME_EXPECTATION: MAY_QUEUE
+      [CJK-токен с ZWSP схлопывается в BYTE_EXACT_TOKEN → детектор МОЖЕТ дать
+       MEDIUM/QUEUE. Карточка НЕ обещает автоматический PASS, которого код не
+       даёт (claim=evidence). НЕ баг — честная граница до typography-контекста
+       (v0.5). См. T1 в oracle-манифесте, OQ по typography-контексту.]
   SAFE_CASE_003:
     INPUT: «символ ZWSP имеет кодпоинт U+200B» (упоминание знака)
     CONTEXT: учебный/цитирование
@@ -497,6 +510,10 @@ OQ-HBP:
   NEEDS: суд конвейера — правильная ли это отдельная сущность-контекст, верен ли
     риск MEDIUM, не плодит ли контексты без нужды (не подвид ли BYTE_EXACT_TOKEN).
     Идёт на конвейер с пачкой F-NEW-3.
+  DIRECTION: при РЕВИЗИИ СХЕМЫ рефакторить в POSITION_ROLE, а не top-level
+    контекст — по сути это ПОЗИЦИОННАЯ роль знака (в начале/в конце/внутри), не
+    отдельный вид контекста наравне с HOST/PATH. Пока НЕ ломать рабочее: живёт
+    как контекст до ревизии схемы (v0.5+).
 OQ-SOLIDUS-DRIFT:
   QUESTION: детектор ／ (СОЛИДУС, ARTIFACT_CONFIRMED) теперь читает
     example.com,／test и gоogle.com*／path как PATH, а не HOST. Патч карточки
@@ -511,6 +528,18 @@ OQ-SOLIDUS-DRIFT:
     как у ZWSP. Связь: ARTIFACT_CONFIRMED привязан к ВЕРСИИ инструмента —
     инструмент изменился → статус солидуса надо переподтвердить. На конвейер
     с пачкой F-NEW-3.
+OQ-SHARED-DETECTOR-BOUNDARY:
+  QUESTION: в TIER_2-батарее ZWSP два кейса остаются «падающими» — U1
+    (?q=bad<ZWSP>word → контекст PATH вместо QUERY_VALUE) и D2
+    (paypal.com<ZWSP>@evil.com → нет разбора userinfo, host не извлекается).
+  STATUS: NOT_A_ZWSP_FAILURE
+    [это НЕ провалы ZWSP: контексты QUERY_VALUE и userinfo-парсинг — свойства
+     ОБЩЕГО детектора, отсутствуют для ЛЮБОГО знака, не только невидимого.
+     ZWSP лишь их обнажил. Классифицированы как SHARED_DETECTOR_BOUNDARY,
+     вынесены на отдельный фронт (F-NEW-4 query, F-NEW-5 userinfo), НЕ
+     засчитываются как долг карточки ZWSP.]
+  BLOCKS_WORKINGLY_CLOSED: NO (для ZWSP)
+  NEEDS: отдельные патчи общего детектора (F-NEW-4, F-NEW-5), своя батарея.
 ALL_OPEN_QUESTIONS_CLOSED: NO
 
 ============================================================

@@ -35,6 +35,7 @@ from load_card import load_card
 from module_engine import process_sign
 from integrator_engine import process_output
 from sequence_engine import process_sequence
+import sequence_engine as _se   # F-NEW-3: reuse domain/context helpers for the removal probe
 from sequence_integrator_engine import process_sequence_output
 from matchers import dot_matcher
 
@@ -259,88 +260,205 @@ def _integrity_check(semantic_action: str, seq_out, cards: list):
 #     UNVERIFIABLE — "there is no card, I cannot verify this; here are the
 #     facts, hold it and look by eye". The last word stays with the human.
 #
-# Trigger = an invisible/format code point with no card: General_Category=Cf,
-# OR a Bidi_Control, OR a Default_Ignorable_Code_Point. Python's stdlib carries
-# no Default_Ignorable property table, so that arm is an HONEST APPROXIMATION —
-# a curated set of the well-known ranges (declared as such, not sold as full
-# coverage). Ordinary whitespace (space/newline/tab -> Zs/Cc, not Cf) is NOT
-# flagged; this channel is only for the truly invisible.
+# F-NEW-3 — the witness predicate is TWO-STAGE (candidate detection, then
+# context-gated emission) so it neither floods (NBSP in prose) nor goes blind
+# (NBSP hiding a host).
+#
+# STAGE_A candidate = union of PROPERTIES (not a hand-typed list):
+#   General_Category == Cf, OR Default_Ignorable_Code_Point (loaded from the
+#   pinned UCD DerivedCoreProperties.txt, not hardcoded), OR {Zl, Zp}, OR a
+#   fixed set of non-ASCII whitespace, OR the braille blank U+2800 (blank
+#   rendering, cat So — the P0 slice folded in here, NOT duplicated).
+#   Deliberately NOT the whole of Mn (ordinary script), nor all So, nor all Zs.
+#
+# STAGE_B emission by FAMILY x CONTEXT (the anti-flood boundary — context gate,
+# not a bare block-list):
+#   CONTROL family (Cf / bidi / join / variation / braille) -> witness EVERYWHERE
+#     (anomalous in any context, incl. FREE_TEXT).
+#   WHITESPACE family (Zl/Zp, non-ASCII spaces, NBSP) -> witness ONLY when a
+#     REMOVAL PROBE shows a machine context (the whitespace itself can hide its
+#     own context: paypal<NBSP>.com tokenises as FREE_TEXT until the NBSP is
+#     removed and 'paypal.com' reappears as HOST). In prose/typography -> silent.
+#   Ordinary ASCII space/tab/LF/CR -> NEVER a candidate (N1 must pass).
+#
+# The witness NEVER changes the verdict; it is surfaced next to it. Default_
+# Ignorable != safe-to-delete: we remove a whitespace ONLY to PROBE the context,
+# never from the text.
 
 _BIDI_CONTROL_CLASSES = {
     "LRE", "RLE", "LRO", "RLO", "PDF", "LRI", "RLI", "FSI", "PDI",
 }
-
-# Curated approximation of Default_Ignorable_Code_Point ranges that are NOT
-# already General_Category=Cf (those are caught by the Cf arm). Honest scope:
-# the well-known stable ones (soft-hidden joiners, fillers, variation
-# selectors). Declared as an approximation on purpose — see D-INV note above.
+# Fallback ONLY if the pinned UCD file is unreadable (honest DEGRADED, declared).
 _DEFAULT_IGNORABLE_EXTRA_RANGES = (
-    (0x034F, 0x034F),      # COMBINING GRAPHEME JOINER (Mn)
-    (0x115F, 0x1160),      # HANGUL CHOSEONG/JUNGSEONG FILLER (Lo)
-    (0x17B4, 0x17B5),      # KHMER VOWEL INHERENT AQ/AA (Mn)
-    (0x180B, 0x180F),      # MONGOLIAN FREE/VOWEL SEPARATORS (Mn/Cf)
-    (0x3164, 0x3164),      # HANGUL FILLER (Lo)
-    (0xFE00, 0xFE0F),      # VARIATION SELECTOR-1..16 (Mn)
-    (0xFFA0, 0xFFA0),      # HALFWIDTH HANGUL FILLER (Lo)
-    (0xFFF0, 0xFFF8),      # unassigned, Default_Ignorable (Cn)
-    (0xE0100, 0xE01EF),    # VARIATION SELECTOR-17..256 (Mn)
+    (0x034F, 0x034F), (0x115F, 0x1160), (0x17B4, 0x17B5), (0x180B, 0x180F),
+    (0x200B, 0x200F), (0x202A, 0x202E), (0x2060, 0x2064), (0x206A, 0x206F),
+    (0x3164, 0x3164), (0xFE00, 0xFE0F), (0xFEFF, 0xFEFF), (0xFFA0, 0xFFA0),
+    (0xFFF0, 0xFFF8), (0xE0100, 0xE01EF),
 )
+_VARIATION_SELECTOR_RANGES = ((0xFE00, 0xFE0F), (0xE0100, 0xE01EF))
+# Non-ASCII whitespace (the explicit set, NOT "all Zs without context").
+_NON_ASCII_WS = frozenset(
+    {0x0085, 0x00A0, 0x1680, 0x202F, 0x205F, 0x3000} | set(range(0x2000, 0x200B)))
+_ASCII_WS = " \t\n\r\f\v"
+_MACHINE_STRUCTURED = {"HOST", "EMAIL", "PATH", "URL", "HIDDEN_BOUNDARY_PADDING"}
+
+_DI_CACHE = {}
 
 
-def _invisible_reason(ch: str) -> str:
-    """Why this code point counts as an uncarded-invisible trigger, or ''
-    if it does not. Cf first (the broadest, most reliable arm), then bidi
-    control, then the curated Default_Ignorable approximation."""
-    if unicodedata.category(ch) == "Cf":
-        return "FORMAT_CHAR"          # General_Category=Cf
-    if unicodedata.bidirectional(ch) in _BIDI_CONTROL_CLASSES:
-        return "BIDI_CONTROL"
-    if ch == "⠀":   # U+2800 BRAILLE PATTERN BLANK (So) — renders empty
-        # Minimal targeted exception (F-NEW-1 stacking case D5): a blank braille
-        # cell hides like a zero-width char but is category So, outside the
-        # Cf/bidi/DI net. The FULL Zs/Zl/Zp witness gap (F-NEW-3) is deferred;
-        # this is only the braille slice the domain-reconstruction strip needs
-        # so a stripped-but-uncarded U+2800 still gets a witness.
-        return "BLANK_GLYPH"
+def _default_ignorable_set():
+    """Default_Ignorable_Code_Point from the pinned UCD source (STAGE_A). Loaded
+    from DerivedCoreProperties.txt (tools/sources/<ver>/), NOT hardcoded, so it
+    tracks the pinned Unicode version. Falls back to a curated set (declared
+    DEGRADED) only if the file is unreadable."""
+    if "set" in _DI_CACHE:
+        return _DI_CACHE["set"], _DI_CACHE["source"]
+    di, source = set(), "EMBEDDED_FALLBACK_DEGRADED"
+    try:
+        import json
+        tools = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tools")
+        with open(os.path.join(tools, "sources", "CURRENT_VERSION.json"),
+                  encoding="utf-8") as f:
+            man = json.load(f)
+        # the manifest path is relative to tools/ (where the pointer lives),
+        # and uses OS-native separators — normalise for the current platform.
+        rel = man["files"]["DerivedCoreProperties.txt"]["path"].replace("\\", os.sep)
+        dcp = os.path.join(tools, rel)
+        with open(dcp, encoding="utf-8") as f:
+            for line in f:
+                line = line.split("#", 1)[0].strip()
+                if not line or "Default_Ignorable_Code_Point" not in line:
+                    continue
+                rng = line.split(";", 1)[0].strip()
+                if ".." in rng:
+                    a, b = rng.split("..")
+                    di.update(range(int(a, 16), int(b, 16) + 1))
+                else:
+                    di.add(int(rng, 16))
+        source = "UCD_" + man.get("unicode_version", "?")
+    except Exception:
+        for lo, hi in _DEFAULT_IGNORABLE_EXTRA_RANGES:
+            di.update(range(lo, hi + 1))
+    _DI_CACHE["set"], _DI_CACHE["source"] = di, source
+    return di, source
+
+
+def _invisible_candidate(ch: str):
+    """STAGE_A. Returns (family, reason_tag) or (None, ''). family is CONTROL
+    (witness everywhere) or WHITESPACE (context-gated in STAGE_B)."""
     cp = ord(ch)
-    for lo, hi in _DEFAULT_IGNORABLE_EXTRA_RANGES:
-        if lo <= cp <= hi:
-            return "DEFAULT_IGNORABLE"
-    return ""
+    if cp in (0x20, 0x09, 0x0A, 0x0D):
+        return (None, "")                       # ordinary ASCII ws -> NEVER
+    cat = unicodedata.category(ch)
+    # ---- CONTROL families: anomalous in ANY context ----
+    if cat == "Cf":
+        if unicodedata.bidirectional(ch) in _BIDI_CONTROL_CLASSES:
+            return ("CONTROL", "BIDI_CONTROL")
+        if cp in (0x200C, 0x200D):
+            return ("CONTROL", "JOIN_CONTROL")
+        return ("CONTROL", "FORMAT_CONTROL")
+    if cp == 0x2800:                             # BRAILLE PATTERN BLANK (So)
+        return ("CONTROL", "BLANK_RENDERING")
+    if any(lo <= cp <= hi for lo, hi in _VARIATION_SELECTOR_RANGES):
+        return ("CONTROL", "VARIATION_SELECTOR")
+    di, _src = _default_ignorable_set()
+    if cp in di:
+        return ("CONTROL", "DEFAULT_IGNORABLE")
+    # ---- WHITESPACE families: context-gated (STAGE_B) ----
+    if cat == "Zl":
+        return ("WHITESPACE", "LINE_SEPARATOR")
+    if cat == "Zp":
+        return ("WHITESPACE", "PARAGRAPH_SEPARATOR")
+    if cp in _NON_ASCII_WS:
+        return ("WHITESPACE", "NON_ASCII_WHITESPACE")
+    return (None, "")
+
+
+def _reconstructed_context(text: str, i: int) -> str:
+    """REMOVAL PROBE: drop the char at i, take the joined token around the join
+    (bounded by ordinary ASCII whitespace), and classify its machine context.
+    Reuses the sequence-layer domain/token helpers so the classification matches
+    the detector. Returns HOST/EMAIL/BYTE_EXACT_TOKEN/FREE_TEXT."""
+    a = i
+    while a > 0 and text[a - 1] not in _ASCII_WS:
+        a -= 1
+    b = i + 1
+    while b < len(text) and text[b] not in _ASCII_WS:
+        b += 1
+    joined = _se._strip_label_invisibles(text[a:i] + text[i + 1:b])
+    if not joined:
+        return "FREE_TEXT"
+    tld_set, degraded = _se._tlds()
+    if _se._looks_like_domain(joined, tld_set, degraded):
+        return "HOST"
+    if "@" in joined:
+        at = joined.rfind("@")
+        local, dom = joined[:at], joined[at + 1:]
+        if local and _se._looks_like_domain(dom, tld_set, degraded):
+            return "EMAIL"
+    if _se._is_byte_exact_token(joined):
+        return "BYTE_EXACT_TOKEN"
+    return "FREE_TEXT"
+
+
+def _whitespace_witnesses(text: str, i: int):
+    """STAGE_B for the WHITESPACE family. Returns the machine context (-> witness)
+    or None (-> silent, no flood). A domain-structured reconstruction witnesses
+    even inside prose (a hidden host is dangerous anywhere); a bare byte-token
+    witnesses only when the text is NOT prose (a standalone machine token, not a
+    word in a sentence — this is the NBSP-in-'100 km' flood guard)."""
+    ctx = _reconstructed_context(text, i)
+    if ctx in _MACHINE_STRUCTURED:
+        return ctx
+    if ctx == "BYTE_EXACT_TOKEN" and not any(c in _ASCII_WS for c in text):
+        return ctx
+    return None
+
+
+def _witness_record(ch, i, family, tag, context_note):
+    try:
+        name = unicodedata.name(ch)
+    except ValueError:
+        name = "UNNAMED / UNASSIGNED CODE POINT"
+    basis = f"invisible code point ({tag}, family {family}) with no card"
+    if context_note:
+        basis += f" — {context_note}"
+    basis += " -> intent cannot be verified by the system"
+    return {
+        "codepoint": f"U+{ord(ch):04X}",
+        "at_offset": i,
+        "unicode_name": name,
+        "category": unicodedata.category(ch),
+        "trigger": tag,
+        "family": family,
+        "context_note": context_note,
+        "card_status": "NOT_CREATED",
+        "finding_status": "UNVERIFIABLE",   # ACK_GAP_TRIVALENT: not safe, not dangerous
+        "finding_basis": basis,
+        "recommendation": (
+            "hold and look by eye; not judged safe and not judged "
+            "dangerous; Default_Ignorable != safe-to-delete"),
+    }
 
 
 def scan_uncarded_invisibles(text: str, cards: list) -> list:
-    """Witness pass: report every invisible/format code point that has NO
-    loaded card. Returns a list of ACK_GAP witness records (never verdicts).
-    Carded code points are excluded — the registrar is for the UNKNOWN only."""
+    """Witness pass (F-NEW-3, two-stage). Reports uncarded invisibles that
+    STAGE_A flags AND STAGE_B admits. Never a verdict; carded code points and
+    ordinary ASCII whitespace are excluded."""
     carded = {ord(c.visible_form) for c in cards if len(c.visible_form) == 1}
     records = []
     for i, ch in enumerate(text):
         if ord(ch) in carded:
-            continue                  # a card exists — the normal path handles it
-        reason = _invisible_reason(ch)
-        if not reason:
             continue
-        try:
-            name = unicodedata.name(ch)
-        except ValueError:
-            name = "UNNAMED / UNASSIGNED CODE POINT"
-        records.append({
-            "codepoint": f"U+{ord(ch):04X}",
-            "at_offset": i,
-            "unicode_name": name,
-            "category": unicodedata.category(ch),
-            "trigger": reason,
-            # witness fields — deliberately NOT a risk_level:
-            "card_status": "NOT_CREATED",
-            "finding_status": "UNVERIFIABLE",   # ACK_GAP_TRIVALENT: not safe, not dangerous
-            "finding_basis": (
-                f"invisible code point ({reason}) with no card -> intent "
-                f"cannot be verified by the system"),
-            "recommendation": (
-                "hold and look by eye; not judged safe and not judged "
-                "dangerous; Default_Ignorable != safe-to-delete"),
-        })
+        family, tag = _invisible_candidate(ch)
+        if family is None:
+            continue
+        note = ""
+        if family == "WHITESPACE":
+            wctx = _whitespace_witnesses(text, i)
+            if wctx is None:
+                continue                  # STAGE_B gate: prose/typography -> no flood
+            note = f"inside reconstructed {wctx}"
+        records.append(_witness_record(ch, i, family, tag, note))
     return records
 
 
@@ -404,6 +522,10 @@ def analyze(text: str, cards: list) -> dict:
     # witness record must never masquerade as a risk verdict. The human reads
     # it alongside the verdict, not inside it.
     uncarded_invisibles = scan_uncarded_invisibles(text, cards)
+    # ATTENTION_STATUS (F-NEW-3): an uncarded witness alongside the verdict means
+    # the interface must NOT show a clean PASS — the human sees "PASS, but hold
+    # your eye: an invisible with no card is present". The verdict is untouched.
+    attention_status = "WITNESS_PRESENT" if uncarded_invisibles else "NONE"
 
     return {
         "text": text,
@@ -417,6 +539,7 @@ def analyze(text: str, cards: list) -> dict:
         "integrity_violations": integrity_violations,
         "integrity_concerns": integrity_concerns,
         "uncarded_invisibles": uncarded_invisibles,
+        "attention_status": attention_status,
     }
 
 
@@ -469,8 +592,10 @@ def print_report(report: dict) -> None:
         # A WITNESS block, printed on its own — never inside the verdict.
         print("\n--- UNCARDED INVISIBLE SIGNS (WITNESS, not a verdict) ---")
         for r in invis:
+            fam = f"{r.get('family', '')}/" if r.get('family') else ""
+            note = f"  ({r['context_note']})" if r.get('context_note') else ""
             print(f"  [{r['at_offset']}] {r['codepoint']} ({r['unicode_name']}) "
-                  f"[{r['category']}/{r['trigger']}]")
+                  f"[{r['category']}/{fam}{r['trigger']}]{note}")
             print(f"        card: {r['card_status']}   finding: {r['finding_status']}")
             print(f"        basis: {r['finding_basis']}")
             print(f"        -> to the human: {r['recommendation']}")
@@ -479,8 +604,13 @@ def print_report(report: dict) -> None:
     sem = report["semantic_action"]
     eff = report["effective_action"]
     status = report.get("integrity_status", "OK")
+    attention = report.get("attention_status", "NONE")
+    # F-NEW-3: never a clean PASS in the window when an uncarded invisible is
+    # present — the witness rides ALONGSIDE the verdict, does not change it.
+    att_tag = ("   [⚠ ATTENTION: WITNESS_PRESENT — uncarded invisible above; "
+               "hold your eye]" if attention == "WITNESS_PRESENT" else "")
     if status == "OK":
-        print(f"FINAL VERDICT: {sem.upper()}")
+        print(f"FINAL VERDICT: {sem.upper()}{att_tag}")
     else:
         # D-GUARD-4: show BOTH so the human sees the discrepancy in the window.
         print(f"SEMANTIC VERDICT (main path): {sem.upper()}")
@@ -489,7 +619,7 @@ def print_report(report: dict) -> None:
             print(f"  [INTEGRITY_VIOLATION] {viol['detail']}")
         for con in report.get("integrity_concerns", []):
             print(f"  [{con['rule']}] {con['detail']}")
-        print(f"EFFECTIVE VERDICT (integrity-adjusted): {eff.upper()}")
+        print(f"EFFECTIVE VERDICT (integrity-adjusted): {eff.upper()}{att_tag}")
     print("=" * 60)
 
 
