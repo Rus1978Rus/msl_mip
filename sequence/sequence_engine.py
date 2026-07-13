@@ -22,6 +22,8 @@ SOLIDUS), '://' (SOLIDUS.SC7).
 
 from __future__ import annotations
 
+import unicodedata
+
 from sign_core_card import SignCoreCard, RiskLevel
 from sequence_output import SequenceMatch, SequenceOutput
 from public_suffix import load_single_tlds
@@ -281,6 +283,59 @@ def _demask(s: str, mask_chars) -> str:
     return "".join(ch for ch in s if ch not in mask_chars)
 
 
+# F-NEW-1 (P0, 2026-07-13): a SECOND, NON-carded invisible next to the carded
+# mask (goog<ZWSP><ZWJ>le.com) used to survive _demask — which strips only
+# CARDED masks — and then trip _looks_like_domain on the residual invisible, so
+# the label read as "not a domain" -> FREE_TEXT -> a SILENTLY MISSED phishing
+# host. The trivial bypass: append any second invisible after the ZWSP.
+#
+# The trap (yesterday's finding): DEFAULT_IGNORABLE != SAFE_TO_DELETE. We must
+# NOT blindly delete all invisibles — a blanket strip would corrupt legitimate
+# Persian ZWNJ orthography and ZWJ emoji sequences. So the rule is narrow:
+#   - an invisible INSIDE a reconstructed domain label is anomalous by its mere
+#     PRESENCE (whatever it is, carded or not) -> strip it ONLY to SEE the real
+#     domain for the "is this a host?" test;
+#   - we NEVER delete it from the text; the uncarded ones are still surfaced as
+#     witnesses by the registrar (msl_mip_runtime);
+#   - this predicate runs ONLY inside _detect_context_at, which is reached ONLY
+#     for a carded-mask relation candidate (a ZWSP/mask is already present).
+#     Emoji/Persian text with NO carded mask never enters this path -> untouched.
+_BIDI_CONTROL_CLASSES = {"LRE", "RLE", "LRO", "RLO", "PDF",
+                         "LRI", "RLI", "FSI", "PDI"}
+# Non-Cf Default_Ignorable ranges that can still hide in a label (stable set;
+# Cf is handled by the category check). Matches the registrar's approximation.
+_DI_EXTRA_RANGES = ((0x034F, 0x034F), (0x115F, 0x1160), (0x17B4, 0x17B5),
+                    (0x180B, 0x180F), (0x3164, 0x3164), (0xFE00, 0xFE0F),
+                    (0xFFA0, 0xFFA0), (0xE0100, 0xE01EF))
+
+
+def _is_domain_label_invisible(ch: str) -> bool:
+    """True if ch is an invisible / zero-advance code point that can hide
+    INSIDE a domain label (F-NEW-1). Ordinary whitespace is EXCLUDED on
+    purpose: it already splits tokens and U+0020 must never be treated as a
+    hidden mask (the N1 witness-flood guard). Extended predicate = Cf +
+    bidi-control + Default_Ignorable-extra + braille-blank; deliberately WIDER
+    than the current registrar witness predicate so a not-yet-carded gap (e.g.
+    braille U+2800) cannot re-open the missed-attack hole while F-NEW-3 is
+    still pending."""
+    if ch.isspace():
+        return False
+    if unicodedata.category(ch) == "Cf":
+        return True
+    if unicodedata.bidirectional(ch) in _BIDI_CONTROL_CLASSES:
+        return True
+    if ch == "⠀":   # BRAILLE PATTERN BLANK (So) — renders empty
+        return True
+    cp = ord(ch)
+    return any(lo <= cp <= hi for lo, hi in _DI_EXTRA_RANGES)
+
+
+def _strip_label_invisibles(s: str) -> str:
+    """Strip domain-label invisibles for RECONSTRUCTION ONLY (see the predicate
+    note above). Never used to mutate the source text."""
+    return "".join(ch for ch in s if not _is_domain_label_invisible(ch))
+
+
 # D-DET-4 (FIX_FIRST round 2, 2026-07-12): a LEADING structural separator
 # is not a wrapper. The positive scan below skips leading non-domain
 # characters to see past wrappers ((, ", *, …); but /, \, ?, #, :, @ carry
@@ -488,6 +543,15 @@ def _detect_context_at(text: str, offset: int, mask_chars=frozenset()) -> str:
     left_part = _demask(token[lead:rel], mask_chars)   # D-DET-1: strip ALL masks,
     right_part = _demask(token[rel + 1:], mask_chars)  # not only the current one
     whole = _demask(token[lead:], mask_chars)          # the token with ALL masks gone
+
+    # F-NEW-1 (P0): after removing carded masks, ALSO strip any residual
+    # label-invisible for the RECONSTRUCTION checks below, so a second hidden
+    # char (ZWJ / U+2062 / braille) cannot silently defeat host/email/token
+    # detection. No-op when nothing residual survives (single-mask cases keep
+    # their exact prior behaviour); the chars are NOT removed from the text.
+    left_part = _strip_label_invisibles(left_part)
+    right_part = _strip_label_invisibles(right_part)
+    whole = _strip_label_invisibles(whole)
 
     # host substitution — a domain on BOTH sides of the mask
     # (a.com<mask>evil.com, incl. tails via _domain_prefix in _looks_like_domain)

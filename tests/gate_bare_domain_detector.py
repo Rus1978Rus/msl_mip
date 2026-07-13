@@ -191,11 +191,14 @@ check("just ／ text -> FREE_TEXT/NONE", vd and vd[0]["detected_context"] == "FR
       and vd[0]["risk_level"] == "NONE")
 check("just ／ text -> protected=False", vd and vd[0]["protected"] is False)
 
-# --- Known boundary (shown, not hidden): zero-width between labels ---
-print("\n[BOUNDARY] Zero-width between labels defeats detection (documented)")
+# --- Former known boundary, NOW CLOSED by F-NEW-1 (P0, 2026-07-13): a
+# zero-width (or any invisible) between labels used to defeat detection
+# (-> FREE_TEXT, a SILENTLY MISSED homoglyph host). The domain-reconstruction
+# strip (_strip_label_invisibles) now sees past it, so this reads HOST. ---
+print("\n[BOUNDARY] Zero-width between labels no longer defeats detection (F-NEW-1)")
 zw = "gоog​／le.com"
-check("gоog<ZWSP>／le.com -> FREE_TEXT (KNOWN LIMITATION, D-DET doc)",
-      _ctx(card, zw) == "FREE_TEXT", _ctx(card, zw))
+check("gоog<ZWSP>／le.com -> HOST (F-NEW-1 P0 closed the zero-width boundary miss; was FREE_TEXT)",
+      _ctx(card, zw) == "HOST", _ctx(card, zw))
 
 # --- D-DET-2: TLD registry unavailable -> alarm, not silence; DEGRADED ---
 print("\n[D-DET-2] Degraded TLD registry -> HOST + run marked DEGRADED")

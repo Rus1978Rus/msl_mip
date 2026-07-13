@@ -295,6 +295,13 @@ def _invisible_reason(ch: str) -> str:
         return "FORMAT_CHAR"          # General_Category=Cf
     if unicodedata.bidirectional(ch) in _BIDI_CONTROL_CLASSES:
         return "BIDI_CONTROL"
+    if ch == "⠀":   # U+2800 BRAILLE PATTERN BLANK (So) — renders empty
+        # Minimal targeted exception (F-NEW-1 stacking case D5): a blank braille
+        # cell hides like a zero-width char but is category So, outside the
+        # Cf/bidi/DI net. The FULL Zs/Zl/Zp witness gap (F-NEW-3) is deferred;
+        # this is only the braille slice the domain-reconstruction strip needs
+        # so a stripped-but-uncarded U+2800 still gets a witness.
+        return "BLANK_GLYPH"
     cp = ord(ch)
     for lo, hi in _DEFAULT_IGNORABLE_EXTRA_RANGES:
         if lo <= cp <= hi:
