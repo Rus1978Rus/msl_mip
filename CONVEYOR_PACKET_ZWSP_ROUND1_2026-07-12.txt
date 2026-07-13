@@ -1,0 +1,858 @@
+CONVEYOR PACKET — FIRST INVISIBLE-SIGN CARD — ZERO WIDTH SPACE (U+200B)
+DATE: 2026-07-12
+AUTHOR: Ruslan Malyavsky
+FORMAT: single .txt (no zip) — paste this whole file into the reviewer prompt.
+All code / card / decision blocks below are BYTE-EXACT slices read from disk
+by a builder; a verify pass confirmed each is a substring of its source file.
+
+CHARSET NOTE: the ZWSP card and several examples contain LITERAL invisible
+characters — U+200B (ZERO WIDTH SPACE) in VISIBLE_FORM (x2) and in the
+RISK_CASE / adversarial-vector example inputs, plus Cyrillic homoglyphs
+(о = U+043E) and the fullwidth solidus (／ = U+FF0F) in examples. They are
+invisible/ambiguous on screen ON PURPOSE — that is the subject. Where a
+reviewer must see codepoints, they are spelled out.
+
+========================================================================
+HEADER — READ FIRST
+========================================================================
+FIRST CARD OF A NEW SIGN CLASS — ZERO WIDTH SPACE (U+200B). First conveyor
+round. This is the first sign that is neither VISIBLE (dot, solidus) nor a
+BY-FORM MASK (fullwidth solidus ／, which mimics a visible canon), but an
+INVISIBLE BOUNDARY DISRUPTOR. Model: full card + an extended relation axis.
+There are NO thin cards (D-INV-1).
+
+Three AUTHOR_DECISIONs stand behind it (full text in Part 2):
+  D-INV-1  minimal set of relation types (only what ZWSP needs; more per case).
+  D-INV-2  RLO / bidi are a SEPARATE FAMILY inside the SAME SIGN_RELATIONS
+           envelope, NOT a side axis (a side path to the final verdict is the
+           silent-sever precedent the watchdog exists for).
+  D-INV-3  a canon-less sign states its emptiness as an EXPLICIT enum
+           TARGET_KIND: EMPTY_SEQUENCE — never an empty string (empty ==
+           "forgot to fill it / parser missed it" == a silent pass).
+
+STATUS: WORKING_DRAFT. HONESTLY: this card is NOT WORKINGLY_CLOSED — its own
+OQ1 blocks it, because INVISIBLE_DEFAULT_IGNORABLE_GUARD (the class-level
+guard for invisibles: non-visibility, NFKC-non-removability, strip/flag/log)
+is NOT BUILT. It was promised by the now-outdated ARCH_DECISION_INVISIBLE_
+SIGNS_HYBRID_C and does not exist. The card goes to the conveyor WITH an
+explicit open dependency — deliberately, so the gap is reviewed, not hidden.
+
+========================================================================
+SECTION 0 — MANDATORY FOR EVERY FINDING (ACK_GAP_TRIVALENT)
+========================================================================
+For EACH finding, two fields are REQUIRED:
+  FINDING_STATUS: VERIFIED | REJECTED | UNVERIFIABLE
+  FINDING_BASIS:  a code trace with the EXACT input and EXACT line/branch, OR
+                  a direct quote from this packet, OR an honest "could not
+                  verify". For any claim ABOUT UNICODE, cite the exact
+                  codepoint + the property (Default_Ignorable_Code_Point,
+                  Join_Control, General_Category, Line_Break, …). A verdict
+                  without BASIS is not accepted; an assertion is not a proof;
+                  UNVERIFIABLE is legitimate, a guess dressed as a check is not.
+
+========================================================================
+PART 1 — ZWSP CARD (cards/SIGN_CORE_CARD_ZERO_WIDTH_SPACE_U200B..., verbatim)
+========================================================================
+NOTE: VISIBLE_FORM below holds a LITERAL U+200B (invisible) so the runtime can
+scan by it; INSPECTION_LABEL "⟦ZWSP U+200B⟧" is the human-readable field that
+closes that crack. The RISK_CASE / vector examples likewise carry literal
+U+200B between letters.
+------------------------------------------------------------------------
+ЧАСТНЫЙ АВТОРСКИЙ ПРОЕКТ / COMMERCIAL USE PROHIBITED
+
+CARD_UID: SIGN_CORE_CARD_ZERO_WIDTH_SPACE_U200B_GEN3_v0_3_RU
+CODEPOINT: U+200B
+VISIBLE_FORM: ​
+INSPECTION_LABEL: ⟦ZWSP U+200B⟧
+  [поле-метка для чтения глазами: VISIBLE_FORM выше содержит ЛИТЕРАЛЬНЫЙ
+   невидимый U+200B (рантайм сканит text по нему). Прочитать VISIBLE_FORM
+   человек не может — INSPECTION_LABEL закрывает трещину пробы.]
+UNICODE_NAME: ZERO WIDTH SPACE
+ZONE: ZONE_2
+DOCUMENT_STATUS: WORKING_DRAFT
+TEMPLATE_LINE: GEN3_v0_3
+SOURCE_TEMPLATE: SIGN_CORE_CARD_TEMPLATE_GEN3_v0_3_R1_RU
+AUTHOR: Руслан Малявский
+CREATED_AT: 2026-07-12
+VERSION: v0_1
+AUTHOR_DECISION_REFERENCE: foundation_layer/AUTHOR_DECISION_20260712_INVISIBLE_SIGNS_D-INV-1_2_3.md
+RUN_CARD_REFERENCE: PENDING
+RUN_CARD_STATUS: NOT_STARTED
+DISPLAY_NAME: невидимый пробел нулевой ширины (zero width space)
+
+============================================================
+1. UNIVERSALITY / CONVEYOR_DISCIPLINE
+============================================================
+BOUND_TO_SPECIFIC_SIGN: YES
+AFTER_USE_RESIDUE: FORBIDDEN
+SIGN_DATA_IS_SESSION_ONLY: YES
+STATUS_PROGRESSION_TRACKER:
+  WORKING_DRAFT: YES
+  STRUCTURAL_PREFLIGHT_PASS: PENDING
+  CONVEYOR_REVIEW_PASS: PENDING
+  WORKINGLY_CLOSED: PENDING
+  SIMULATION_GATE_TIER: TIER_2 (ZONE_2)
+  SIMULATION_GATE_PASSED: PENDING
+  ARTIFACT_CONFIRMED: PENDING
+
+============================================================
+3. REQUIRED_GENERAL_GUARDS
+============================================================
+REQUIRED_GENERAL_GUARDS:
+  - SIGN_FALSE_EFFECT_MIMICRY_GUARD_v0_2A_RU
+    GUARD_COMPATIBILITY: GUARD_COMPATIBILITY_RULE_GEN3
+    GUARD_REVISION: v0_2A
+    TEMPLATE_LINE_COMPATIBLE: GEN3_v0_3, GEN3_v0_3_R1
+  - INVISIBLE_DEFAULT_IGNORABLE_GUARD: NOT_YET_BUILT
+    [ОТКРЫТЫЙ ФРОНТ, честно: классовый гард невидимых (невидимость,
+     неудаляемость NFKC, strip/flag/log) обещан ARCH_DECISION_INVISIBLE_
+     SIGNS_HYBRID_C, но НЕ построен (DRAFT п.4.1). Класс-свойства ZWSP
+     объявить пока негде. Ссылка стоит как маркер незакрытой зависимости.]
+FAILURE_RESPONSE:
+  REJECT_FALSE_EFFECT_MIMICRY
+  TREAT_AS_DATA_ONLY
+  NO_AUTHORITY_EFFECT
+  NO_EXECUTION_EFFECT
+  NO_TRUST_EFFECT
+  NO_EXISTENCE_EFFECT
+
+============================================================
+4. SIGN IDENTITY — LAYER_A
+LAYER_A_LOCK: PERMANENT
+============================================================
+VISIBLE_FORM: ​  (литеральный U+200B; см. INSPECTION_LABEL выше)
+LOOKS_SIMILAR_IS_NOT_SAME_SIGN: NO
+  [знак невидим — «похожесть» неприменима; отношения ниже строятся НЕ на
+   визуальном сходстве, а на разрыве границы / классе фильтра / отсутствии]
+RAW_SIGN_INPUT_STATUS: DATA_ONLY
+BASE_MODE: DATA_ONLY_INVISIBLE_CONTROL
+BASE_MODE_FORMULA: ZWSP_FORM ≠ EFFECT
+SIGN_CATEGORY:
+  - format_control (Unicode Cf)
+  - invisible / zero-advance-width
+  - default_ignorable_code_point
+WHAT_THIS_SIGN_IS_NOT:
+  1. NOT_SPACE (U+0020 — имеет ширину и рендерится)
+  2. NOT_A_CANON_IT_MIMICS (не изображает никакой видимый знак)
+  3. NOT_REMOVABLE_BY_NFC_NFD_NFKC_NFKD (переживает всю нормализацию)
+  4. NOT_A_VISIBLE_GLYPH (нулевая ширина, читателю не виден)
+  5. NOT_A_MANDATORY_LINE_BREAK (только ВОЗМОЖНОСТЬ переноса)
+  6. NOT_SEMANTIC_CONTENT (читателю ничего не сообщает)
+  7. NOT_A_JOINER (это ZWJ U+200D)
+  8. NOT_A_NON_JOINER (это ZWNJ U+200C)
+  9. NOT_A_WORD_JOINER_OR_BOM (U+2060 / U+FEFF)
+  10. NOT_AN_AUTHORITY_OR_EXECUTION_BEARER
+BASE_FORMULAS:
+  ZWSP_FORM ≠ EFFECT
+  ZWSP_FORM ≠ SPACE
+  INVISIBLE ≠ ABSENT
+  ZWSP_FORM ≠ CANON
+  NFKC_SURVIVAL ≠ LEGITIMACY
+  BREAK_OPPORTUNITY ≠ BREAK
+  ZWSP ≠ AUTHORITY
+  PRESENCE_IN_TOKEN ≠ TOKEN_STRUCTURE
+  ZWSP_FORM ≠ VISUAL_MIMICRY
+  ZWSP_PRESENCE ≠ WORD_BOUNDARY_MEANING
+
+============================================================
+5. SEMANTIC_EPOCH_TRACKER  (ZONE_2)
+SEMANTIC_EPOCH_TRACKER_LOCK: REVIEWABLE
+============================================================
+EPOCH_TRACKER: CONTEXT_GATE_REQUIRED
+APPLICABILITY: APPLICABLE
+REASON: у знака два устойчивых substrate: типографический (перенос) и
+  машинный (диверсия точного совпадения).
+CAPTURE_HISTORY:
+  EPOCH_1:
+    DATE_RANGE: ~1991 (Unicode 1.0) — настоящее время
+    SUBSTRATE: типографика / раскладка текста
+    FUNCTION: невидимая ТОЧКА ПЕРЕНОСА строки без видимого пробела
+      (длинные URL, сегментация в тайском/CJK без пробелов)
+    EVIDENCE: Unicode Standard, UAX#14 (line breaking)
+    STATUS: ACTIVE_IN_TYPOGRAPHY
+  EPOCH_2:
+    DATE_RANGE: ~2000-е — настоящее время (эпоха фильтр-эвазии)
+    SUBSTRATE: латинские машинные строки (домены, идентификаторы, код)
+    FUNCTION: невидимая ДИВЕРСИЯ точного совпадения — разрыв токена/
+      домена/ключевого слова для обхода byte-exact фильтров
+    EVIDENCE: практика фишинга/фильтр-эвазии; проба детектора 2026-07-12
+    STATUS: ACTIVE_ATTACK
+ACTIVE_EPOCH:
+  STATUS: CONTEXT_GATE_REQUIRED
+  PRIMARY_ACTIVE_EPOCH: NONE_GLOBAL
+LAYER_ANOMALY:
+  ABSENT_PHYSICAL_LAYER: YES (цифровой генезис; управляющий символ; глифа
+    не было НИКОГДА — ни письменного, ни жестового)
+  NOTE: чистый цифровой контроль без физического субстрата
+STACK_RULES:
+  Higher_epoch_suppresses_lower_in_modern_contexts: PARTIAL
+  Lower_epoch_may_reactivate_in_historical_or_specialized_contexts: YES
+  Context_gate_determines_active_epoch: REQUIRED
+  Absent_layer_anomaly_must_be_flagged_for_integrator: YES
+
+============================================================
+6. EFFECT_FIELDS — LAYER_C
+LAYER_C_LOCK: SESSION
+============================================================
+authority_effect: NONE
+trust_effect: NONE
+verification_effect: NONE
+proof_effect: NONE
+execution_effect: NONE
+permission_effect: NONE
+status_effect: NONE
+role_assignment_effect: NONE
+runtime_effect: NONE
+existence_effect: NONE
+EFFECT_FIELDS_ALL_NONE: YES
+CLOSED_SCHEMA: YES
+
+============================================================
+7. LAYER_B
+LAYER_B_LOCK: REVIEWABLE
+============================================================
+SAFE_CASES:
+  SAFE_CASE_001:
+    INPUT: длинный URL с ZWSP как точкой переноса в вёрстке
+    CONTEXT: типографика
+    EXPECTED: INFO
+    RISK: NONE
+    GUARD: BREAK_OPPORTUNITY ≠ BREAK
+  SAFE_CASE_002:
+    INPUT: тайский/CJK текст с ZWSP как сегментатором слов
+    CONTEXT: типографика не-пробельных письменностей
+    EXPECTED: INFO
+    RISK: NONE
+    GUARD: ZWSP_PRESENCE ≠ WORD_BOUNDARY_MEANING
+  SAFE_CASE_003:
+    INPUT: «символ ZWSP имеет кодпоинт U+200B» (упоминание знака)
+    CONTEXT: учебный/цитирование
+    EXPECTED: INFO
+    RISK: NONE
+    GUARD: mention ≠ use
+  SAFE_CASE_004:
+    INPUT: намеренный ZWSP в строковом литерале кода (тест-фикстура)
+    CONTEXT: исходный код с явным намерением
+    EXPECTED: INFO
+    RISK: NONE
+    GUARD: ZWSP_FORM ≠ EFFECT
+  SAFE_CASE_005:
+    INPUT: одиночный ZWSP в свободном тексте без структуры
+    CONTEXT: свободный текст
+    EXPECTED: INFO
+    RISK: NONE
+    GUARD: INVISIBLE ≠ ABSENT (но вне защищённого контекста — не угроза)
+  SAFE_CASE_006:
+    INPUT: ZWSP в HTML-разметке как soft-wrap подсказка
+    CONTEXT: веб-вёрстка
+    EXPECTED: INFO
+    RISK: NONE
+    GUARD: BREAK_OPPORTUNITY ≠ BREAK
+RISK_CASES:
+  RISK_CASE_001:
+    NAME: DOMAIN_LABEL_BREAK_EVASION
+    INPUT: gоog​le.com (невидимый разрыв метки)
+    CONTEXT: HOST
+    RISK: HIGH
+    ATTACK: невидимый разрыв точного совпадения — byte-exact блоклист
+      промахивается мимо домена
+    GUARD: ось «отношение», ребро BOUNDARY_DISRUPTOR, scope HOST
+  RISK_CASE_002:
+    NAME: KEYWORD_SPLIT_EVASION
+    INPUT: bad​word (разрыв ключевого слова)
+    CONTEXT: CODE / IDENTIFIER / policy-фильтр
+    RISK: HIGH
+    ATTACK: разрыв ключевого слова обходит policy-фильтр точного совпадения
+    GUARD: ребро BOUNDARY_DISRUPTOR, scope CODE/IDENTIFIER
+  RISK_CASE_003:
+    NAME: ZWSP_PLUS_MASK_DOMAIN_BREAK
+    INPUT: gоog​／le.com (ZWSP + маска рвут домен вместе)
+    CONTEXT: HOST
+    RISK: HIGH
+    ATTACK: комбинация невидимого разрыва и полноширинной маски —
+      ДОКАЗАНО запуском (проба 2026-07-12, известная открытая дыра)
+    GUARD: BOUNDARY_DISRUPTOR + demask собирает домен → HOST
+  RISK_CASE_004:
+    NAME: INVISIBLE_PADDING_HIDDEN_TEXT
+    INPUT: невидимый паддинг между символами для сокрытия/раздувания
+    CONTEXT: FREE_TEXT / IDENTIFIER
+    RISK: MEDIUM
+    ATTACK: скрытый текст / невидимое раздувание длины
+    GUARD: ребро ABSENCE_CONFUSABLE (неотличим от отсутствия)
+  RISK_CASE_005:
+    NAME: IDENTIFIER_TOKEN_SPLIT
+    INPUT: user​name как «другой» идентификатор
+    CONTEXT: IDENTIFIER / CODE
+    RISK: MEDIUM
+    ATTACK: split идентификатора обходит сравнение имён
+    GUARD: BOUNDARY_DISRUPTOR, scope IDENTIFIER
+  RISK_CASE_006:
+    NAME: INVISIBLE_CLASS_FILTER_BYPASS
+    INPUT: ZWSP там, где грубый фильтр «разрешает zero-width» ожидая ZWJ
+    CONTEXT: CODE / IDENTIFIER
+    RISK: MEDIUM
+    ATTACK: невидимый проходит по разрешению ДРУГОГО невидимого в грубом
+      классификаторе (класс, не Unicode-функция)
+    GUARD: ребро INVISIBLE_CLASS_COLLISION (TARGET_KIND: CLASS)
+CONFUSABLES:
+  [ТРЕЩИНА ПРОБЫ, честно: у невидимого нет ВИЗУАЛЬНЫХ двойников. Список
+   ниже — членство в КЛАССЕ невидимых (грубый фильтр), НЕ визуальная
+   похожесть. Формат RULE сохранён для совместимости, но «≠» здесь про
+   различие ФУНКЦИИ, не вида. Рантайм читает только SIGN_RELATIONS ниже.]
+  CONFUSABLE_001:
+    VISIBLE_FORM: (невидим)
+    CODEPOINT: U+200C
+    NAME: ZERO WIDTH NON-JOINER
+    RISK: MEDIUM
+    RULE: ZWNJ ≠ ZWSP (ZWNJ подавляет соединение — персидская орфография)
+  CONFUSABLE_002:
+    VISIBLE_FORM: (невидим)
+    CODEPOINT: U+200D
+    NAME: ZERO WIDTH JOINER
+    RISK: MEDIUM
+    RULE: ZWJ ≠ ZWSP (ZWJ соединяет — эмодзи; Join_Control=YES у ZWJ, NO у ZWSP)
+  CONFUSABLE_003:
+    VISIBLE_FORM: (невидим)
+    CODEPOINT: U+2060
+    NAME: WORD JOINER
+    RISK: MEDIUM
+    RULE: WJ ≠ ZWSP (WJ ЗАПРЕЩАЕТ разрыв — противоположность ZWSP)
+  CONFUSABLE_004:
+    VISIBLE_FORM: (невидим)
+    CODEPOINT: U+FEFF
+    NAME: ZERO WIDTH NO-BREAK SPACE / BOM
+    RISK: MEDIUM
+    RULE: BOM ≠ ZWSP (BOM — маркер порядка байт / no-break)
+  CONFUSABLE_005:
+    VISIBLE_FORM: (невидим)
+    CODEPOINT: U+00AD
+    NAME: SOFT HYPHEN
+    RISK: LOW
+    RULE: SHY ≠ ZWSP (SHY — условный перенос с видимым дефисом при разрыве)
+
+SIGN_RELATIONS:
+  [ИСТОЧНИК ИСТИНЫ ДЛЯ РАНТАЙМА. Три ребра по D-INV-1 (минимум типов).
+   Честно: без канона-кодпоинта — TARGET_KIND: EMPTY_SEQUENCE (D-INV-3),
+   без выдуманного TARGET и без ложного VISUAL_MIMIC_OF.]
+  RELATION_001:
+    RELATION_TYPE: BOUNDARY_DISRUPTOR
+    TARGET_KIND: EMPTY_SEQUENCE
+    CONTEXT_SCOPE: HOST, IDENTIFIER, CODE
+    VERIFICATION_STATUS: VERIFIED
+    RUNTIME_EFFECT: RELATION_ONLY
+  RELATION_002:
+    RELATION_TYPE: INVISIBLE_CLASS_COLLISION
+    TARGET_KIND: CLASS
+    TARGET: zero-width-allowed (грубый классификатор, НЕ Unicode-функция)
+    CONTEXT_SCOPE: IDENTIFIER, CODE
+    VERIFICATION_STATUS: CANDIDATE
+    RUNTIME_EFFECT: RELATION_ONLY
+  RELATION_003:
+    RELATION_TYPE: ABSENCE_CONFUSABLE
+    TARGET_KIND: EMPTY_SEQUENCE
+    CONTEXT_SCOPE: HOST, IDENTIFIER, CODE, EMAIL
+    VERIFICATION_STATUS: VERIFIED
+    RUNTIME_EFFECT: RELATION_ONLY
+
+CONTRADICTION_GUARDS:
+  CG1:
+    TRIGGER: «ZWSP невидим, значит его нет»
+    RESPONSE: INVISIBLE ≠ ABSENT
+    RULE: невидимость — не отсутствие; знак присутствует в потоке байт
+  CG2:
+    TRIGGER: «ZWSP — это пробел»
+    RESPONSE: ZWSP_FORM ≠ SPACE
+    RULE: нулевая ширина, не разделитель слов, другой кодпоинт
+  CG3:
+    TRIGGER: «нормализация уберёт ZWSP»
+    RESPONSE: NFKC_SURVIVAL ≠ LEGITIMACY
+    RULE: невидимые переживают NFC/NFD/NFKC/NFKD — остаются в строке
+  CG4:
+    TRIGGER: «RELATION_FOUND значит угроза»
+    RESPONSE: RELATION_FOUND ≠ THREAT
+    RULE: ребро — «разрывает границу в scope», риск выносит sequence-слой
+  CG5:
+    TRIGGER: «все невидимые можно слепо удалить»
+    RESPONSE: DEFAULT_IGNORABLE ≠ SAFE_TO_DELETE
+    RULE: ZWNJ/ZWJ несут смысл (орфография/эмодзи); удаление исказит
+  CG6:
+    TRIGGER: «нет видимого канона — нет отношения»
+    RESPONSE: NO_CODEPOINT_CANON ≠ NO_RELATION
+    RULE: отношение к границе/классу/пустоте есть без визуального канона
+
+SEQUENCE_LAYER_BOUNDARY:
+  SIGN_SAFE_ALONE ≠ SIGN_SAFE_IN_SEQUENCE: YES
+  SEQUENCE_CANDIDATES: NOT_APPLICABLE
+    [у ZWSP нет собственных литеральных SEQUENCE_CANDIDATES; межзнаковое
+     поведение (ZWSP между метками домена) оценивается через ось
+     «отношение» (active_relation_candidates + _assess_relation_risk),
+     как у маски ／, а не через литеральный кандидат последовательности]
+
+PHAGO_ENTITY_MIMICRY:
+  NOT_APPLICABLE:
+    REASON: ZWSP не выдаёт себя за СУЩНОСТЬ (лицо/бренд/систему) — он
+      разрывает границу и прячется, механизм — диверсия, не олицетворение
+    REVIEW_REQUIRED: YES
+
+============================================================
+8. ADVERSARIAL_COVERAGE — RUN_CARD SEED
+============================================================
+MIN_TOTAL_VECTORS: 12
+CATEGORY_A: FORM_MANIPULATION
+  A1: ZWSP между каждой парой символов домена
+  A2: несколько ZWSP подряд для раздувания длины
+CATEGORY_B: CONTEXT_INJECTION
+  B1: ZWSP в host-части URL без схемы
+  B2: ZWSP в email локальной части
+CATEGORY_C: SEQUENCE_MANIPULATION
+  C1: ZWSP + полноширинная маска ／ вместе (RISK_CASE_003)
+  C2: ZWSP между меткой и TLD (gоogle​.com)
+CATEGORY_D: SEMANTIC_MIMICRY
+  [МЯГКОЕ ТРЕНИЕ: ZWSP не ИМИТИРУЕТ; векторы сформулированы как ДИВЕРСИЯ]
+  D1: ZWSP проходит там, где фильтр «разрешает zero-width» ждёт ZWJ
+  D2: ZWSP имитирует ОТСУТСТВИЕ (ABSENCE_CONFUSABLE) — паддинг «как чисто»
+CATEGORY_E: PHAGO_ENTITY_MIMICRY
+  E1: NOT_APPLICABLE (см. раздел 7; ZWSP не олицетворяет сущность)
+  E2: NOT_APPLICABLE
+CATEGORY_F: SEMANTIC_LAYER_MANIPULATION
+  F1: смена активной эпохи гейтом контекста (типографика → машинная)
+  F2: подача ZWSP в типографическом обрамлении для сокрытия машинного риска
+ACTUAL_TOTAL_VECTORS: 12
+COVERAGE_STATUS: SUFFICIENT
+
+============================================================
+9. MUTATION_CHECK
+============================================================
+MUTATION_01:
+  CLAIM: ZWSP даёт authority_effect
+  EXPECTED: FAIL_FALSE_AUTHORITY
+  RESULT: FAIL
+MUTATION_02:
+  CLAIM: ZWSP исполняется/запускает
+  EXPECTED: FAIL_FALSE_EXECUTION
+  RESULT: FAIL
+MUTATION_03:
+  CLAIM: ZWSP — доказательство/верификация
+  EXPECTED: FAIL_FALSE_VERIFICATION
+  RESULT: FAIL
+MUTATION_04:
+  CLAIM: ZWSP эквивалентен пробелу U+0020
+  EXPECTED: FAIL_FALSE_EQUIVALENCE
+  RESULT: FAIL
+MUTATION_05:
+  CLAIM: ZWSP безопасно удаляется всегда
+  EXPECTED: FAIL_FALSE_SAFE_DELETE (ZWNJ/ZWJ несут смысл)
+  RESULT: FAIL
+MUTATION_06:
+  CLAIM: невидимость = отсутствие в потоке
+  EXPECTED: FAIL_FALSE_ABSENCE
+  RESULT: FAIL
+
+============================================================
+10. KNOWN_OPEN_QUESTIONS
+============================================================
+OQ1:
+  QUESTION: классовый INVISIBLE_DEFAULT_IGNORABLE_GUARD не построен —
+    класс-свойства ZWSP объявить негде
+  STATUS: OPEN
+  BLOCKS_WORKINGLY_CLOSED: YES
+  NOTE: DRAFT п.4.1; зависимость раздела 3 этой карточки
+OQ2:
+  QUESTION: D-GUARD-2 слеп к warned-ребру с ненулевым вердиктом
+    (кандидат D-GUARD-5)
+  STATUS: OPEN
+  BLOCKS_WORKINGLY_CLOSED: NO
+  NOTE: DRAFT п.4.2; граница сторожа, не карточки
+OQ3:
+  QUESTION: детектор _demask НЕ должен слепо удалять ZWNJ/ZWJ (сломает
+    персидскую орфографию / эмодзи) — это ГРАНИЦА ДЕТЕКТОРА, не карточки
+  STATUS: OPEN
+  BLOCKS_WORKINGLY_CLOSED: NO
+  NOTE: DEFAULT_IGNORABLE ≠ SAFE_TO_DELETE; для ZWSP demask корректен
+    (ZWSP в машинном домене — разрыв, удаление реконструирует канон),
+    но для ZWNJ/ZWJ демаск-удаление исказит смысл
+ALL_OPEN_QUESTIONS_CLOSED: NO
+
+============================================================
+11. PATCH_HISTORY
+============================================================
+PATCH_HISTORY:
+  v0_1_PATCH_01: initial creation (проба шаблона на ZWSP 2026-07-12 +
+    AUTHOR_DECISION D-INV-1/2/3) — первая карточка невидимого знака;
+    ось «отношение» расширена типами BOUNDARY_DISRUPTOR /
+    INVISIBLE_CLASS_COLLISION / ABSENCE_CONFUSABLE, TARGET_KIND enum.
+PATCHES_APPLIED: 1
+PATCHES_VERIFIED: 0/1
+
+============================================================
+12. LIMITATION_STATEMENT
+============================================================
+LIMITATION_STATEMENT:
+  THIS_CARD IS A WORKING_DRAFT ARTIFACT (до ARTIFACT_CONFIRMED)
+  NOT A FINAL_STANDARD
+  NOT A PARSER
+  NOT A RUNTIME
+  NOT A SECURITY_CERTIFICATE
+  CONVEYOR_PASS ≠ VALIDATION
+  RUN_CARD_RESULT ≠ FINAL_STATUS
+  WORKINGLY_CLOSED ≠ ARTIFACT_CONFIRMED
+  WORKINGLY_CLOSED ≠ LOCKED_WORKING_CORE
+  DETECTOR_BOUNDARY_NOTE: DEFAULT_IGNORABLE ≠ SAFE_TO_DELETE — _demask
+    детектора НЕ должен слепо удалять все невидимые: удаление ZWNJ/ZWJ
+    исказит смысл (персидская орфография, эмодзи-ZWJ-секвенции), а не
+    очистит. Для ZWSP в машинном контексте (домен/идентификатор) demask
+    корректен — это граница ДЕТЕКТОРА, фиксируется здесь как ограничение,
+    но реализуется в детекторе, не в карточке.
+
+============================================================
+13. INTEGRATION_INTERFACE_STATUS
+============================================================
+INTEGRATION_INTERFACE_STATUS:
+  STATUS: READY_PENDING_CONCRETE_INTEGRATOR
+  ATTACHED_INTEGRATOR_UID: NONE_CURRENTLY_ATTACHED
+  ACTIVE_MODULES_COUNT: 0
+  RUNTIME_ATTACHMENT: NONE
+  PERMANENT_BINDING: NO
+  SESSION_ONLY_BINDING: YES
+  AFTER_RUN_RESIDUE: FORBIDDEN
+
+END_OF_CARD
+------------------------------------------------------------------------
+
+========================================================================
+PART 2 — AUTHOR_DECISION D-INV-1/2/3 (verbatim; RU)
+========================================================================
+------------------------------------------------------------------------
+ЧАСТНЫЙ АВТОРСКИЙ ПРОЕКТ / COMMERCIAL USE PROHIBITED
+
+DOCUMENT_ID: AUTHOR_DECISION_20260712_INVISIBLE_SIGNS_D-INV-1_2_3
+DOCUMENT_TYPE: AUTHOR_DECISION (принято)
+STATUS: ACCEPTED (решение автора)
+AUTHOR: Руслан Малявский (AUTHOR_DECISION_STATUS_AUTHORITY)
+DATE: 2026-07-12
+BASIS: DRAFT_INVISIBLE_SIGNS_SYNTHESIS_2026-07-12 (два потока: конвейер
+       6 моделей + эмпирическая проба шаблона на ZWSP). Закрывает форки
+       1, 2, 3 того черновика. Остальные форки (4–7) остаются открытыми.
+
+════════════════════════════════════════════════════════════════
+D-INV-1 (форк 1 — РАЗМЕР ШАГА): МИНИМУМ ТИПОВ
+════════════════════════════════════════════════════════════════
+Ось «отношение» расширяется МИНИМАЛЬНО — только типами, нужными для
+первой карточки невидимого знака (ZWSP). Прочие типы (VS16-модификатор
+MODIFIES_VISIBLE_HOST, BOM-позиция, RLO-порядок и т.д.) добавляются ПО
+КЕЙСАМ, когда доходим до тех знаков. НЕ проектировать наперёд —
+«божественный relation-объект» с 9 типами и 12-значным каналом наблюдения
+отвергнут (предостережение адверсариального ревьюера).
+
+Для ZWSP введены ровно три RELATION_TYPE:
+  - BOUNDARY_DISRUPTOR       — знак РВЁТ границу точного совпадения.
+                               Доказано запуском: ZWSP на gоog<ZWSP>／le.com.
+                               TARGET_KIND: EMPTY_SEQUENCE.
+  - INVISIBLE_CLASS_COLLISION — невидимый проходит по разрешению ДРУГОГО
+                               невидимого в ГРУБОМ фильтре. Канон — НЕ
+                               Unicode-функция (ZWSP и ZWJ в разных классах:
+                               Join_Control YES/NO), а класс грубого
+                               классификатора. TARGET_KIND: CLASS.
+  - ABSENCE_CONFUSABLE       — визуально неотличим от ОТСУТСТВИЯ знака.
+                               TARGET_KIND: EMPTY_SEQUENCE.
+
+════════════════════════════════════════════════════════════════
+D-INV-2 (форк 3 — RLO / bidi): ОТДЕЛЬНОЕ СЕМЕЙСТВО В ОБЩЕМ КОНВЕРТЕ
+════════════════════════════════════════════════════════════════
+RLO (U+202E) и прочие bidi-контроли — ОТДЕЛЬНОЕ СЕМЕЙСТВО (ORDER_TRANSFORM,
+stateful, SPAN_START/END/TERMINATOR) ВНУТРИ общего конверта SIGN_RELATIONS,
+со своим span-evaluator. НЕ отдельная ось.
+
+ПОЧЕМУ не отдельная ось. Отдельный путь к финальному вердикту — это ровно
+тот прецедент тихого обрыва, который ловили сторожем (relation_verdicts
+доходили до финала единственным ручным путём; второй боковой путь = второе
+место, где всё молча провалится). Bidi живёт в том же конверте, проходит
+тот же сторож (D-GUARD-1..4).
+
+Для ZWSP это НЕ нужно (ZWSP не stateful, не span). Решение зафиксировано
+на будущее, чтобы к RLO не изобретать боковой путь.
+
+════════════════════════════════════════════════════════════════
+D-INV-3 (форк 2 — ПУСТОЙ КАНОН): ЯВНЫЙ enum TARGET_KIND
+════════════════════════════════════════════════════════════════
+Когда у знака нет канона-кодпоинта, это выражается ЯВНЫМ enum
+TARGET_KIND: EMPTY_SEQUENCE. НЕ пустой строкой, НЕ "NULL", НЕ U+0000.
+
+ПОЧЕМУ. Пустое/отсутствующее поле TARGET неотличимо от «забыли заполнить /
+парсер не прочитал / target неизвестен» — это ТИХИЙ ПРОХОД, тот же класс,
+что ловили в детекторе весь день. Явный enum делает «канона нет»
+НАМЕРЕННЫМ и проверяемым, а не совпадающим с ошибкой заполнения.
+
+TARGET_KIND (enum): CODEPOINT | EMPTY_SEQUENCE | CLASS.
+  CODEPOINT      — канон есть, TARGET обязателен (мимикрия: ／→U+002F).
+  EMPTY_SEQUENCE — канона-кодпоинта нет (разрыв/пустота); TARGET опущен.
+  CLASS          — канон = класс грубого фильтра; TARGET несёт имя класса.
+
+════════════════════════════════════════════════════════════════
+РЕАЛИЗАЦИЯ (минимальная, под D-INV-1) — уже в коде
+════════════════════════════════════════════════════════════════
+- core/sign_core_card.py: SignRelation.target_kind (default "CODEPOINT").
+- core/load_card.py: _VALID_TYPE расширен тремя типами; _VALID_TARGET_KIND
+  = {CODEPOINT, EMPTY_SEQUENCE, CLASS}; TARGET_KIND парсится (отсутствует →
+  CODEPOINT); TARGET опционален при kind ≠ CODEPOINT; предупреждения на
+  несогласованность (CODEPOINT без TARGET; EMPTY_SEQUENCE с TARGET; неизвестный
+  kind).
+- single_sign/module_engine.py и sequence/sequence_engine.py: target_kind и
+  relation_type пронесены до кандидата и до вердикта (не роняются на шве —
+  урок аудита), честный тип виден в выводе рантайма.
+
+СОВМЕСТИМОСТЬ (проверено): legacy-карточки (／, ☠, .) без TARGET_KIND →
+default CODEPOINT, TARGET присутствует → без предупреждений, не ломаются.
+
+════════════════════════════════════════════════════════════════
+ЧТО ОСТАЁТСЯ ОТКРЫТЫМ (форки 4–7 черновика, НЕ решены здесь)
+════════════════════════════════════════════════════════════════
+- Форк 4: переименование SIGN_RELATIONS → SIGN_EFFECT_RELATIONS.
+- Форк 5: TARGET_KIND-union против раздельных TARGET+EFFECT (для VS16/RLO).
+- Форк 6: CLASSIFIER_ID для конкретных внешних фильтров.
+- Форк 7: единичный слой ставит LOW за неожиданное присутствие невидимого,
+  или всегда NONE.
+Плюс две побочные находки черновика (не в scope этого решения): классовый
+INVISIBLE_DEFAULT_IGNORABLE_GUARD не построен; D-GUARD-2 слеп к warned-ребру
+с ненулевым вердиктом (кандидат D-GUARD-5).
+
+СВЯЗЬ: DRAFT_INVISIBLE_SIGNS_SYNTHESIS_2026-07-12 (источник форков),
+SIGN_CORE_CARD_FULLWIDTH_SOLIDUS_UFF0F (модель полной карточки),
+ARCH_DECISION_INVISIBLE_SIGNS_HYBRID_C (устарело, п.1.3 черновика — на
+переписывание), первая карточка невидимого: ZERO_WIDTH_SPACE U+200B.
+------------------------------------------------------------------------
+
+========================================================================
+PART 3 — RELATION-AXIS EXTENSION (minimal, D-INV-1/3; verbatim slices)
+========================================================================
+3a. core/sign_core_card.py — SignRelation with the new target_kind field
+    (default "CODEPOINT" so legacy cards are unaffected).
+------------------------------------------------------------------------
+@dataclass
+class SignRelation:
+    """Relation edge between signs (relation axis,
+    AUTHOR_DECISION_20260708, D-REL-2). SOURCE OF TRUTH for the runtime.
+    An edge by itself is NOT risk: RUNTIME_EFFECT=RELATION_ONLY,
+    RELATION_FOUND != THREAT. Mask risk is decided by the sequence layer."""
+    relation_id: str
+    relation_type: str = ""          # mimicry: CONFUSABLE_OF / NFKC_MAPS_TO / VISUAL_MIMIC_OF; invisible (D-INV-1): BOUNDARY_DISRUPTOR / INVISIBLE_CLASS_COLLISION / ABSENCE_CONFUSABLE
+    target: str = ""                 # canon codepoint/sequence; OPTIONAL when target_kind != CODEPOINT (D-INV-3)
+    target_kind: str = "CODEPOINT"   # D-INV-3: CODEPOINT / EMPTY_SEQUENCE / CLASS. Explicit enum, never an empty string (empty = "forgot to fill / parser missed it" = a silent pass). Absent in a card -> CODEPOINT (legacy cards unaffected).
+    context_scope: list = field(default_factory=list)  # URL/HOST/PORT/PATH/EMAIL/IDENTIFIER/IDN/CODE/FREE_TEXT/ANY
+    verification_status: str = ""    # VERIFIED / CANDIDATE / MANUAL_OVERRIDE
+    runtime_effect: str = "RELATION_ONLY"  # hard invariant
+    is_active: bool = True                  # edge can be disabled without deletion (experiments with "disabled" masks)
+    validation_warnings: list = field(default_factory=list)  # bad edge fields (unknown scope/type, effect != RELATION_ONLY)
+------------------------------------------------------------------------
+3b. core/load_card.py — _extract_relations: three new RELATION_TYPEs, the
+    TARGET_KIND enum, TARGET optional when kind != CODEPOINT, and the
+    consistency warnings.
+------------------------------------------------------------------------
+def _extract_relations(root: Node) -> list:
+    """SIGN_RELATIONS block — runtime SOURCE OF TRUTH for relations
+    (relation axis, D-REL-2). Absence of the block = empty list
+    (legacy/standalone sign, D1 via non-intervention).
+    CONFUSABLES is NOT read here — it is documentation/provenance."""
+    section = root.child("SIGN_RELATIONS")
+    if not section:
+        return []
+    _VALID_SCOPE = {"URL", "HOST", "PORT", "PATH", "EMAIL", "IDENTIFIER",
+                    "IDN", "CODE", "FREE_TEXT", "ANY"}
+    # Mimicry types (a visible canon) + invisible types (D-INV-1, minimal set
+    # for ZWSP; more added per case, not designed ahead).
+    _VALID_TYPE = {"CONFUSABLE_OF", "NFKC_MAPS_TO", "VISUAL_MIMIC_OF",
+                   "BOUNDARY_DISRUPTOR", "INVISIBLE_CLASS_COLLISION",
+                   "ABSENCE_CONFUSABLE"}
+    # D-INV-3: the kind of canon a target points at. Explicit enum — an
+    # empty/missing target is indistinguishable from "forgot to fill it in",
+    # exactly the silent-pass class we hunt. Absent -> CODEPOINT (legacy).
+    _VALID_TARGET_KIND = {"CODEPOINT", "EMPTY_SEQUENCE", "CLASS"}
+    out = []
+    for rel in section.children_with_prefix("RELATION_"):
+        scope_raw = rel.child("CONTEXT_SCOPE").text() if rel.child("CONTEXT_SCOPE") else ""
+        scope = [s.strip() for s in scope_raw.replace(",", " ").split() if s.strip()]
+        rtype = rel.child("RELATION_TYPE").text() if rel.child("RELATION_TYPE") else ""
+        target = rel.child("TARGET").text() if rel.child("TARGET") else ""
+        # TARGET_KIND absent -> CODEPOINT, so legacy cards (/, .) keep working.
+        tkind = (rel.child("TARGET_KIND").text()
+                 if rel.child("TARGET_KIND") else "CODEPOINT").strip()
+        reffect = (rel.child("RUNTIME_EFFECT").text()
+                   if rel.child("RUNTIME_EFFECT") else "RELATION_ONLY")
+        active_raw = (rel.child("IS_ACTIVE").text() if rel.child("IS_ACTIVE") else "")
+        is_active = active_raw.strip().upper() not in ("FALSE", "NO", "0", "OFF")
+        # Edge field validation — bad values are flagged but do NOT
+        # break loading (the card stays readable; warning visible on
+        # inspection). Invariant RUNTIME_EFFECT=RELATION_ONLY.
+        warnings = []
+        if not scope:
+            warnings.append("RELATION_WITHOUT_SCOPE: edge has no CONTEXT_SCOPE — will not match any context (except ANY) and silently yields no verdict; check whether scope was omitted")
+        bad_scope = [s for s in scope if s not in _VALID_SCOPE]
+        if bad_scope:
+            warnings.append(f"UNKNOWN_CONTEXT_SCOPE: {bad_scope}")
+        if rtype and rtype not in _VALID_TYPE:
+            warnings.append(f"UNKNOWN_RELATION_TYPE: {rtype!r}")
+        if reffect != "RELATION_ONLY":
+            warnings.append(f"RUNTIME_EFFECT_MUST_BE_RELATION_ONLY: got {reffect!r}")
+        # D-INV-3 target/target_kind consistency
+        if tkind not in _VALID_TARGET_KIND:
+            warnings.append(f"UNKNOWN_TARGET_KIND: {tkind!r} (allowed: CODEPOINT/EMPTY_SEQUENCE/CLASS)")
+        if tkind == "CODEPOINT" and not target:
+            warnings.append("TARGET_KIND_CODEPOINT_WITHOUT_TARGET: a CODEPOINT canon needs a TARGET codepoint")
+        if tkind == "EMPTY_SEQUENCE" and target:
+            warnings.append(f"TARGET_KIND_EMPTY_SEQUENCE_WITH_TARGET: {target!r} — EMPTY_SEQUENCE means no canon codepoint; drop TARGET")
+        out.append(SignRelation(
+            relation_id=rel.key,
+            relation_type=rtype,
+            target=target,
+            target_kind=tkind,
+            context_scope=scope,
+            verification_status=(rel.child("VERIFICATION_STATUS").text()
+                                 if rel.child("VERIFICATION_STATUS") else ""),
+            runtime_effect=reffect,
+            is_active=is_active,
+            validation_warnings=warnings,
+        ))
+    return out
+------------------------------------------------------------------------
+3c. single_sign/module_engine.py — target_kind carried into the relation
+    candidate (not dropped at the module->sequence seam).
+------------------------------------------------------------------------
+"relation_id": r.relation_id,
+                    "relation_type": r.relation_type,
+                    "target": r.target,
+                    "target_kind": r.target_kind,   # D-INV-3: carried, not dropped at the seam
+                    "context_scope": list(r.context_scope),
+                    "verification_status": r.verification_status,
+                    "runtime_effect": r.runtime_effect,
+                    "is_active": r.is_active,   # sequence ignores False when deciding
+                    "at_offset": offset,
+                    "visible_form": card.visible_form,
+                    "canon_hypothesis": None,   # channel for the canon probe
+------------------------------------------------------------------------
+3d. sequence/sequence_engine.py — target_kind + relation_type surfaced in the
+    mask verdict so the honest type is visible in the runtime output.
+------------------------------------------------------------------------
+            verdicts.append({
+                "visible_form": cand.get("visible_form", ""),
+                "target": cand.get("target", ""),
+                "target_kind": cand.get("target_kind", "CODEPOINT"),  # D-INV-3
+                "relation_type": cand.get("relation_type", ""),       # D-INV-1: honest type visible
+                "at_offset": offset,
+                "detected_context": ctx,
+                "protected": protected,
+                "risk_level": risk.value,
+                "canon_hypothesis": None,  # probe deferred (D3)
+                "relation_id": cand.get("relation_id", ""),
+                "tld_source_degraded": tld_degraded,  # D-DET-2
+            })
+------------------------------------------------------------------------
+
+========================================================================
+PART 4 — RAW RUNTIME on gоog<U+200B>／le.com (the known open hole)
+========================================================================
+Measured, not asserted. Hermetic (pinned TLD set). "[CARD_WARNING] …
+WORKING_DRAFT …" boilerplate elided; every data line verbatim. The input is
+g + о(U+043E) + og + U+200B(ZWSP) + ／(U+FF0F) + le.com.
+------------------------------------------------------------------------
+﻿=== ZWSP card load ===
+visible_form repr: '\u200b'  codepoint: U+200B  status: WORKING_DRAFT  zone: Zone.ZONE_2
+edges: 3
+  RELATION_001: type=BOUNDARY_DISRUPTOR target_kind=EMPTY_SEQUENCE target='' scope=['HOST', 'IDENTIFIER', 'CODE'] verif=VERIFIED warnings=[]
+  RELATION_002: type=INVISIBLE_CLASS_COLLISION target_kind=CLASS target='zero-width-allowed (грубый классификатор, НЕ Unicode-функция)' scope=['IDENTIFIER', 'CODE'] verif=CANDIDATE warnings=[]
+  RELATION_003: type=ABSENCE_CONFUSABLE target_kind=EMPTY_SEQUENCE target='' scope=['HOST', 'IDENTIFIER', 'CODE', 'EMAIL'] verif=VERIFIED warnings=[]
+
+=== runtime on the known open hole ===
+input codepoints: U+0067 U+043E U+006F U+0067 U+200B U+FF0F U+006C U+0065 U+002E U+0063 U+006F U+006D
+relation verdicts:
+  RELATION_001 sign=ZWSP  type=BOUNDARY_DISRUPTOR       target_kind=EMPTY_SEQUENCE ctx=HOST      risk=HIGH   protected=True
+  RELATION_002 sign=ZWSP  type=INVISIBLE_CLASS_COLLISION target_kind=CLASS          ctx=HOST      risk=NONE   protected=False
+  RELATION_003 sign=ZWSP  type=ABSENCE_CONFUSABLE       target_kind=EMPTY_SEQUENCE ctx=HOST      risk=HIGH   protected=True
+  RELATION_001 sign=／     type=NFKC_MAPS_TO             target_kind=CODEPOINT      ctx=HOST      risk=HIGH   protected=True
+semantic: hold_pending_review  effective: hold_pending_review  integrity: OK
+
+HONEST?  no load warnings: True  | no false VISUAL_MIMIC_OF: True  | BOUNDARY_DISRUPTOR fired HOST/HIGH: True
+------------------------------------------------------------------------
+Reading: the BOUNDARY_DISRUPTOR edge (TARGET_KIND EMPTY_SEQUENCE, no TARGET)
+fires HOST/HIGH with NO load warning and NO false VISUAL_MIMIC_OF — the honest
+close of the hole that yesterday's probe could only shut via a warning
+(invented type) or a lie (VISUAL_MIMIC_OF U+0020).
+
+========================================================================
+PART 5 — LEGACY NOT BROKEN (measured)
+========================================================================
+Legacy cards (/, and the gate temp-cards that use TARGET with no TARGET_KIND)
+default to CODEPOINT -> no warnings, unchanged behaviour.
+
+﻿=== single pass ===
+[gate_bare_domain_detector.py] EXIT=0 :: TOTAL: 55 OK / 0 FAIL
+[gate_english_only.py] EXIT=0 :: TOTAL: CLEAN — no Cyrillic outside functional data
+[gate_relation_verdict_step4.py] EXIT=0 :: TOTAL: 12 OK / 0 FAIL
+[gate_safeguard.py] EXIT=0 :: TOTAL: 23 OK / 0 FAIL
+[gate_solidus_scheme.py] EXIT=0 :: === TOTAL: 28/28 ===
+
+--- determinism: every gate run 20x, distribution of the TOTAL line ---
+﻿[gate_bare_domain_detector.py] 20x  exit=0 :: TOTAL: 55 OK / 0 FAIL
+[gate_safeguard.py] 20x  exit=0 :: TOTAL: 23 OK / 0 FAIL
+[gate_english_only.py] 20x  exit=0 :: TOTAL: CLEAN — no Cyrillic outside functional data
+[gate_relation_verdict_step4.py] 20x  exit=0 :: TOTAL: 12 OK / 0 FAIL
+[gate_solidus_scheme.py] 20x  exit=0 :: === TOTAL: 28/28 ===
+
+========================================================================
+QUESTIONS TO REVIEWERS
+========================================================================
+Z1. THREE VERDICTS ON ONE SIGN. On gоog<ZWSP>／le.com, ZWSP yields
+    BOUNDARY_DISRUPTOR->HIGH, ABSENCE_CONFUSABLE->HIGH, and
+    INVISIBLE_CLASS_COLLISION->NONE. Are the two HIGHs TWO DISTINCT FACETS of
+    the relation (boundary break + absence-mimicry) or a DUPLICATE that should
+    collapse to one? The author's fork is handed to you. Give BASIS.
+
+Z2. ARE THE TYPES HONEST? BOUNDARY_DISRUPTOR (breaks an exact-match boundary,
+    canon = emptiness), ABSENCE_CONFUSABLE (indistinguishable from the sign's
+    own absence), INVISIBLE_CLASS_COLLISION (passes on another invisible's
+    permission in a coarse filter). Do they describe ZWSP correctly per
+    Unicode, or is any of them forced? Cite the property.
+
+Z3. TARGET_KIND: EMPTY_SEQUENCE. D-INV-3 states an empty canon as an explicit
+    enum, not an empty string. Does this actually close the silent pass? Any
+    way around it (a card that reads as EMPTY_SEQUENCE but means "forgot",
+    or the reverse)?
+
+Z4. CONTEXT. The card says ZWSP in HOST/IDENTIFIER/CODE is an attack, and in
+    Thai/CJK line-breaking is legitimate. Is the CONTEXT_SCOPE on each edge
+    right? What is missed (EMAIL? IDN? PATH?)?
+
+Z5. BYPASSES. Find an input where ZWSP genuinely harms but card+detector
+    return FREE_TEXT/NONE. Trace the whole path (scan_signs -> module_engine
+    -> _assess_relation_risk -> _detect_context_at / _demask). Exact input,
+    exact line.
+
+Z6. THE OPEN DEPENDENCY. The card ships with OQ1 (the class guard does not
+    exist). Is that acceptable for a first round, or must the dependency be
+    closed BEFORE the conveyor? Argue it.
+
+========================================================================
+MY OWN MISTAKES (this assembly + the work behind it, unpolished)
+========================================================================
+1. Three ZWSP verdicts on one input is a design smell I did NOT resolve — I
+   gave both BOUNDARY_DISRUPTOR and ABSENCE_CONFUSABLE a HOST scope, so both
+   fire HIGH on the same domain break. It may be two real facets or a
+   duplicate; I left it (Z1) rather than pick, but a cleaner first card might
+   have scoped ABSENCE_CONFUSABLE away from HOST. Named, not hidden.
+2. The card carries an open dependency (OQ1: the invisible class guard does
+   not exist) yet I still built a full production-shaped card on top of it.
+   That is deliberate per the author, but it means Part 1 asserts structure
+   (REQUIRED_GENERAL_GUARDS) that points at a NOT_YET_BUILT guard — a card
+   that references a thing that isn't there. Honest, but a reviewer should
+   weigh whether that is loadable-but-incomplete or a preflight blocker (Z6).
+3. Recurring across this whole G1/invisible work: I have repeatedly dropped
+   literal Cyrillic homoglyphs into production code comments and had the
+   english-only gate catch them. Not in THIS change (the code here is
+   English), but the pattern is mine and worth flagging to reviewers who
+   trust my code hygiene.
+4. This packet is stitched by an anchor-slicing builder — only as trustworthy
+   as the anchors. Mitigated by a verify pass (each block asserted a substring
+   of its source), but spot-check any block against the repo.
+
+========================================================================
+END OF PACKET
+========================================================================
