@@ -150,16 +150,22 @@ def process_sign(card: SignCoreCard, text: str, offset: int,
             # risk=NONE. Candidates carry ALL edges with the is_active
             # flag (disabled ones for debug/audit; the sequence layer
             # IGNORES is_active=False edges when deciding the verdict).
-            active_relations = [r for r in card.relations if r.is_active]
+            # Level 3 (Z3-02): a CONTRACT-INVALID edge (bad type/kind, canon
+            # mismatch) is neither silently activated nor silently dropped —
+            # it is EXCLUDED from the runtime and SURFACED as a warning.
+            active_relations = [r for r in card.relations
+                                if r.is_active and not r.invalid]
             relation_candidates = [
                 {
                     "relation_id": r.relation_id,
                     "relation_type": r.relation_type,
                     "target": r.target,
+                    "target_kind": r.target_kind,   # D-INV-3: carried, not dropped at the seam
                     "context_scope": list(r.context_scope),
                     "verification_status": r.verification_status,
                     "runtime_effect": r.runtime_effect,
                     "is_active": r.is_active,   # sequence ignores False when deciding
+                    "invalid": r.invalid,       # Level 3: excluded from active, surfaced
                     "at_offset": offset,
                     "visible_form": card.visible_form,
                     "canon_hypothesis": None,   # channel for the canon probe (D-REL-5); filled in the sequence layer where context exists. The fragile canon matcher is not called blindly.
@@ -167,11 +173,16 @@ def process_sign(card: SignCoreCard, text: str, offset: int,
                 for r in card.relations
             ]
             mask_warnings = [draft_warning] if draft_warning else []
+            for r in card.relations:
+                if r.invalid:
+                    mask_warnings.append(
+                        f"INVALID_EDGE_NOT_ACTIVATED: {r.relation_id} "
+                        f"({r.relation_type or 'no-type'}) — {'; '.join(r.validation_warnings)}")
             if not active_relations:
-                # All edges disabled — the mask is silent. Not a risk,
+                # No valid+active edge — the mask is silent. Not a risk,
                 # but a suspicious config state: a soft trace for audit
                 # (risk stays NONE, no candidates for the verdict).
-                mask_warnings.append("ALL_RELATIONS_INACTIVE")
+                mask_warnings.append("ALL_RELATIONS_INACTIVE_OR_INVALID")
             return OutputStatus(
                 sign_codepoint=card.codepoint,
                 card_version=card.card_uid,
@@ -186,11 +197,12 @@ def process_sign(card: SignCoreCard, text: str, offset: int,
                 output_warnings=mask_warnings,
                 relation_candidates=relation_candidates,
                 # Barrier N3 (a technical guarantee, not a comment):
-                # the sequence layer takes ONLY this list. Disabled edges
-                # physically never reach it -> cannot leak into the
+                # the sequence layer takes ONLY this list. Disabled/invalid
+                # edges physically never reach it -> cannot leak into the
                 # verdict. Full relation_candidates stays for debugging.
                 active_relation_candidates=[
-                    c for c in relation_candidates if c["is_active"]
+                    c for c in relation_candidates
+                    if c["is_active"] and not c["invalid"]
                 ],
             )
         raise ModuleError("MATCHER_NOT_FOUND",

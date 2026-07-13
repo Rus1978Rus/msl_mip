@@ -414,9 +414,23 @@ def _looks_like_domain(raw: str, tld_set, degraded: bool) -> bool:
     return _is_tld(labels[-1], tld_set, degraded)
 
 
+def _is_byte_exact_token(s: str) -> bool:
+    """Level 1: a no-space word that would go to an EXACT (byte-for-byte)
+    comparison — an identifier, a keyword, a handle. An invisible/mask break
+    inside it silently defeats that comparison. Requirements: length >= 2,
+    only [alnum / '-' / '_'], NO dot (a dotted thing is a domain, handled
+    above), and at least one LETTER (a pure-digit run like a CJK date
+    '20260711' is not a token going to exact compare -> stays FREE_TEXT)."""
+    if len(s) < 2 or "." in s:
+        return False
+    if not all(ch.isalnum() or ch in "-_" for ch in s):
+        return False
+    return any(ch.isalpha() for ch in s)
+
+
 def _detect_context_at(text: str, offset: int, mask_chars=frozenset()) -> str:
     """Context detector around the mask position (step 4, D2): URL / HOST /
-    PATH / FREE_TEXT.
+    EMAIL / PATH / BYTE_EXACT_TOKEN / FREE_TEXT.
 
     Two passes:
       1. SCHEME (P4): a 'scheme://' is honoured ONLY inside the mask's own
@@ -473,6 +487,7 @@ def _detect_context_at(text: str, offset: int, mask_chars=frozenset()) -> str:
 
     left_part = _demask(token[lead:rel], mask_chars)   # D-DET-1: strip ALL masks,
     right_part = _demask(token[rel + 1:], mask_chars)  # not only the current one
+    whole = _demask(token[lead:], mask_chars)          # the token with ALL masks gone
 
     # host substitution — a domain on BOTH sides of the mask
     # (a.com<mask>evil.com, incl. tails via _domain_prefix in _looks_like_domain)
@@ -483,17 +498,42 @@ def _detect_context_at(text: str, offset: int, mask_chars=frozenset()) -> str:
     # makes the double-mask goog<mask>le.<mask>com collapse to google.com too.
     if _looks_like_domain(left_part + right_part, tld_set, degraded):
         return "HOST"
+    # EMAIL (Level 1): local@domain with the mask anywhere -> the mask breaks
+    # exact matching of an identity token (user<mask>name@example.com).
+    if "@" in whole:
+        at = whole.rfind("@")
+        local, dom = whole[:at], whole[at + 1:]
+        if local and _looks_like_domain(dom, tld_set, degraded):
+            return "EMAIL"
     # a domain then the mask opens a tail -> path segment (readme.md<mask>x);
     # a LEADING structural separator demotes this PATH to FREE_TEXT (D-DET-4).
     if _looks_like_domain(left_part, tld_set, degraded):
         return "FREE_TEXT" if had_leading_structural else "PATH"
+    # BYTE_EXACT_TOKEN (Level 1): a no-space word that goes to an exact compare
+    # (bad<mask>word, user<mask>name). The mask silently breaks the match. We
+    # cannot tell a keyword from an identifier from a bare string (that finer
+    # CODE/IDENTIFIER split is deferred — see the card KNOWN_OPEN), so we name
+    # the honest generic and surface it.
+    if _is_byte_exact_token(whole):
+        return "BYTE_EXACT_TOKEN"
     return "FREE_TEXT"
 
 
+# FRAMING: this is a WITNESS, not a judge. Every level here maps to a
+# RECOMMENDATION surfaced to the human (HIGH -> "hold, look"; MEDIUM ->
+# "queue, look"), never to an automatic block. HOST (a domain break) is the
+# one unambiguous case -> HIGH. EMAIL / BYTE_EXACT_TOKEN / PATH are contexts
+# where an invisible break DEFEATS exact matching but we cannot be sure it is
+# malicious (an identifier, a keyword, a soft-wrapped displayed URL) -> we
+# SURFACE them at MEDIUM rather than assert HIGH. PATH specifically: ZWSP in a
+# DISPLAYED url (soft-wrap) is legitimate, in a MACHINE path it is suspect;
+# we cannot tell display from machine from the string, so PATH stays MEDIUM.
 _SCOPE_RISK = {
-    "HOST": RiskLevel.HIGH,     # host substitution — the main case
+    "HOST": RiskLevel.HIGH,             # host / domain break — the unambiguous case
+    "EMAIL": RiskLevel.MEDIUM,          # identity token exact-match; surfaced, not judged
+    "BYTE_EXACT_TOKEN": RiskLevel.MEDIUM,  # no-space word going to exact compare; can't tell keyword vs identifier -> surface
     "URL": RiskLevel.MEDIUM,
-    "PATH": RiskLevel.MEDIUM,
+    "PATH": RiskLevel.MEDIUM,           # display (soft-wrap) vs machine ambiguity -> not HIGH (Z4-05)
     "FREE_TEXT": RiskLevel.NONE,
 }
 
@@ -505,6 +545,30 @@ def _downgrade(level: RiskLevel) -> RiskLevel:
              RiskLevel.HIGH, RiskLevel.CRITICAL]
     i = order.index(level)
     return order[max(0, i - 1)]
+
+
+# Level 2 (finding S-03): a RELATION_TYPE must be a CONTRACT, not a label.
+# runtime_role says what a type actually DOES at runtime, honestly:
+#   PRIMARY          — emits an INDEPENDENT risk verdict (context-driven).
+#   SUPPORTING_FACET — evidence attached to a primary; does NOT emit a second
+#                      independent risk on the same sign+context (removes the
+#                      Z1 duplicate: ABSENCE_CONFUSABLE no longer double-HIGHs).
+#   TAXONOMY_ONLY    — the type is a described distinction whose runtime check
+#                      does NOT yet exist (e.g. INVISIBLE_CLASS_COLLISION: a
+#                      COARSE external filter's "zero-width allowed" behaviour
+#                      is NOT observable from the input string). Carried and
+#                      surfaced, but does not drive risk — not passed off as a
+#                      working contract.
+# Legacy mimicry types (the ／ mask edge) are PRIMARY -> unchanged behaviour.
+_RELATION_RUNTIME_ROLE = {
+    "BOUNDARY_DISRUPTOR": "PRIMARY",
+    "ABSENCE_CONFUSABLE": "SUPPORTING_FACET",
+    "INVISIBLE_CLASS_COLLISION": "TAXONOMY_ONLY",
+    "CONFUSABLE_OF": "PRIMARY",
+    "NFKC_MAPS_TO": "PRIMARY",
+    "VISUAL_MIMIC_OF": "PRIMARY",
+    "": "PRIMARY",   # no declared type (legacy) -> primary
+}
 
 
 def _assess_relation_risk(text: str, sign_statuses: list) -> list:
@@ -525,15 +589,19 @@ def _assess_relation_risk(text: str, sign_statuses: list) -> list:
         for cand in getattr(st, "active_relation_candidates", []):
             offset = cand.get("at_offset", 0)
             scope_of_edge = set(cand.get("context_scope", []))
+            rtype = cand.get("relation_type", "")
+            role = _RELATION_RUNTIME_ROLE.get(rtype, "PRIMARY")
             ctx = _detect_context_at(text, offset, run_mask_chars)
 
             # PROTECTED_CONTEXT: the real context is in the edge scope
             # (or the edge is ANY). Otherwise the mask is out of scope.
             protected = ("ANY" in scope_of_edge) or (ctx in scope_of_edge)
-            if protected and ctx != "FREE_TEXT":
+            # Level 2: ONLY a PRIMARY type emits an independent risk. A
+            # SUPPORTING_FACET or a TAXONOMY_ONLY type is recorded (its
+            # context/protected are computed for provenance) but does NOT add
+            # a second verdict-driving risk on the same sign.
+            if role == "PRIMARY" and protected and ctx != "FREE_TEXT":
                 risk = _SCOPE_RISK.get(ctx, RiskLevel.MEDIUM)
-                # OBFUSCATION (D-REL-6): substituting a canon with a
-                # mask in protected context — already in the risk level.
             else:
                 risk = RiskLevel.NONE  # RELATION_FOUND != THREAT
 
@@ -545,6 +613,12 @@ def _assess_relation_risk(text: str, sign_statuses: list) -> list:
             verdicts.append({
                 "visible_form": cand.get("visible_form", ""),
                 "target": cand.get("target", ""),
+                # Level 3 (Z3-02): NO silent "CODEPOINT" fallback at this seam.
+                # module_engine always carries target_kind; an empty value here
+                # is surfaced as-is, never quietly migrated to CODEPOINT.
+                "target_kind": cand.get("target_kind", ""),
+                "relation_type": rtype,       # honest type visible (D-INV-1)
+                "runtime_role": role,         # Level 2: PRIMARY/SUPPORTING_FACET/TAXONOMY_ONLY
                 "at_offset": offset,
                 "detected_context": ctx,
                 "protected": protected,

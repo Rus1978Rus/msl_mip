@@ -112,13 +112,25 @@ def _extract_relations(root: Node) -> list:
     if not section:
         return []
     _VALID_SCOPE = {"URL", "HOST", "PORT", "PATH", "EMAIL", "IDENTIFIER",
-                    "IDN", "CODE", "FREE_TEXT", "ANY"}
-    _VALID_TYPE = {"CONFUSABLE_OF", "NFKC_MAPS_TO", "VISUAL_MIMIC_OF"}
+                    "IDN", "CODE", "FREE_TEXT", "ANY", "BYTE_EXACT_TOKEN"}
+    # Mimicry types (a visible canon) + invisible types (D-INV-1, minimal set
+    # for ZWSP; more added per case, not designed ahead).
+    _VALID_TYPE = {"CONFUSABLE_OF", "NFKC_MAPS_TO", "VISUAL_MIMIC_OF",
+                   "BOUNDARY_DISRUPTOR", "INVISIBLE_CLASS_COLLISION",
+                   "ABSENCE_CONFUSABLE"}
+    # D-INV-3: the kind of canon a target points at. Explicit enum — an
+    # empty/missing target is indistinguishable from "forgot to fill it in",
+    # exactly the silent-pass class we hunt. Absent -> CODEPOINT (legacy).
+    _VALID_TARGET_KIND = {"CODEPOINT", "EMPTY_SEQUENCE", "CLASS"}
     out = []
     for rel in section.children_with_prefix("RELATION_"):
         scope_raw = rel.child("CONTEXT_SCOPE").text() if rel.child("CONTEXT_SCOPE") else ""
         scope = [s.strip() for s in scope_raw.replace(",", " ").split() if s.strip()]
         rtype = rel.child("RELATION_TYPE").text() if rel.child("RELATION_TYPE") else ""
+        target = rel.child("TARGET").text() if rel.child("TARGET") else ""
+        # TARGET_KIND absent -> CODEPOINT, so legacy cards (/, .) keep working.
+        tkind = (rel.child("TARGET_KIND").text()
+                 if rel.child("TARGET_KIND") else "CODEPOINT").strip()
         reffect = (rel.child("RUNTIME_EFFECT").text()
                    if rel.child("RUNTIME_EFFECT") else "RELATION_ONLY")
         active_raw = (rel.child("IS_ACTIVE").text() if rel.child("IS_ACTIVE") else "")
@@ -127,6 +139,7 @@ def _extract_relations(root: Node) -> list:
         # break loading (the card stays readable; warning visible on
         # inspection). Invariant RUNTIME_EFFECT=RELATION_ONLY.
         warnings = []
+        invalid = False  # Level 3 (Z3-02): a CONTRACT violation, not just a note
         if not scope:
             warnings.append("RELATION_WITHOUT_SCOPE: edge has no CONTEXT_SCOPE — will not match any context (except ANY) and silently yields no verdict; check whether scope was omitted")
         bad_scope = [s for s in scope if s not in _VALID_SCOPE]
@@ -134,17 +147,33 @@ def _extract_relations(root: Node) -> list:
             warnings.append(f"UNKNOWN_CONTEXT_SCOPE: {bad_scope}")
         if rtype and rtype not in _VALID_TYPE:
             warnings.append(f"UNKNOWN_RELATION_TYPE: {rtype!r}")
+            invalid = True
         if reffect != "RELATION_ONLY":
             warnings.append(f"RUNTIME_EFFECT_MUST_BE_RELATION_ONLY: got {reffect!r}")
+            invalid = True
+        # D-INV-3 target/target_kind consistency — a broken canon contract is
+        # INVALID, not a soft note: an edge that lies about its canon must not
+        # silently participate (nor silently vanish — it is surfaced).
+        if tkind not in _VALID_TARGET_KIND:
+            warnings.append(f"UNKNOWN_TARGET_KIND: {tkind!r} (allowed: CODEPOINT/EMPTY_SEQUENCE/CLASS)")
+            invalid = True
+        if tkind == "CODEPOINT" and not target:
+            warnings.append("TARGET_KIND_CODEPOINT_WITHOUT_TARGET: a CODEPOINT canon needs a TARGET codepoint")
+            invalid = True
+        if tkind == "EMPTY_SEQUENCE" and target:
+            warnings.append(f"TARGET_KIND_EMPTY_SEQUENCE_WITH_TARGET: {target!r} — EMPTY_SEQUENCE means no canon codepoint; drop TARGET")
+            invalid = True
         out.append(SignRelation(
             relation_id=rel.key,
             relation_type=rtype,
-            target=rel.child("TARGET").text() if rel.child("TARGET") else "",
+            target=target,
+            target_kind=tkind,
             context_scope=scope,
             verification_status=(rel.child("VERIFICATION_STATUS").text()
                                  if rel.child("VERIFICATION_STATUS") else ""),
             runtime_effect=reffect,
             is_active=is_active,
+            invalid=invalid,
             validation_warnings=warnings,
         ))
     return out

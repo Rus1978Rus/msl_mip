@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import sys
 import os
+import unicodedata
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "core"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "single_sign"))
@@ -242,6 +243,100 @@ def _integrity_check(semantic_action: str, seq_out, cards: list):
     return violations, concerns
 
 
+# --- INVISIBLE_UNCARDED_REGISTRAR (D-INV witness channel) ------------------
+# A LIGHT witness, not a judge. The pipeline above only processes signs that
+# have a loaded card (scan_signs keys on card.visible_form) — so an invisible
+# character with NO card is simply never seen: it passes in total silence. That
+# silence is the danger, not the character. The registrar closes that gap by
+# NOTICING such a character and SURFACING it as a fact — nothing more.
+#
+# It obeys the whole project stance (this is an ALERT system, not an antivirus;
+# the machine is a witness, never judge or executioner):
+#   - it does NOT decide risk (records never enter semantic/effective_action);
+#   - it does NOT delete or "clean" (Default_Ignorable != safe-to-delete);
+#   - it does NOT touch carded signs (ZWSP has a card now -> excluded here);
+#   - its finding is TRIVALENT and honest: not "dangerous", not "safe", but
+#     UNVERIFIABLE — "there is no card, I cannot verify this; here are the
+#     facts, hold it and look by eye". The last word stays with the human.
+#
+# Trigger = an invisible/format code point with no card: General_Category=Cf,
+# OR a Bidi_Control, OR a Default_Ignorable_Code_Point. Python's stdlib carries
+# no Default_Ignorable property table, so that arm is an HONEST APPROXIMATION —
+# a curated set of the well-known ranges (declared as such, not sold as full
+# coverage). Ordinary whitespace (space/newline/tab -> Zs/Cc, not Cf) is NOT
+# flagged; this channel is only for the truly invisible.
+
+_BIDI_CONTROL_CLASSES = {
+    "LRE", "RLE", "LRO", "RLO", "PDF", "LRI", "RLI", "FSI", "PDI",
+}
+
+# Curated approximation of Default_Ignorable_Code_Point ranges that are NOT
+# already General_Category=Cf (those are caught by the Cf arm). Honest scope:
+# the well-known stable ones (soft-hidden joiners, fillers, variation
+# selectors). Declared as an approximation on purpose — see D-INV note above.
+_DEFAULT_IGNORABLE_EXTRA_RANGES = (
+    (0x034F, 0x034F),      # COMBINING GRAPHEME JOINER (Mn)
+    (0x115F, 0x1160),      # HANGUL CHOSEONG/JUNGSEONG FILLER (Lo)
+    (0x17B4, 0x17B5),      # KHMER VOWEL INHERENT AQ/AA (Mn)
+    (0x180B, 0x180F),      # MONGOLIAN FREE/VOWEL SEPARATORS (Mn/Cf)
+    (0x3164, 0x3164),      # HANGUL FILLER (Lo)
+    (0xFE00, 0xFE0F),      # VARIATION SELECTOR-1..16 (Mn)
+    (0xFFA0, 0xFFA0),      # HALFWIDTH HANGUL FILLER (Lo)
+    (0xFFF0, 0xFFF8),      # unassigned, Default_Ignorable (Cn)
+    (0xE0100, 0xE01EF),    # VARIATION SELECTOR-17..256 (Mn)
+)
+
+
+def _invisible_reason(ch: str) -> str:
+    """Why this code point counts as an uncarded-invisible trigger, or ''
+    if it does not. Cf first (the broadest, most reliable arm), then bidi
+    control, then the curated Default_Ignorable approximation."""
+    if unicodedata.category(ch) == "Cf":
+        return "FORMAT_CHAR"          # General_Category=Cf
+    if unicodedata.bidirectional(ch) in _BIDI_CONTROL_CLASSES:
+        return "BIDI_CONTROL"
+    cp = ord(ch)
+    for lo, hi in _DEFAULT_IGNORABLE_EXTRA_RANGES:
+        if lo <= cp <= hi:
+            return "DEFAULT_IGNORABLE"
+    return ""
+
+
+def scan_uncarded_invisibles(text: str, cards: list) -> list:
+    """Witness pass: report every invisible/format code point that has NO
+    loaded card. Returns a list of ACK_GAP witness records (never verdicts).
+    Carded code points are excluded — the registrar is for the UNKNOWN only."""
+    carded = {ord(c.visible_form) for c in cards if len(c.visible_form) == 1}
+    records = []
+    for i, ch in enumerate(text):
+        if ord(ch) in carded:
+            continue                  # a card exists — the normal path handles it
+        reason = _invisible_reason(ch)
+        if not reason:
+            continue
+        try:
+            name = unicodedata.name(ch)
+        except ValueError:
+            name = "UNNAMED / UNASSIGNED CODE POINT"
+        records.append({
+            "codepoint": f"U+{ord(ch):04X}",
+            "at_offset": i,
+            "unicode_name": name,
+            "category": unicodedata.category(ch),
+            "trigger": reason,
+            # witness fields — deliberately NOT a risk_level:
+            "card_status": "NOT_CREATED",
+            "finding_status": "UNVERIFIABLE",   # ACK_GAP_TRIVALENT: not safe, not dangerous
+            "finding_basis": (
+                f"invisible code point ({reason}) with no card -> intent "
+                f"cannot be verified by the system"),
+            "recommendation": (
+                "hold and look by eye; not judged safe and not judged "
+                "dangerous; Default_Ignorable != safe-to-delete"),
+        })
+    return records
+
+
 def analyze(text: str, cards: list) -> dict:
     """Full text run through all layers. Returns a report structure
     for printing (and possible programmatic use)."""
@@ -296,6 +391,13 @@ def analyze(text: str, cards: list) -> dict:
         integrity_status = "OK"
         effective_action = semantic_action
 
+    # --- INVISIBLE_UNCARDED_REGISTRAR (witness channel, D-INV) ---
+    # Run LAST and kept in its OWN field. It is deliberately NOT folded into
+    # single_actions / relation_actions / semantic_action: an UNVERIFIABLE
+    # witness record must never masquerade as a risk verdict. The human reads
+    # it alongside the verdict, not inside it.
+    uncarded_invisibles = scan_uncarded_invisibles(text, cards)
+
     return {
         "text": text,
         "sign_statuses": sign_statuses,
@@ -307,6 +409,7 @@ def analyze(text: str, cards: list) -> dict:
         "integrity_status": integrity_status,
         "integrity_violations": integrity_violations,
         "integrity_concerns": integrity_concerns,
+        "uncarded_invisibles": uncarded_invisibles,
     }
 
 
@@ -344,9 +447,26 @@ def print_report(report: dict) -> None:
     if seq_out.relation_verdicts:
         print("\n--- RELATION (MASK) VERDICTS ---")
         for v in seq_out.relation_verdicts:
-            print(f"  [{v['at_offset']}] {v['visible_form']} -> {v['target']} "
+            # relation_type/runtime_role make the "one PRIMARY verdict, the
+            # rest supporting facets" story legible — otherwise three lines at
+            # the same offset look like three independent verdicts.
+            rtype = v.get("relation_type", "")
+            role = v.get("runtime_role", "")
+            tag = f"[{rtype}/{role}] " if rtype or role else ""
+            print(f"  [{v['at_offset']}] {v['visible_form']} {tag}-> {v['target']} "
                   f"context={v['detected_context']} risk={v['risk_level']} "
                   f"protected={v['protected']}")
+
+    invis = report.get("uncarded_invisibles", [])
+    if invis:
+        # A WITNESS block, printed on its own — never inside the verdict.
+        print("\n--- UNCARDED INVISIBLE SIGNS (WITNESS, not a verdict) ---")
+        for r in invis:
+            print(f"  [{r['at_offset']}] {r['codepoint']} ({r['unicode_name']}) "
+                  f"[{r['category']}/{r['trigger']}]")
+            print(f"        card: {r['card_status']}   finding: {r['finding_status']}")
+            print(f"        basis: {r['finding_basis']}")
+            print(f"        -> to the human: {r['recommendation']}")
 
     print("\n" + "=" * 60)
     sem = report["semantic_action"]

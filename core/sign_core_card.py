@@ -98,12 +98,14 @@ class SignRelation:
     An edge by itself is NOT risk: RUNTIME_EFFECT=RELATION_ONLY,
     RELATION_FOUND != THREAT. Mask risk is decided by the sequence layer."""
     relation_id: str
-    relation_type: str = ""          # CONFUSABLE_OF / NFKC_MAPS_TO / VISUAL_MIMIC_OF
-    target: str = ""                 # canon codepoint/sequence
+    relation_type: str = ""          # mimicry: CONFUSABLE_OF / NFKC_MAPS_TO / VISUAL_MIMIC_OF; invisible (D-INV-1): BOUNDARY_DISRUPTOR / INVISIBLE_CLASS_COLLISION / ABSENCE_CONFUSABLE
+    target: str = ""                 # canon codepoint/sequence; OPTIONAL when target_kind != CODEPOINT (D-INV-3)
+    target_kind: str = "CODEPOINT"   # D-INV-3: CODEPOINT / EMPTY_SEQUENCE / CLASS. Explicit enum, never an empty string (empty = "forgot to fill / parser missed it" = a silent pass). Absent in a card -> CODEPOINT (legacy cards unaffected).
     context_scope: list = field(default_factory=list)  # URL/HOST/PORT/PATH/EMAIL/IDENTIFIER/IDN/CODE/FREE_TEXT/ANY
     verification_status: str = ""    # VERIFIED / CANDIDATE / MANUAL_OVERRIDE
     runtime_effect: str = "RELATION_ONLY"  # hard invariant
     is_active: bool = True                  # edge can be disabled without deletion (experiments with "disabled" masks)
+    invalid: bool = False                   # Level 3 (Z3-02): a CONTRACT violation (unknown type/kind, CODEPOINT w/o TARGET, EMPTY_SEQUENCE w/ TARGET). An invalid edge is NOT silently activated NOR silently dropped — it is surfaced.
     validation_warnings: list = field(default_factory=list)  # bad edge fields (unknown scope/type, effect != RELATION_ONLY)
 
 
