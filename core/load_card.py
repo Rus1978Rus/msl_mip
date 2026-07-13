@@ -112,7 +112,8 @@ def _extract_relations(root: Node) -> list:
     if not section:
         return []
     _VALID_SCOPE = {"URL", "HOST", "PORT", "PATH", "EMAIL", "IDENTIFIER",
-                    "IDN", "CODE", "FREE_TEXT", "ANY", "BYTE_EXACT_TOKEN"}
+                    "IDN", "CODE", "FREE_TEXT", "ANY", "BYTE_EXACT_TOKEN",
+                    "HIDDEN_BOUNDARY_PADDING"}
     # Mimicry types (a visible canon) + invisible types (D-INV-1, minimal set
     # for ZWSP; more added per case, not designed ahead).
     _VALID_TYPE = {"CONFUSABLE_OF", "NFKC_MAPS_TO", "VISUAL_MIMIC_OF",

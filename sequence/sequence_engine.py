@@ -336,6 +336,14 @@ def _strip_label_invisibles(s: str) -> str:
     return "".join(ch for ch in s if not _is_domain_label_invisible(ch))
 
 
+def _has_alnum(s: str) -> bool:
+    """A side of the mask is 'content-bearing' iff it has at least one
+    alphanumeric char (F-NEW-2 root 2A). Deliberately NOT '== a full domain':
+    a real in-label mask (goog<mask>le.com) has halves ('goog', 'le.com') where
+    neither half is a domain on its own, yet the concat IS one."""
+    return any(ch.isalnum() for ch in s)
+
+
 # D-DET-4 (FIX_FIRST round 2, 2026-07-12): a LEADING structural separator
 # is not a wrapper. The positive scan below skips leading non-domain
 # characters to see past wrappers ((, ", *, …); but /, \, ?, #, :, @ carry
@@ -558,10 +566,37 @@ def _detect_context_at(text: str, offset: int, mask_chars=frozenset()) -> str:
     if _looks_like_domain(left_part, tld_set, degraded) \
             and _looks_like_domain(right_part, tld_set, degraded):
         return "HOST"
+    # F-NEW-2 root 2A (P1 leading / P2 trailing): a hidden zero-width at the
+    # very START or END of a domain-shaped token is PADDING (defeats a
+    # byte-exact match of the domain), NOT a label break -> not HOST/HIGH. But
+    # removing the false HIGH must NOT open a silent PASS (the padding would slip
+    # through) -> a MEDIUM fallback, never pass. The padding tell: the whole
+    # reconstructs to a domain, yet one side of the mask is empty/blank (no
+    # alnum). A genuine in-label mask (goog<ZWSP>le.com) has alnum on BOTH
+    # sides, so it is NOT caught here.
+    if _looks_like_domain(whole, tld_set, degraded) \
+            and not (_has_alnum(left_part) and _has_alnum(right_part)):
+        return "HIDDEN_BOUNDARY_PADDING"
     # mask inserted INSIDE one domain (goog<mask>le.com -> google.com). D-DET-1
     # makes the double-mask goog<mask>le.<mask>com collapse to google.com too.
-    if _looks_like_domain(left_part + right_part, tld_set, degraded):
-        return "HOST"
+    # F-NEW-2 root 2B (P4 after-domain / P5 deep-path): DOMAIN_PREFIX_FOUND !=
+    # SIGN_IS_INSIDE_DOMAIN. A leading domain prefix in the reconstruction does
+    # NOT mean the mask broke the host — the mask may sit in the path. Bind it
+    # to POSITION: the mask lands at index len(left_part) in the reconstruction
+    # (the mask char itself is removed); fire HOST only if that index is INSIDE
+    # the host label span [.. host_end). At/after host_end the mask is in the
+    # path/tail -> fall through to PATH. This (the "host-span" form) also keeps
+    # the multi-label case honest: www.example.com<mask>.evil.com reconstructs
+    # to ONE longer host, the mask is inside it -> still HOST (a simpler
+    # "left is not itself a domain" test would wrongly drop that one). Both
+    # sides must be content-bearing (2A handles an empty side above).
+    if _has_alnum(left_part) and _has_alnum(right_part):
+        recon = left_part + right_part
+        if _looks_like_domain(recon, tld_set, degraded):
+            host = _domain_prefix(recon)
+            host_end = recon.find(host) + len(host)
+            if len(left_part) < host_end:
+                return "HOST"
     # EMAIL (Level 1): local@domain with the mask anywhere -> the mask breaks
     # exact matching of an identity token (user<mask>name@example.com).
     if "@" in whole:
@@ -598,6 +633,10 @@ _SCOPE_RISK = {
     "BYTE_EXACT_TOKEN": RiskLevel.MEDIUM,  # no-space word going to exact compare; can't tell keyword vs identifier -> surface
     "URL": RiskLevel.MEDIUM,
     "PATH": RiskLevel.MEDIUM,           # display (soft-wrap) vs machine ambiguity -> not HIGH (Z4-05)
+    # F-NEW-2 root 2A: a hidden zero-width padding a whole domain at its edge —
+    # not a label break (not HIGH), but a real evasion of byte-exact matching
+    # that must be surfaced, never a silent pass -> MEDIUM.
+    "HIDDEN_BOUNDARY_PADDING": RiskLevel.MEDIUM,
     "FREE_TEXT": RiskLevel.NONE,
 }
 
@@ -654,7 +693,13 @@ def _assess_relation_risk(text: str, sign_statuses: list) -> list:
             offset = cand.get("at_offset", 0)
             scope_of_edge = set(cand.get("context_scope", []))
             rtype = cand.get("relation_type", "")
-            role = _RELATION_RUNTIME_ROLE.get(rtype, "PRIMARY")
+            # M4-precondition: an UNKNOWN relation_type must NOT default to
+            # PRIMARY (the old dangerous default — an unrecognised type would
+            # then emit an INDEPENDENT risk verdict). It maps to INVALID_EDGE:
+            # no independent risk, surfaced as an integrity concern. (In
+            # practice load_card already marks unknown types invalid and they
+            # are filtered upstream; this is defence-in-depth at the seam.)
+            role = _RELATION_RUNTIME_ROLE.get(rtype, "INVALID_EDGE")
             ctx = _detect_context_at(text, offset, run_mask_chars)
 
             # PROTECTED_CONTEXT: the real context is in the edge scope

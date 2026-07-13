@@ -308,7 +308,7 @@ SIGN_RELATIONS:
       [рвёт границу точного совпадения; ЕДИНСТВЕННЫЙ самостоятельный вердикт
        ZWSP — реальный контракт, VERIFIED прогоном на gоog<ZWSP>／le.com]
     TARGET_KIND: EMPTY_SEQUENCE
-    CONTEXT_SCOPE: HOST, EMAIL, BYTE_EXACT_TOKEN, PATH
+    CONTEXT_SCOPE: HOST, EMAIL, BYTE_EXACT_TOKEN, PATH, HIDDEN_BOUNDARY_PADDING
     VERIFICATION_STATUS: VERIFIED
     RUNTIME_EFFECT: RELATION_ONLY
   RELATION_002:
@@ -473,16 +473,44 @@ OQ5:
     MEDIUM). Корень: ветка «маска внутри домена» (_domain_prefix терпит
     хвост-путь); различающий сигнал — до-масочный кусок токена уже содержит
     / ? #.
-  STATUS: OPEN
-  BLOCKS_WORKINGLY_CLOSED: YES
+  STATUS: RESOLVED (F-NEW-2 patch, 2026-07-13)
+  BLOCKS_WORKINGLY_CLOSED: NO (was YES)
   SEVERITY: HIGH
     [это СИСТЕМА ОПОВЕЩЕНИЯ: ложная тревога критична — подрывает доверие
      человека к HOLD. Не косметика — чинить, не откладывать бессрочно.]
   SCOPE: ОБЩИЙ детектор — задевает и маску ／ (U+FF0F), и все 55 кейсов
     bare-domain. Фикс требует полного ре-гейта 55 + регрессии на ／, поэтому
     отдельным пакетом, а не внутри этого коммита невидимых.
-  RESOLUTION: NEXT_SESSION_FIX (НЕ «отложено навсегда» — чинится следующим
-    заходом; заведено здесь, чтобы не потерялось до фикса)
+  RESOLUTION: CLOSED by F-NEW-2 root 2B — HOST fires only if the mask index is
+    INSIDE the host span (len(left_part) < host_end of the reconstruction);
+    past the host -> PATH. NB: the ORIGINAL hypothesis above (pre-mask token
+    already contains / ? #) proved INSUFFICIENT — it missed P5-style deep paths;
+    the host-span check replaced it. docs.example.com/guide/very-long<ZWSP>-
+    section now reads PATH/MEDIUM.
+OQ-HBP:
+  QUESTION: HIDDEN_BOUNDARY_PADDING — НОВЫЙ контекст (F-NEW-2 root 2A) для
+    ведущей/хвостовой невидимки у ЦЕЛОГО домена (<ZWSP>paypal.com,
+    paypal.com<ZWSP>): не разрыв метки (не HOST/HIGH), но и не молчаливый PASS
+    → MEDIUM/QUEUE как fallback от pass.
+  STATUS: OPEN
+  BLOCKS_WORKINGLY_CLOSED: NO
+  NEEDS: суд конвейера — правильная ли это отдельная сущность-контекст, верен ли
+    риск MEDIUM, не плодит ли контексты без нужды (не подвид ли BYTE_EXACT_TOKEN).
+    Идёт на конвейер с пачкой F-NEW-3.
+OQ-SOLIDUS-DRIFT:
+  QUESTION: детектор ／ (СОЛИДУС, ARTIFACT_CONFIRMED) теперь читает
+    example.com,／test и gоogle.com*／path как PATH, а не HOST. Патч карточки
+    ZWSP задел зону ГОТОВОГО артефакта — ПЕРВЫЙ подтверждённый ДРЕЙФ.
+  STATUS: OPEN
+  BLOCKS_WORKINGLY_CLOSED: NO
+  SEVERITY: MEDIUM
+    [позиционно PATH вернее старого over-read HOST (гейт солидуса сам звал это
+     квирком); но изменение поведения ARTIFACT_CONFIRMED-детектора обязано
+     пройти ре-валидацию, не тихо.]
+  NEEDS: ре-валидация карточки СОЛИДУСА сегодняшним инструментом (BY_CODE),
+    как у ZWSP. Связь: ARTIFACT_CONFIRMED привязан к ВЕРСИИ инструмента —
+    инструмент изменился → статус солидуса надо переподтвердить. На конвейер
+    с пачкой F-NEW-3.
 ALL_OPEN_QUESTIONS_CLOSED: NO
 
 ============================================================

@@ -265,22 +265,21 @@ check("my-host／name.com -> HOST/HIGH (known_behavior: 'my-host'+'name.com' "
       "attack here, just two hyphenated/dotted fragments coinciding)",
       _ctx(card, "my-host／name.com") == "HOST" and _risk(card, "my-host／name.com") == "HIGH",
       (_ctx(card, "my-host／name.com"), _risk(card, "my-host／name.com")))
-check("example.com,／test -> HOST/HIGH (known_behavior: the comma stops the "
-      "positive-extraction run before 'test', so the concatenated check "
-      "just re-derives the left-hand domain and fires HOST rather than "
-      "PATH; 'test' is silently dropped from consideration)",
-      _ctx(card, "example.com,／test") == "HOST" and _risk(card, "example.com,／test") == "HIGH",
+check("example.com,／test -> PATH/MEDIUM (F-NEW-2 2B corrected the D-DET-3 "
+      "over-read: the ／ mask sits AFTER the whole domain example.com, in the "
+      "path position, so the host-span check reads PATH not the old quirk "
+      "HOST; risk MEDIUM not HIGH)",
+      _ctx(card, "example.com,／test") == "PATH" and _risk(card, "example.com,／test") == "MEDIUM",
       (_ctx(card, "example.com,／test"), _risk(card, "example.com,／test")))
-# D-DET-3 addendum (round 2): a mask AFTER the domain reads as HOST, not
-# PATH. 'gоogle.com*／path' — the '*' ends the positive run at 'gоogle.com',
-# and both the left-only check and the concat check re-derive that domain
-# and fire HOST; the ／ mask actually sits in the PATH segment. Kin to the
-# concatenation FPs (same rough-heuristic root), but a distinct mechanism
-# (trailing wrapper, not gluing). Documented/accepted, pinned, not fixed.
-check("gоogle.com*／path -> HOST/HIGH (known_behavior: mask AFTER the domain; "
-      "the trailing '*' ends the run at gоogle.com so it reads HOST, not the "
-      "PATH the mask position would suggest — D-DET-3 addendum)",
-      _ctx(card, "gоogle.com*／path") == "HOST" and _risk(card, "gоogle.com*／path") == "HIGH",
+# D-DET-3 addendum, NOW CLOSED by F-NEW-2 2B (2026-07-13): a mask AFTER the
+# domain used to read HOST. 'gоogle.com*／path' — the '*' ends the positive
+# run at 'gоogle.com'; the ／ mask actually sits in the PATH segment. The
+# host-span check (mask index vs host_end) binds the verdict to POSITION, so
+# this now correctly reads PATH — what the mask position always suggested.
+check("gоogle.com*／path -> PATH/MEDIUM (F-NEW-2 2B: mask AFTER the domain; the "
+      "／ sits past gоogle.com in the path, so the host-span check now reads "
+      "PATH — what the mask position always suggested — not the old quirk HOST)",
+      _ctx(card, "gоogle.com*／path") == "PATH" and _risk(card, "gоogle.com*／path") == "MEDIUM",
       (_ctx(card, "gоogle.com*／path"), _risk(card, "gоogle.com*／path")))
 
 # --- Deferred to v0.5 (known, not fixed in this round) ---
