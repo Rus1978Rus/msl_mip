@@ -443,9 +443,20 @@ CATEGORY_D: SEMANTIC_MIMICRY
   [МЯГКОЕ ТРЕНИЕ: ZWSP не ИМИТИРУЕТ; векторы сформулированы как ДИВЕРСИЯ]
   D1: ZWSP проходит там, где фильтр «разрешает zero-width» ждёт ZWJ
   D2: ZWSP имитирует ОТСУТСТВИЕ (ABSENCE_CONFUSABLE) — паддинг «как чисто»
-CATEGORY_E: PHAGO_ENTITY_MIMICRY
-  E1: NOT_APPLICABLE (см. раздел 7; ZWSP не олицетворяет сущность)
-  E2: NOT_APPLICABLE
+CATEGORY_E: PHAGO_ENTITY_MIMICRY — N/A_ACTIVELY_VERIFIED (прогон 2026-07-13)
+  [PHAGO=NOT_APPLICABLE, но правило «N/A по фаго проверяется ОТДЕЛЬНО» → это не
+   отписка «NOT_APPLICABLE», а 2 АКТИВНЫХ вектора: попытки заставить ZWSP создать
+   ложную принадлежность к сущности, которые ПРОВАЛИВАЮТСЯ на движке, подтверждая
+   N/A. RESULT = вывод детектора, не догадка.]
+  E1: попытка ZWSP как сущность-сигнал РОЛИ — «admin<ZWSP>istrator»
+    OBSERVED: детектор → BYTE_EXACT_TOKEN / MEDIUM (разрыв токена), НЕ entity-мимикрия
+    RESULT: N/A ПОДТВЕРЖДЁН — роль «administrator» несут ВИДИМЫЕ БУКВЫ (убрать ZWSP →
+      «administrator» цел); ZWSP своей функцией ложной принадлежности не создаёт
+  E2: попытка ZWSP создать принадлежность к БРЕНДУ — «paypal<ZWSP>.com»
+    OBSERVED: детектор → HOST / HIGH (разрыв домена)
+    RESULT: N/A ПОДТВЕРЖДЁН — бренд-схожесть «paypal.com» эмерджентна из СТРОКИ
+      (видимые буквы), цела без ZWSP; мимикрия (если возникает) на уровне
+      ПОСЛЕДОВАТЕЛЬНОСТИ, не одиночного знака (согласовано с PHAGO_BASIS, раздел 7)
 CATEGORY_F: SEMANTIC_LAYER_MANIPULATION
   F1: смена активной эпохи гейтом контекста (типографика → машинная)
   F2: подача ZWSP в типографическом обрамлении для сокрытия машинного риска
@@ -484,6 +495,42 @@ MUTATION_06:
   CLAIM: невидимость = отсутствие в потоке
   EXPECTED: FAIL_FALSE_ABSENCE
   RESULT: FAIL
+
+MUTATION_CHECK_RUNTIME (engine-verified, прогон msl_mip_runtime 2026-07-13 —
+  РЕАЛЬНЫЕ мутации кодпоинта/контекста/scope/типа/target_kind; RESULT = вывод
+  ДЕТЕКТОРА на прогоне, не предположение; MUTATION_01-06 выше — семантические,
+  об EFFECT_FIELDS; эти — рантаймовые, о поведении детектора):
+  MR_01_CODEPOINT_BINDING:
+    CLAIM: любой невидимый в домене срабатывает как ZWSP
+    METHOD: goog<U+2062>le.com (U+2062 вместо U+200B)
+    OBSERVED: ZWSP-ребро НЕ сработало; U+2062 → witness (UNVERIFIABLE); verdict pass
+    RESULT: FAIL (карта bound к U+200B; чужой невидимый → witness, не ZWSP-вердикт)
+  MR_02_CONTEXT_GATING:
+    CLAIM: ZWSP даёт фиксированный риск независимо от контекста
+    METHOD: goog<ZWSP>le.com / bad<ZWSP>word / «просто <ZWSP> текст»
+    OBSERVED: HOST=HIGH, BYTE_EXACT_TOKEN=MEDIUM, FREE_TEXT=NONE
+    RESULT: FAIL (риск контекст-зависим — гейтится _detect_context_at)
+  MR_03_SCOPE_PROTECTION:
+    CLAIM: риск не зависит от CONTEXT_SCOPE ребра
+    METHOD: temp-карта без HOST в scope BOUNDARY_DISRUPTOR; goog<ZWSP>le.com
+    OBSERVED: ctx=HOST, но protected=False → risk NONE, verdict pass
+    RESULT: FAIL (scope гейтит риск; HOST вне scope → NONE)
+  MR_04_UNKNOWN_TYPE_SAFETY:
+    CLAIM: неизвестный RELATION_TYPE эмитит риск как PRIMARY
+    METHOD: temp-карта RELATION_TYPE=FOOBAR_UNKNOWN_TYPE; goog<ZWSP>le.com
+    OBSERVED: INVALID_EDGE_NOT_ACTIVATED (1 ребро), исключено, риск не эмитит
+    RESULT: FAIL (неизвестный тип → INVALID_EDGE, не PRIMARY-дефолт)
+  MR_05_FACET_ROLE_GATING:
+    CLAIM: ABSENCE_CONFUSABLE не эмитит риск ни при каком типе
+    METHOD: temp-карта ABSENCE_CONFUSABLE→BOUNDARY_DISRUPTOR; goog<ZWSP>le.com
+    OBSERVED: как SUPPORTING_FACET → NONE; сменив тип на PRIMARY → HOST/HIGH
+    RESULT: FAIL (эмиссия гейтится РОЛЬЮ/типом, не фиксирована — дедуп реален)
+  MR_06_TARGET_KIND_ENFORCEMENT:
+    CLAIM: TARGET_KIND CODEPOINT без TARGET активируется молча
+    METHOD: temp-карта TARGET_KIND EMPTY_SEQUENCE→CODEPOINT (TARGET не добавлен)
+    OBSERVED: INVALID_EDGE_NOT_ACTIVATED (1 ребро), surfaced, не активирован
+    RESULT: FAIL (CODEPOINT требует TARGET; контракт-нарушение → INVALID_EDGE)
+  MUTATION_CHECK_RUNTIME_TOTAL: 6 (все FAIL = движок держит инвариант при мутации)
 
 ============================================================
 10. KNOWN_OPEN_QUESTIONS
