@@ -1,0 +1,784 @@
+ЧАСТНЫЙ АВТОРСКИЙ ПРОЕКТ / COMMERCIAL USE PROHIBITED
+
+DOCUMENT_ID: CONVEYOR_PACKET_ZWSP_CARD_REVIEW
+VERSION: v0_1
+DATE: 2026-07-13
+STATUS: ACTIVE_PACKET
+PROJECT: MSL/MIP — Malyavsky Syntax Language / Malyavsky Invariant Protocol
+PACKET_TYPE: REVIEW
+PACKET_SUBTYPE: FILLED_CARD_PREFLIGHT_REVIEW
+TARGET: карточка ZWSP (U+200B) — ПЕРВАЯ карточка класса «невидимые знаки».
+  Цель раунда: пройти STRUCTURAL_PREFLIGHT_PASS + CONVEYOR_REVIEW_PASS (были
+  ПРОСКОЧЕНЫ — симуляция обогнала ревью). Целевой статус после раунда:
+  WORKINGLY_CLOSED_PENDING_CLASS_GUARD.
+
+============================================================
+0. ОБЯЗАТЕЛЬНЫЕ ПРАВИЛА (для любого пакета)
+============================================================
+ISOLATED_PACKET_DELIVERY_MANDATORY: оценивай ТОЛЬКО содержимое этого пакета и
+  приложенной карточки (ниже, byte-exact), не по памяти о других задачах.
+VERIFY_BEFORE_TRUST_MANDATORY: ссылки на другие документы проекта — проверяй по
+  первоисточнику, не по пересказу.
+AUTHOR_DECISION_STATUS_AUTHORITY: вердикт ревьюера = РЕКОМЕНДАЦИЯ, не финальный
+  статус; статус присваивает автор через AUTHOR_DECISION.
+PER_FINDING_STATUS_AND_BASIS_MANDATORY: КАЖДАЯ находка несёт
+  FINDING_STATUS: VERIFIED | REJECTED | UNVERIFIABLE и FINDING_BASIS
+  (METHOD+TARGET+OBSERVED — чем/где/что найдено). Голое «проверил» = не основание.
+
+============================================================
+КОНТЕКСТ (что УЖЕ пройдено — НЕ пере-проверять в этом раунде)
+============================================================
+- SIMULATION_GATE (TIER_2): пройдена BY_CODE. Батарея 21/21, mutation-adequacy 5/5,
+  reconcile по кортежу, oracle-манифест. Артефакт:
+  conveyor_runs/SIMULATION_ARTIFACT_ZERO_WIDTH_SPACE_U200B_TIER2_BY_CODE_v0_2_RU.md.
+- PHAGO_ENTITY_MIMICRY: NOT_APPLICABLE, VERIFIED (conveyor 9 reviewers 8:1 + author
+  decision). Критерий: RULE_PHAGO_APPLICABILITY_v0_1. Природа PHAGO — ОТКРЫТЫЙ
+  УЗЕЛ (OPEN_NODE_PHAGO_NATURE), НЕ предмет этого ревью.
+- OQ1 (классовый гард INVISIBLE_DEFAULT_IGNORABLE_GUARD) переклассифицирован в
+  CLASS_FRONT_DEPENDENCY, BLOCKS_WORKINGLY_CLOSED: NO (гард строится на классе
+  ≥3 знаков — не блокер первой карточки).
+- F-NEW-4 (query) / F-NEW-5 (userinfo) общего детектора закрыты;
+  OQ-SHARED-DETECTOR-BOUNDARY: RESOLVED.
+
+============================================================
+A. МАТЕРИАЛ
+============================================================
+REQUIRED: карточка ZWSP — приложена BYTE-EXACT ниже (раздел CARD_CONTENT).
+NOT_REQUIRED_FOR_THIS_ROUND: код детектора (покрыт симуляцией),
+  OPEN_NODE_PHAGO_NATURE, классовый гард — это отдельные фронты, не ревьюить.
+
+============================================================
+B. ЗАДАНИЕ
+============================================================
+B.1 ЧТО ПРОВЕРЯЕТСЯ: (1) структурная полнота, (2) внутренняя консистентность,
+  (3) готовность как ПЕРВОЙ карточки класса невидимых (задаёт прецедент класса).
+  Против: SIGN_CORE_CARD_CONVEYOR_RULES_GEN3_v0_3_R1 (раздел 2, REQUIRED_FIELDS).
+
+B.2 ВОПРОСЫ (каждый — с FINDING_STATUS + BASIS):
+  Q1. STRUCTURAL_PREFLIGHT: все REQUIRED_FIELDS на месте? (META 14 полей;
+      LAYER_A: BASE_MODE/FORMULA, SIGN_CATEGORY, WHAT_THIS_SIGN_IS_NOT ≥10,
+      BASE_FORMULAS ≥10; LAYER_B: SAFE ≥6, RISK ≥6, CONFUSABLES ≥5,
+      CONTRADICTION_GUARDS ≥6, SEQUENCE_LAYER_BOUNDARY, PHAGO; LAYER_C: 10
+      EFFECT_FIELDS + ALL_NONE + CLOSED_SCHEMA; DOC: ADVERSARIAL_COVERAGE
+      (3 поля), MUTATION_CHECK ≥6, KNOWN_OPEN_QUESTIONS).
+      Само-preflight автора: 33/34 PASS (единственный FAIL — Q2 ниже).
+  Q2. ★ КЛЮЧЕВОЕ (прецедент класса): CONFUSABLES у НЕВИДИМОГО знака. Правило
+      требует ≥5, но у ZWSP НЕТ визуальных двойников (он невидим) → в карточке
+      стоит CONFUSABLES: NOT_APPLICABLE + обоснование + отдельный блок
+      FUNCTIONAL_NEIGHBORS (5 соседей по КЛАССУ невидимых — НЕ спутываемость по
+      виду). ВОПРОС: приемлемо ли NOT_APPLICABLE для CONFUSABLES у невидимого
+      знака (по аналогии с SEQUENCE_LAYER_BOUNDARY и PHAGO, которым правило
+      ЯВНО разрешает NOT_APPLICABLE с обоснованием), ИЛИ правило ≥5 должно
+      строго соблюдаться? Правило ≥5 не содержит явного исключения для
+      невидимых. Это ПРЕЦЕДЕНТ — решение задаст норму для VS16/ZWJ/RLO/BOM.
+  Q3. ВНУТРЕННЯЯ КОНСИСТЕНТНОСТЬ: RISK_CASES контексты/уровни/RUNTIME_STATUS
+      совпадают с RUNTIME_REALITY (обещания=дело)? SIGN_RELATIONS (3 ребра:
+      BOUNDARY_DISRUPTOR/ABSENCE_CONFUSABLE/INVISIBLE_CLASS_COLLISION) —
+      типы/scope/verification/RUNTIME_ROLE консистентны? Нет ли поля, которое
+      обещает больше, чем система делает?
+  Q4. PHAGO: NOT_APPLICABLE + PHAGO_REVIEW: VERIFIED + PHAGO_BASIS по критерию +
+      PHAGO_INTERACTION_ROLE: ENABLER_ONLY + PHAGO_ROBUST (по 3 прочтениям).
+      Обоснование достаточно и воспроизводимо? (природу PHAGO НЕ обсуждать —
+      это OPEN_NODE).
+  Q5. СТАТУСНЫЙ БЛОК: DOCUMENT_STATUS: WORKING_DRAFT (machine-gate поле, оставлен
+      намеренно) + LIFECYCLE_STATUS: VALIDATED_BY_TOOL/PENDING_CONVEYOR_REVIEW +
+      VALIDATION_METHOD + CLASS_ROLE + PATH_TO_ARTIFACT. Честно ли отражает
+      реальность? Готова ли карточка к переходу WORKINGLY_CLOSED_PENDING_CLASS_
+      GUARD после этого ревью?
+  Q6. КАК ПЕРВАЯ КАРТОЧКА КЛАССА: какой прецедент она задаёт для невидимых, и
+      есть ли структурные пробелы, которые аукнутся на следующих (VS16/ZWJ/RLO)?
+
+B.3 КЛАССИФИКАЦИЯ НАХОДОК: CRITICAL_ISSUE / MAJOR_ISSUE / MINOR_ISSUE /
+  TRACE_ONLY_NOTE.
+
+B.4 ЧТО НЕ ВХОДИТ В ЭТОТ РАУНД: природа PHAGO (OPEN_NODE), классовый гард,
+  код общего детектора, повторная симуляция (пройдена).
+
+============================================================
+C. DELIVERABLE_FORMAT
+============================================================
+REVIEW_RESULT:
+  REVIEWER: <модель>
+  MODEL_FAMILY: <семейство> (MODEL_FAMILY_DIVERSITY_REQUIRED: ≥3 семейств суммарно)
+  ANSWERS_TO_QUESTIONS: ответ на Q1..Q6, каждый с FINDING_STATUS + FINDING_BASIS
+  CRITICAL_ISSUES: <count + список>
+  MAJOR_ISSUES: <count + список>
+  MINOR_ISSUES: <count + список>
+  TRACE_ONLY_NOTES: <список>
+  VERDICT: ACCEPT / ACCEPT_WITH_PATCHES / REJECT
+  READY_FOR_WORKINGLY_CLOSED_PENDING_CLASS_GUARD: YES / NO / YES_AFTER_PATCHES
+
+REQUIRED_REVIEWERS: минимум 3, MINIMUM_REVIEWER_FAMILIES: 3 (прецедент черепа:
+  5/5 ревьюеров — Grok/Gemini/Kimi/GPT-5.5 + 1, APPROVE / APPROVE_WITH_FIXES).
+FINDING_STATUS_RULE: VERIFIED | REJECTED | UNVERIFIABLE; UNVERIFIABLE — законный
+  ответ; догадка, выданная за проверку, — нет. BASIS_MINIMUM = METHOD+TARGET+OBSERVED.
+
+CONVEYOR_EXIT_CONDITION:
+  ALL_REVIEWERS_ACCEPT → READY_FOR: WORKINGLY_CLOSED_PENDING_CLASS_GUARD
+  ANY_CRITICAL → REJECTED, патч-цикл → возврат к WORKING_DRAFT с открытым списком
+  ACCEPT_WITH_PATCHES (большинство) → применить патчи, при необходимости повторный раунд
+  Q2 (CONFUSABLES-прецедент) — если расхождение → REQUIRES_ARBITRATION (AUTHOR_DECISION):
+    правило класса или карточка меняется, не молча.
+
+============================================================
+CARD_CONTENT (byte-exact, приложенная карточка — источник истины для ревью)
+============================================================
+ЧАСТНЫЙ АВТОРСКИЙ ПРОЕКТ / COMMERCIAL USE PROHIBITED
+
+CARD_UID: SIGN_CORE_CARD_ZERO_WIDTH_SPACE_U200B_GEN3_v0_3_RU
+CODEPOINT: U+200B
+VISIBLE_FORM: ​
+INSPECTION_LABEL: ⟦ZWSP U+200B⟧
+  [поле-метка для чтения глазами: VISIBLE_FORM выше содержит ЛИТЕРАЛЬНЫЙ
+   невидимый U+200B (рантайм сканит text по нему). Прочитать VISIBLE_FORM
+   человек не может — INSPECTION_LABEL закрывает трещину пробы.]
+UNICODE_NAME: ZERO WIDTH SPACE
+ZONE: ZONE_2
+DOCUMENT_STATUS: WORKING_DRAFT
+LIFECYCLE_STATUS: VALIDATED_BY_TOOL / PENDING_CONVEYOR_REVIEW
+  [РЕАЛЬНАЯ позиция в жизненном цикле (AUTHOR_DECISION D-ZWSP-STATUS 2026-07-13).
+   DOCUMENT_STATUS выше НАМЕРЕННО оставлен WORKING_DRAFT — это MACHINE-GATE поле
+   (module_engine._VALID_STATUSES). Карточка НЕ прошла внешний конвейер-ревью,
+   рантайм ОБЯЗАН продолжать предупреждать CARD_NOT_CONVEYOR_REVIEWED. Менять
+   DOCUMENT_STATUS на VALIDATED_* нельзя: (1) сломает код (значение не в
+   _VALID_STATUSES) при прямом запрете трогать код; (2) погасило бы ВЕРНОЕ
+   предупреждение «не отревьюено». Симуляция обогнала ревью; порядок канона
+   (card→конвейер→симуляция→код) восстанавливается прохождением ревью — см.
+   PATH_TO_ARTIFACT ниже.]
+VALIDATION_METHOD: TWO_LEGGED_SIMULATION + MUTATION_ADEQUACY_5/5 + RECONCILE_BY_TUPLE
+CLASS_ROLE: METHOD_REFERENCE_SPECIMEN
+  [первый невидимый знак класса, проведённый строгим инструментом — эталон метода]
+TEMPLATE_LINE: GEN3_v0_3
+SOURCE_TEMPLATE: SIGN_CORE_CARD_TEMPLATE_GEN3_v0_3_R1_RU
+AUTHOR: Руслан Малявский
+CREATED_AT: 2026-07-12
+VERSION: v0_1
+AUTHOR_DECISION_REFERENCE: foundation_layer/AUTHOR_DECISION_20260712_INVISIBLE_SIGNS_D-INV-1_2_3.md
+AUTHOR_DECISION_REFERENCE_STATUS: foundation_layer/AUTHOR_DECISION_20260713_D-ZWSP-STATUS.md
+RUN_CARD_REFERENCE: conveyor_runs/SIMULATION_ARTIFACT_ZERO_WIDTH_SPACE_U200B_TIER2_BY_CODE_v0_2_RU.md
+RUN_CARD_STATUS: SIMULATION_DONE (BY_CODE 19/21; U1/D2 = SHARED_DETECTOR_BOUNDARY, не провал ZWSP)
+PATH_TO_ARTIFACT:
+  1. пройти STRUCTURAL_PREFLIGHT_PASS + CONVEYOR_REVIEW_PASS (проскочены — симуляция
+     обогнала внешнее ревью; пройти, чтобы восстановить порядок канона)
+  2. → WORKINGLY_CLOSED_PENDING_CLASS_GUARD
+  3. построить INVISIBLE_DEFAULT_IGNORABLE_GUARD (из >=3 разных невидимых) + ре-валидация
+  4. → ARTIFACT_CONFIRMED
+DISPLAY_NAME: невидимый пробел нулевой ширины (zero width space)
+
+============================================================
+1. UNIVERSALITY / CONVEYOR_DISCIPLINE
+============================================================
+BOUND_TO_SPECIFIC_SIGN: YES
+AFTER_USE_RESIDUE: FORBIDDEN
+SIGN_DATA_IS_SESSION_ONLY: YES
+STATUS_PROGRESSION_TRACKER:
+  WORKING_DRAFT: YES
+  STRUCTURAL_PREFLIGHT_PASS: PENDING
+  CONVEYOR_REVIEW_PASS: PENDING
+  WORKINGLY_CLOSED: PENDING (target: WORKINGLY_CLOSED_PENDING_CLASS_GUARD)
+  SIMULATION_GATE_TIER: TIER_2 (ZONE_2)
+  SIMULATION_GATE_PASSED: BY_TOOL_DONE (BY_CODE 19/21; формальный gate — после конвейер-ревью)
+  ARTIFACT_CONFIRMED: PENDING (blocked ТОЛЬКО классовым гардом — CLASS_FRONT, не дефект карточки)
+
+============================================================
+3. REQUIRED_GENERAL_GUARDS
+============================================================
+REQUIRED_GENERAL_GUARDS:
+  - SIGN_FALSE_EFFECT_MIMICRY_GUARD_v0_2A_RU
+    GUARD_COMPATIBILITY: GUARD_COMPATIBILITY_RULE_GEN3
+    GUARD_REVISION: v0_2A
+    TEMPLATE_LINE_COMPATIBLE: GEN3_v0_3, GEN3_v0_3_R1
+  - INVISIBLE_DEFAULT_IGNORABLE_GUARD: NOT_YET_BUILT
+    [ОТКРЫТЫЙ ФРОНТ, честно: классовый гард невидимых (невидимость,
+     неудаляемость NFKC, strip/flag/log) обещан ARCH_DECISION_INVISIBLE_
+     SIGNS_HYBRID_C, но НЕ построен (DRAFT п.4.1). Класс-свойства ZWSP
+     объявить пока негде. Ссылка стоит как маркер незакрытой зависимости.]
+FAILURE_RESPONSE:
+  REJECT_FALSE_EFFECT_MIMICRY
+  TREAT_AS_DATA_ONLY
+  NO_AUTHORITY_EFFECT
+  NO_EXECUTION_EFFECT
+  NO_TRUST_EFFECT
+  NO_EXISTENCE_EFFECT
+
+============================================================
+4. SIGN IDENTITY — LAYER_A
+LAYER_A_LOCK: PERMANENT
+============================================================
+VISIBLE_FORM: ​  (литеральный U+200B; см. INSPECTION_LABEL выше)
+LOOKS_SIMILAR_IS_NOT_SAME_SIGN: NO
+  [знак невидим — «похожесть» неприменима; отношения ниже строятся НЕ на
+   визуальном сходстве, а на разрыве границы / классе фильтра / отсутствии]
+RAW_SIGN_INPUT_STATUS: DATA_ONLY
+BASE_MODE: DATA_ONLY_INVISIBLE_CONTROL
+BASE_MODE_FORMULA: ZWSP_FORM ≠ EFFECT
+SIGN_CATEGORY:
+  - format_control (Unicode Cf)
+  - invisible / zero-advance-width
+  - default_ignorable_code_point
+WHAT_THIS_SIGN_IS_NOT:
+  1. NOT_SPACE (U+0020 — имеет ширину и рендерится)
+  2. NOT_A_CANON_IT_MIMICS (не изображает никакой видимый знак)
+  3. NOT_REMOVABLE_BY_NFC_NFD_NFKC_NFKD (переживает всю нормализацию)
+  4. NOT_A_VISIBLE_GLYPH (нулевая ширина, читателю не виден)
+  5. NOT_A_MANDATORY_LINE_BREAK (только ВОЗМОЖНОСТЬ переноса)
+  6. NOT_SEMANTIC_CONTENT (читателю ничего не сообщает)
+  7. NOT_A_JOINER (это ZWJ U+200D)
+  8. NOT_A_NON_JOINER (это ZWNJ U+200C)
+  9. NOT_A_WORD_JOINER_OR_BOM (U+2060 / U+FEFF)
+  10. NOT_AN_AUTHORITY_OR_EXECUTION_BEARER
+BASE_FORMULAS:
+  ZWSP_FORM ≠ EFFECT
+  ZWSP_FORM ≠ SPACE
+  INVISIBLE ≠ ABSENT
+  ZWSP_FORM ≠ CANON
+  NFKC_SURVIVAL ≠ LEGITIMACY
+  BREAK_OPPORTUNITY ≠ BREAK
+  ZWSP ≠ AUTHORITY
+  PRESENCE_IN_TOKEN ≠ TOKEN_STRUCTURE
+  ZWSP_FORM ≠ VISUAL_MIMICRY
+  ZWSP_PRESENCE ≠ WORD_BOUNDARY_MEANING
+
+============================================================
+5. SEMANTIC_EPOCH_TRACKER  (ZONE_2)
+SEMANTIC_EPOCH_TRACKER_LOCK: REVIEWABLE
+============================================================
+EPOCH_TRACKER: CONTEXT_GATE_REQUIRED
+APPLICABILITY: APPLICABLE
+REASON: у знака два устойчивых substrate: типографический (перенос) и
+  машинный (диверсия точного совпадения).
+CAPTURE_HISTORY:
+  EPOCH_1:
+    DATE_RANGE: ~1991 (Unicode 1.0) — настоящее время
+    SUBSTRATE: типографика / раскладка текста
+    FUNCTION: невидимая ТОЧКА ПЕРЕНОСА строки без видимого пробела
+      (длинные URL, сегментация в тайском/CJK без пробелов)
+    EVIDENCE: Unicode Standard, UAX#14 (line breaking)
+    STATUS: ACTIVE_IN_TYPOGRAPHY
+  EPOCH_2:
+    DATE_RANGE: ~2000-е — настоящее время (эпоха фильтр-эвазии)
+    SUBSTRATE: латинские машинные строки (домены, идентификаторы, код)
+    FUNCTION: невидимая ДИВЕРСИЯ точного совпадения — разрыв токена/
+      домена/ключевого слова для обхода byte-exact фильтров
+    EVIDENCE: практика фишинга/фильтр-эвазии; проба детектора 2026-07-12
+    STATUS: ACTIVE_ATTACK
+ACTIVE_EPOCH:
+  STATUS: CONTEXT_GATE_REQUIRED
+  PRIMARY_ACTIVE_EPOCH: NONE_GLOBAL
+LAYER_ANOMALY:
+  ABSENT_PHYSICAL_LAYER: YES (цифровой генезис; управляющий символ; глифа
+    не было НИКОГДА — ни письменного, ни жестового)
+  NOTE: чистый цифровой контроль без физического субстрата
+STACK_RULES:
+  Higher_epoch_suppresses_lower_in_modern_contexts: PARTIAL
+  Lower_epoch_may_reactivate_in_historical_or_specialized_contexts: YES
+  Context_gate_determines_active_epoch: REQUIRED
+  Absent_layer_anomaly_must_be_flagged_for_integrator: YES
+
+============================================================
+6. EFFECT_FIELDS — LAYER_C
+LAYER_C_LOCK: SESSION
+============================================================
+authority_effect: NONE
+trust_effect: NONE
+verification_effect: NONE
+proof_effect: NONE
+execution_effect: NONE
+permission_effect: NONE
+status_effect: NONE
+role_assignment_effect: NONE
+runtime_effect: NONE
+existence_effect: NONE
+EFFECT_FIELDS_ALL_NONE: YES
+CLOSED_SCHEMA: YES
+
+============================================================
+7. LAYER_B
+LAYER_B_LOCK: REVIEWABLE
+============================================================
+SAFE_CASES:
+  SAFE_CASE_001:
+    INPUT: длинный URL с ZWSP как точкой переноса в вёрстке
+    CONTEXT: типографика
+    EXPECTED: INFO
+    RISK: NONE
+    GUARD: BREAK_OPPORTUNITY ≠ BREAK
+  SAFE_CASE_002:
+    INPUT: тайский/CJK текст с ZWSP как сегментатором слов
+    CONTEXT: типографика не-пробельных письменностей
+    EXPECTED: INFO
+    RISK: NONE
+    GUARD: ZWSP_PRESENCE ≠ WORD_BOUNDARY_MEANING
+    SEMANTIC_STATUS: LEGITIMATE_USE
+      [U+200B — класс переноса строки ZW (UAX#14); в CJK/тайском это законный
+       сегментатор слов, семантически безопасен]
+    IMPLEMENTATION_STATUS: NOT_RECOGNIZED_WITHOUT_EXTERNAL_TYPOGRAPHY_CONTEXT
+      [детектор НЕ различает типографику от машинной строки без внешнего
+       typography-контекста; чинить кодом нельзя — эвристика «CJK=безопасно»
+       откроет пропуск маски в CJK-ДОМЕНЕ (gоog<ZWSP>le.中国). Честность
+       карточки, не эвристика — решение конвейера 5/5.]
+    CURRENT_RUNTIME_EXPECTATION: MAY_QUEUE
+      [CJK-токен с ZWSP схлопывается в BYTE_EXACT_TOKEN → детектор МОЖЕТ дать
+       MEDIUM/QUEUE. Карточка НЕ обещает автоматический PASS, которого код не
+       даёт (claim=evidence). НЕ баг — честная граница до typography-контекста
+       (v0.5). См. T1 в oracle-манифесте, OQ по typography-контексту.]
+  SAFE_CASE_003:
+    INPUT: «символ ZWSP имеет кодпоинт U+200B» (упоминание знака)
+    CONTEXT: учебный/цитирование
+    EXPECTED: INFO
+    RISK: NONE
+    GUARD: mention ≠ use
+  SAFE_CASE_004:
+    INPUT: намеренный ZWSP в строковом литерале кода (тест-фикстура)
+    CONTEXT: исходный код с явным намерением
+    EXPECTED: INFO
+    RISK: NONE
+    GUARD: ZWSP_FORM ≠ EFFECT
+  SAFE_CASE_005:
+    INPUT: одиночный ZWSP в свободном тексте без структуры
+    CONTEXT: свободный текст
+    EXPECTED: INFO
+    RISK: NONE
+    GUARD: INVISIBLE ≠ ABSENT (но вне защищённого контекста — не угроза)
+  SAFE_CASE_006:
+    INPUT: ZWSP в HTML-разметке как soft-wrap подсказка
+    CONTEXT: веб-вёрстка
+    EXPECTED: INFO
+    RISK: NONE
+    GUARD: BREAK_OPPORTUNITY ≠ BREAK
+RISK_CASES:
+  [RISK_CASE_RUNTIME_STATUS (обещания=реальность): VERIFIED — кейс РЕАЛЬНО
+   срабатывает прогоном (проба 2026-07-12); PENDING — систему СЕЙЧАС этот
+   кейс НЕ производит (контекст даёт NONE, либо тип TAXONOMY_ONLY/
+   SUPPORTING_FACET риска не эмитит). Уровень RISK ниже = то, что ВЫДАЁТ
+   детектор, не то, что «хотелось бы». Детектор различает контексты
+   HOST/EMAIL/PATH/BYTE_EXACT_TOKEN/FREE_TEXT; CODE и IDENTIFIER отдельно
+   НЕ различает — см. KNOWN_OPEN OQ4.]
+  RISK_CASE_001:
+    NAME: DOMAIN_LABEL_BREAK_EVASION
+    INPUT: gоog​le.com (невидимый разрыв метки)
+    CONTEXT: HOST
+    RISK: HIGH
+    RUNTIME_STATUS: VERIFIED
+    ATTACK: невидимый разрыв точного совпадения — byte-exact блоклист
+      промахивается мимо домена
+    GUARD: ось «отношение», ребро BOUNDARY_DISRUPTOR, scope HOST
+  RISK_CASE_002:
+    NAME: KEYWORD_SPLIT_EVASION
+    INPUT: bad​word (разрыв ключевого слова)
+    CONTEXT: BYTE_EXACT_TOKEN
+    RISK: MEDIUM
+    RUNTIME_STATUS: VERIFIED
+      [РЕАЛЬНОСТЬ: детектор не различает CODE/IDENTIFIER/policy — все
+       схлопываются в BYTE_EXACT_TOKEN → MEDIUM (не HIGH). Раньше карта
+       обещала HIGH+CODE, чего система не производит; приведено к делу.
+       Тонкое различение — KNOWN_OPEN OQ4.]
+    ATTACK: разрыв ключевого слова обходит policy-фильтр точного совпадения
+    GUARD: ребро BOUNDARY_DISRUPTOR, scope BYTE_EXACT_TOKEN
+  RISK_CASE_003:
+    NAME: ZWSP_PLUS_MASK_DOMAIN_BREAK
+    INPUT: gоog​／le.com (ZWSP + маска рвут домен вместе)
+    CONTEXT: HOST
+    RISK: HIGH
+    RUNTIME_STATUS: VERIFIED
+    ATTACK: комбинация невидимого разрыва и полноширинной маски —
+      ДОКАЗАНО запуском (проба 2026-07-12, известная открытая дыра)
+    GUARD: BOUNDARY_DISRUPTOR + demask собирает домен → HOST
+  RISK_CASE_004:
+    NAME: INVISIBLE_PADDING_HIDDEN_TEXT
+    INPUT: невидимый паддинг между символами для сокрытия/раздувания
+    CONTEXT: FREE_TEXT
+    RISK: NONE
+    RUNTIME_STATUS: PENDING
+      [ЧЕСТНО: в FREE_TEXT детектор выдаёт NONE, а ABSENCE_CONFUSABLE теперь
+       SUPPORTING_FACET (самостоятельного риска не эмитит). Система СЕЙЧАС
+       этот кейс НЕ поднимает — не выдаём за сработавший. Ждёт отдельного
+       захода (детекция паддинга/раздувания вне защищённого контекста).]
+    ATTACK: скрытый текст / невидимое раздувание длины
+    GUARD: ребро ABSENCE_CONFUSABLE (эвиденция, не самостоятельный вердикт)
+  RISK_CASE_005:
+    NAME: IDENTIFIER_TOKEN_SPLIT
+    INPUT: user​name как «другой» идентификатор
+    CONTEXT: BYTE_EXACT_TOKEN
+    RISK: MEDIUM
+    RUNTIME_STATUS: VERIFIED
+      [РЕАЛЬНОСТЬ: контекст детектора — BYTE_EXACT_TOKEN (IDENTIFIER/CODE у
+       детектора нет); MEDIUM совпал с прогоном.]
+    ATTACK: split идентификатора обходит сравнение имён
+    GUARD: BOUNDARY_DISRUPTOR, scope BYTE_EXACT_TOKEN
+  RISK_CASE_006:
+    NAME: INVISIBLE_CLASS_FILTER_BYPASS
+    INPUT: ZWSP там, где грубый фильтр «разрешает zero-width» ожидая ZWJ
+    CONTEXT: BYTE_EXACT_TOKEN
+    RISK: NONE
+    RUNTIME_STATUS: PENDING
+      [ЧЕСТНО: ребро INVISIBLE_CLASS_COLLISION — TAXONOMY_ONLY: поведение
+       ВНЕШНЕГО грубого фильтра не наблюдаемо из входной строки, рантайм-
+       проверки нет, риска не эмитит. Тип описан, но за работающий контракт
+       не выдаётся. Ждёт отдельного захода по кейсам.]
+    ATTACK: невидимый проходит по разрешению ДРУГОГО невидимого в грубом
+      классификаторе (класс, не Unicode-функция)
+    GUARD: ребро INVISIBLE_CLASS_COLLISION (TARGET_KIND: CLASS)
+CONFUSABLES:
+  NOT_APPLICABLE:
+    REASON: у невидимого знака НЕТ визуальных двойников — «спутать ПО ВИДУ»
+      нельзя то, что не видно. Классический механизм CONFUSABLES (визуальная
+      мимикрия) к ZWSP неприменим. Рантайм читает только SIGN_RELATIONS ниже.
+    REVIEW_REQUIRED: YES
+  FUNCTIONAL_NEIGHBORS:
+    [НЕ спутываемость ПО ВИДУ, а соседи по КЛАССУ невидимых. Разнесены сюда
+     честно: это НЕ CONFUSABLES (различие ФУНКЦИИ, не вида). Справочный блок
+     для человека; рантайм риск по ним НЕ считает — ключей CONFUSABLE_ здесь
+     нет, парсер их не грузит, и это НАМЕРЕННО.]
+    NEIGHBOR_001:
+      CODEPOINT: U+200C
+      NAME: ZERO WIDTH NON-JOINER (ZWNJ)
+      FUNCTION_DIFF: ZWNJ подавляет соединение (персидская орфография);
+        несёт смысл — слепое удаление исказит
+    NEIGHBOR_002:
+      CODEPOINT: U+200D
+      NAME: ZERO WIDTH JOINER (ZWJ)
+      FUNCTION_DIFF: ZWJ соединяет (эмодзи-секвенции); Join_Control=YES
+        (у ZWSP NO); несёт смысл
+    NEIGHBOR_003:
+      CODEPOINT: U+2060
+      NAME: WORD JOINER (WJ)
+      FUNCTION_DIFF: WJ ЗАПРЕЩАЕТ разрыв — прямая противоположность ZWSP
+    NEIGHBOR_004:
+      CODEPOINT: U+FEFF
+      NAME: ZERO WIDTH NO-BREAK SPACE / BOM
+      FUNCTION_DIFF: BOM — маркер порядка байт / no-break
+    NEIGHBOR_005:
+      CODEPOINT: U+00AD
+      NAME: SOFT HYPHEN (SHY)
+      FUNCTION_DIFF: SHY — условный перенос с ВИДИМЫМ дефисом при разрыве
+
+SIGN_RELATIONS:
+  [ИСТОЧНИК ИСТИНЫ ДЛЯ РАНТАЙМА. Три ребра по D-INV-1 (минимум типов).
+   Честно: без канона-кодпоинта — TARGET_KIND: EMPTY_SEQUENCE (D-INV-3),
+   без выдуманного TARGET и без ложного VISUAL_MIMIC_OF.
+   RELATION_TYPE_RUNTIME_STATUS (Level 2, находка S-03) — тип это КОНТРАКТ,
+   не ярлык; поле говорит, что тип РЕАЛЬНО делает в рантайме, а не только
+   описывает. Соответствует карте _RELATION_RUNTIME_ROLE в sequence_engine.]
+  RELATION_001:
+    RELATION_TYPE: BOUNDARY_DISRUPTOR
+    RELATION_TYPE_RUNTIME_STATUS: PRIMARY
+      [рвёт границу точного совпадения; ЕДИНСТВЕННЫЙ самостоятельный вердикт
+       ZWSP — реальный контракт, VERIFIED прогоном на gоog<ZWSP>／le.com]
+    TARGET_KIND: EMPTY_SEQUENCE
+    CONTEXT_SCOPE: HOST, EMAIL, BYTE_EXACT_TOKEN, PATH, HIDDEN_BOUNDARY_PADDING, QUERY_VALUE, FRAGMENT, USERINFO
+    VERIFICATION_STATUS: VERIFIED
+    RUNTIME_EFFECT: RELATION_ONLY
+  RELATION_002:
+    RELATION_TYPE: INVISIBLE_CLASS_COLLISION
+    RELATION_TYPE_RUNTIME_STATUS: TAXONOMY_ONLY
+      [проходит по разрешению другого невидимого в ГРУБОМ внешнем фильтре;
+       поведение того фильтра НЕ наблюдаемо из входной строки → рантайм-
+       проверки пока НЕТ. Тип описан честно, но НЕ выдаётся за работающий
+       контракт: риска не эмитит. Ждёт отдельного захода по кейсам.]
+    TARGET_KIND: CLASS
+    TARGET: zero-width-allowed (грубый классификатор, НЕ Unicode-функция)
+    CONTEXT_SCOPE: BYTE_EXACT_TOKEN
+    VERIFICATION_STATUS: CANDIDATE
+    RUNTIME_EFFECT: RELATION_ONLY
+  RELATION_003:
+    RELATION_TYPE: ABSENCE_CONFUSABLE
+    RELATION_TYPE_RUNTIME_STATUS: SUPPORTING_FACET
+      [неотличим от отсутствия знака; ЭВИДЕНЦИЯ при первичном вердикте, НЕ
+       самостоятельный второй HIGH на тот же знак в том же контексте (Z1,
+       три ревьюера — дубль убран). Риска не эмитит.]
+    TARGET_KIND: EMPTY_SEQUENCE
+    CONTEXT_SCOPE: HOST, EMAIL, BYTE_EXACT_TOKEN
+    VERIFICATION_STATUS: VERIFIED
+    RUNTIME_EFFECT: RELATION_ONLY
+
+CONTRADICTION_GUARDS:
+  CG1:
+    TRIGGER: «ZWSP невидим, значит его нет»
+    RESPONSE: INVISIBLE ≠ ABSENT
+    RULE: невидимость — не отсутствие; знак присутствует в потоке байт
+  CG2:
+    TRIGGER: «ZWSP — это пробел»
+    RESPONSE: ZWSP_FORM ≠ SPACE
+    RULE: нулевая ширина, не разделитель слов, другой кодпоинт
+  CG3:
+    TRIGGER: «нормализация уберёт ZWSP»
+    RESPONSE: NFKC_SURVIVAL ≠ LEGITIMACY
+    RULE: невидимые переживают NFC/NFD/NFKC/NFKD — остаются в строке
+  CG4:
+    TRIGGER: «RELATION_FOUND значит угроза»
+    RESPONSE: RELATION_FOUND ≠ THREAT
+    RULE: ребро — «разрывает границу в scope», риск выносит sequence-слой
+  CG5:
+    TRIGGER: «все невидимые можно слепо удалить»
+    RESPONSE: DEFAULT_IGNORABLE ≠ SAFE_TO_DELETE
+    RULE: ZWNJ/ZWJ несут смысл (орфография/эмодзи); удаление исказит
+  CG6:
+    TRIGGER: «нет видимого канона — нет отношения»
+    RESPONSE: NO_CODEPOINT_CANON ≠ NO_RELATION
+    RULE: отношение к границе/классу/пустоте есть без визуального канона
+
+SEQUENCE_LAYER_BOUNDARY:
+  SIGN_SAFE_ALONE ≠ SIGN_SAFE_IN_SEQUENCE: YES
+  SEQUENCE_CANDIDATES: NOT_APPLICABLE
+    [у ZWSP нет собственных литеральных SEQUENCE_CANDIDATES; межзнаковое
+     поведение (ZWSP между метками домена) оценивается через ось
+     «отношение» (active_relation_candidates + _assess_relation_risk),
+     как у маски ／, а не через литеральный кандидат последовательности]
+
+PHAGO_ENTITY_MIMICRY:
+  NOT_APPLICABLE
+  PHAGO_REVIEW: VERIFIED (conveyor 9 reviewers 8:1 + author decision 2026-07-13)
+  PHAGO_BASIS: ZWSP СВОЕЙ ФУНКЦИЕЙ (разрыв токена) НЕ создаёт ложную
+    принадлежность к сущности. Мимикрия при участии ZWSP эмерджентна на уровне
+    ПОСЛЕДОВАТЕЛЬНОСТИ (в связке с гомоглифом/доменом) → относится к
+    SEQUENCE/RELATION-слою, не свойство одиночного знака. Согласовано с якорями
+    критерия: / U+002F APPLICABLE (функция-разделитель САМА порождает ложную
+    иерархию бренда), . U+002E NOT_APPLICABLE (сама не порождает) — ZWSP как точка.
+    Тест: убрать ZWSP — целевая сущность (administrator, paypal) существует без него.
+  PHAGO_ROBUST: NOT_APPLICABLE держится по ЛЮБОМУ прочтению фаго — вердикт НЕ
+    зависит от открытого узла PHAGO_NATURE. ZWSP: (1) НЕ создаёт ложную
+    ПРИНАДЛЕЖНОСТЬ к сущности; (2) НЕ ПОГЛОЩАЕТ чужую идентичность (тест
+    фагоцитоз-гипотезы); (3) сам НЕ есть сущность-сигнал (невидимый разрыв, не
+    лицо/бренд/авторитет). → NOT_APPLICABLE при всех трёх прочтениях.
+    См. foundation_layer/OPEN_NODE_PHAGO_NATURE.md.
+  PHAGO_INTERACTION_ROLE: ENABLER_ONLY
+    [участвует в мимикрии на уровне ПОСЛЕДОВАТЕЛЬНОСТИ, НЕ PHAGO-актор на уровне
+     знака. ПРОШЛАЯ граница («своё лицо» / «служит» / «невидим») ОТКАЧЕНА как
+     неверная — конфликтовала с / U+002F (APPLICABLE). Верный критерий — в
+     foundation_layer/RULE_PHAGO_APPLICABILITY_v0_1.md.]
+  PHAGO_APPLICABILITY_RULE: каноничный источник —
+    foundation_layer/RULE_PHAGO_APPLICABILITY_v0_1.md (здесь НЕ дублируется во
+    избежание дрейфа).
+
+============================================================
+8. ADVERSARIAL_COVERAGE — RUN_CARD SEED
+============================================================
+MIN_TOTAL_VECTORS: 12
+CATEGORY_A: FORM_MANIPULATION
+  A1: ZWSP между каждой парой символов домена
+  A2: несколько ZWSP подряд для раздувания длины
+CATEGORY_B: CONTEXT_INJECTION
+  B1: ZWSP в host-части URL без схемы
+  B2: ZWSP в email локальной части
+CATEGORY_C: SEQUENCE_MANIPULATION
+  C1: ZWSP + полноширинная маска ／ вместе (RISK_CASE_003)
+  C2: ZWSP между меткой и TLD (gоogle​.com)
+CATEGORY_D: SEMANTIC_MIMICRY
+  [МЯГКОЕ ТРЕНИЕ: ZWSP не ИМИТИРУЕТ; векторы сформулированы как ДИВЕРСИЯ]
+  D1: ZWSP проходит там, где фильтр «разрешает zero-width» ждёт ZWJ
+  D2: ZWSP имитирует ОТСУТСТВИЕ (ABSENCE_CONFUSABLE) — паддинг «как чисто»
+CATEGORY_E: PHAGO_ENTITY_MIMICRY
+  E1: NOT_APPLICABLE (см. раздел 7; ZWSP не олицетворяет сущность)
+  E2: NOT_APPLICABLE
+CATEGORY_F: SEMANTIC_LAYER_MANIPULATION
+  F1: смена активной эпохи гейтом контекста (типографика → машинная)
+  F2: подача ZWSP в типографическом обрамлении для сокрытия машинного риска
+ACTUAL_TOTAL_VECTORS: 12
+COVERAGE_STATUS: UNVERIFIED
+COVERAGE_SUFFICIENCY: UNVERIFIED
+  [ЧЕСТНО: RUN_CARD_STATUS=NOT_STARTED — 12 векторов ВЫПИСАНЫ, но не
+   ПРОГНАНЫ адверсариально. «Достаточность» нельзя объявить до прогона;
+   SUFFICIENT здесь было бы обещанием без дела. Останется UNVERIFIED, пока
+   RUN_CARD не отработает.]
+
+============================================================
+9. MUTATION_CHECK
+============================================================
+MUTATION_01:
+  CLAIM: ZWSP даёт authority_effect
+  EXPECTED: FAIL_FALSE_AUTHORITY
+  RESULT: FAIL
+MUTATION_02:
+  CLAIM: ZWSP исполняется/запускает
+  EXPECTED: FAIL_FALSE_EXECUTION
+  RESULT: FAIL
+MUTATION_03:
+  CLAIM: ZWSP — доказательство/верификация
+  EXPECTED: FAIL_FALSE_VERIFICATION
+  RESULT: FAIL
+MUTATION_04:
+  CLAIM: ZWSP эквивалентен пробелу U+0020
+  EXPECTED: FAIL_FALSE_EQUIVALENCE
+  RESULT: FAIL
+MUTATION_05:
+  CLAIM: ZWSP безопасно удаляется всегда
+  EXPECTED: FAIL_FALSE_SAFE_DELETE (ZWNJ/ZWJ несут смысл)
+  RESULT: FAIL
+MUTATION_06:
+  CLAIM: невидимость = отсутствие в потоке
+  EXPECTED: FAIL_FALSE_ABSENCE
+  RESULT: FAIL
+
+============================================================
+10. KNOWN_OPEN_QUESTIONS
+============================================================
+OQ1:
+  QUESTION: классовый INVISIBLE_DEFAULT_IGNORABLE_GUARD не построен —
+    класс-свойства ZWSP объявить негде
+  STATUS: RECLASSIFIED (AUTHOR_DECISION D-ZWSP-STATUS 2026-07-13)
+  BLOCKS_WORKINGLY_CLOSED: NO  (было YES)
+  RECLASSIFIED_AS: CLASS_FRONT_DEPENDENCY
+    [гард — КЛАССОВАЯ зависимость, НЕ дефект этой карточки. Строить на N=1 =
+     переобучение (нарушает «не обобщай с одного», рискует сломать легитимные
+     ZWJ/ZWNJ — DEFAULT_IGNORABLE ≠ SAFE_TO_DELETE). Вынесен в class-front
+     register: foundation_layer/CLASS_FRONT_INVISIBLE_SIGNS.md. Регистратор
+     (witness) ЧАСТИЧНО покрывает под-обещание «незнакомое не молчит» → снижает
+     срочность, но НЕ заменяет (witness ≠ policy: goog<U+2063>le.com →
+     PASS+witness, не HOST/HIGH). Гард нужен позже, из >=3 знаков.]
+  NOTE: класс-свойства ZWSP объявлены inline (SIGN_CATEGORY +
+    WHAT_THIS_SIGN_IS_NOT); общий дом для них — будущий гард на уровне класса.
+OQ2:
+  QUESTION: D-GUARD-2 слеп к warned-ребру с ненулевым вердиктом
+    (кандидат D-GUARD-5)
+  STATUS: OPEN
+  BLOCKS_WORKINGLY_CLOSED: NO
+  NOTE: DRAFT п.4.2; граница сторожа, не карточки
+OQ3:
+  QUESTION: детектор _demask НЕ должен слепо удалять ZWNJ/ZWJ (сломает
+    персидскую орфографию / эмодзи) — это ГРАНИЦА ДЕТЕКТОРА, не карточки
+  STATUS: OPEN
+  BLOCKS_WORKINGLY_CLOSED: NO
+  NOTE: DEFAULT_IGNORABLE ≠ SAFE_TO_DELETE; для ZWSP demask корректен
+    (ZWSP в машинном домене — разрыв, удаление реконструирует канон),
+    но для ZWNJ/ZWJ демаск-удаление исказит смысл
+OQ4:
+  QUESTION: детектор НЕ различает CODE vs IDENTIFIER vs policy-фильтр — все
+    схлопываются в один контекст BYTE_EXACT_TOKEN (MEDIUM). Тонкое различение
+    (ключевое слово policy → HIGH против рядового идентификатора → MEDIUM)
+    не выдумывается: детектор пока этого не умеет
+  STATUS: OPEN
+  BLOCKS_WORKINGLY_CLOSED: NO
+  NOTE: RISK_CASE_002/005/006 приведены к реальному BYTE_EXACT_TOKEN; карта
+    больше НЕ обещает контекст, которого система не производит
+OQ5:
+  QUESTION: ЛОЖНАЯ ТРЕВОГА в ОБЩЕМ детекторе (R8): schemeless-домен с маской
+    в ПУТИ ложно классифицируется как HOST/HIGH вместо PATH/MEDIUM. Пример:
+    docs.example.com/guide/very-long<ZWSP>-section → HOST/HIGH/HOLD, хотя ZWSP
+    сидит в ПУТИ, не в хосте. Тот же вход СО СХЕМОЙ отрабатывает верно (PATH/
+    MEDIUM). Корень: ветка «маска внутри домена» (_domain_prefix терпит
+    хвост-путь); различающий сигнал — до-масочный кусок токена уже содержит
+    / ? #.
+  STATUS: RESOLVED (F-NEW-2 patch, 2026-07-13)
+  BLOCKS_WORKINGLY_CLOSED: NO (was YES)
+  SEVERITY: HIGH
+    [это СИСТЕМА ОПОВЕЩЕНИЯ: ложная тревога критична — подрывает доверие
+     человека к HOLD. Не косметика — чинить, не откладывать бессрочно.]
+  SCOPE: ОБЩИЙ детектор — задевает и маску ／ (U+FF0F), и все 55 кейсов
+    bare-domain. Фикс требует полного ре-гейта 55 + регрессии на ／, поэтому
+    отдельным пакетом, а не внутри этого коммита невидимых.
+  RESOLUTION: CLOSED by F-NEW-2 root 2B — HOST fires only if the mask index is
+    INSIDE the host span (len(left_part) < host_end of the reconstruction);
+    past the host -> PATH. NB: the ORIGINAL hypothesis above (pre-mask token
+    already contains / ? #) proved INSUFFICIENT — it missed P5-style deep paths;
+    the host-span check replaced it. docs.example.com/guide/very-long<ZWSP>-
+    section now reads PATH/MEDIUM.
+OQ-HBP:
+  QUESTION: HIDDEN_BOUNDARY_PADDING — НОВЫЙ контекст (F-NEW-2 root 2A) для
+    ведущей/хвостовой невидимки у ЦЕЛОГО домена (<ZWSP>paypal.com,
+    paypal.com<ZWSP>): не разрыв метки (не HOST/HIGH), но и не молчаливый PASS
+    → MEDIUM/QUEUE как fallback от pass.
+  STATUS: OPEN
+  BLOCKS_WORKINGLY_CLOSED: NO
+  NEEDS: суд конвейера — правильная ли это отдельная сущность-контекст, верен ли
+    риск MEDIUM, не плодит ли контексты без нужды (не подвид ли BYTE_EXACT_TOKEN).
+    Идёт на конвейер с пачкой F-NEW-3.
+  DIRECTION: при РЕВИЗИИ СХЕМЫ рефакторить в POSITION_ROLE, а не top-level
+    контекст — по сути это ПОЗИЦИОННАЯ роль знака (в начале/в конце/внутри), не
+    отдельный вид контекста наравне с HOST/PATH. Пока НЕ ломать рабочее: живёт
+    как контекст до ревизии схемы (v0.5+).
+OQ-SOLIDUS-DRIFT:
+  QUESTION: детектор ／ (СОЛИДУС, ARTIFACT_CONFIRMED) теперь читает
+    example.com,／test и gоogle.com*／path как PATH, а не HOST. Патч карточки
+    ZWSP задел зону ГОТОВОГО артефакта — ПЕРВЫЙ подтверждённый ДРЕЙФ.
+  STATUS: OPEN
+  BLOCKS_WORKINGLY_CLOSED: NO
+  SEVERITY: MEDIUM
+    [позиционно PATH вернее старого over-read HOST (гейт солидуса сам звал это
+     квирком); но изменение поведения ARTIFACT_CONFIRMED-детектора обязано
+     пройти ре-валидацию, не тихо.]
+  NEEDS: ре-валидация карточки СОЛИДУСА сегодняшним инструментом (BY_CODE),
+    как у ZWSP. Связь: ARTIFACT_CONFIRMED привязан к ВЕРСИИ инструмента —
+    инструмент изменился → статус солидуса надо переподтвердить. На конвейер
+    с пачкой F-NEW-3.
+OQ-SHARED-DETECTOR-BOUNDARY:
+  QUESTION: в TIER_2-батарее ZWSP два кейса остаются «падающими» — U1
+    (?q=bad<ZWSP>word → контекст PATH вместо QUERY_VALUE) и D2
+    (paypal.com<ZWSP>@evil.com → нет разбора userinfo, host не извлекается).
+  STATUS: RESOLVED (F-NEW-4 + F-NEW-5, 2026-07-13)
+    [были НЕ провалами ZWSP: QUERY_VALUE и userinfo-парсинг — свойства ОБЩЕГО
+     детектора. Закрыты патчами общего детектора _detect_context_at:
+     F-NEW-4 — разбор URL на компоненты (authority/path/QUERY_VALUE/FRAGMENT);
+     F-NEW-5 — userinfo (host после ПОСЛЕДНЕГО @ внутри authority, EMAIL не
+     сломан — разведён по наличию scheme://). U1 → QUERY_VALUE/MEDIUM,
+     D2 → USERINFO/MEDIUM. Батарея ZWSP 19/21 → 21/21.]
+  BLOCKS_WORKINGLY_CLOSED: NO (для ZWSP)
+  NEEDS: — (закрыто; общий детектор чинился отдельным фронтом, как и планировалось).
+ALL_OPEN_QUESTIONS_CLOSED: NO
+
+============================================================
+11. PATCH_HISTORY
+============================================================
+PATCH_HISTORY:
+  v0_1_PATCH_01: initial creation (проба шаблона на ZWSP 2026-07-12 +
+    AUTHOR_DECISION D-INV-1/2/3) — первая карточка невидимого знака;
+    ось «отношение» расширена типами BOUNDARY_DISRUPTOR /
+    INVISIBLE_CLASS_COLLISION / ABSENCE_CONFUSABLE, TARGET_KIND enum.
+  v0_1_PATCH_02: FIX_FIRST по первому кругу (2026-07-12) — обещания=реальность.
+    RISK_CASE контексты/уровни/RUNTIME_STATUS приведены к тому, что РЕАЛЬНО
+    производит детектор (BYTE_EXACT_TOKEN/MEDIUM вместо выдуманного CODE/HIGH;
+    004/006 честно PENDING). RELATION_TYPE_RUNTIME_STATUS (Level 2): PRIMARY/
+    TAXONOMY_ONLY/SUPPORTING_FACET — убран дубль HIGH. CONFUSABLES →
+    NOT_APPLICABLE + FUNCTIONAL_NEIGHBORS. COVERAGE → UNVERIFIED. OQ4
+    (CODE/IDENTIFIER не различаются). RUNTIME_REALITY в LIMITATION.
+    Реестратор невидимых-без-карточки — в рантайме, не в карте. Найденный
+    ложняк R8 (schemeless путь → ложно HOST) заведён как OQ5 NEXT_SESSION_FIX
+    (общий детектор, чинится отдельным заходом с ре-гейтом 55).
+PATCHES_APPLIED: 2
+PATCHES_VERIFIED: 0/2
+
+============================================================
+12. LIMITATION_STATEMENT
+============================================================
+LIMITATION_STATEMENT:
+  THIS_CARD IS A WORKING_DRAFT ARTIFACT (до ARTIFACT_CONFIRMED)
+  NOT A FINAL_STANDARD
+  NOT A PARSER
+  NOT A RUNTIME
+  NOT A SECURITY_CERTIFICATE
+  CONVEYOR_PASS ≠ VALIDATION
+  RUN_CARD_RESULT ≠ FINAL_STATUS
+  WORKINGLY_CLOSED ≠ ARTIFACT_CONFIRMED
+  WORKINGLY_CLOSED ≠ LOCKED_WORKING_CORE
+  DETECTOR_BOUNDARY_NOTE: DEFAULT_IGNORABLE ≠ SAFE_TO_DELETE — _demask
+    детектора НЕ должен слепо удалять все невидимые: удаление ZWNJ/ZWJ
+    исказит смысл (персидская орфография, эмодзи-ZWJ-секвенции), а не
+    очистит. Для ZWSP в машинном контексте (домен/идентификатор) demask
+    корректен — это граница ДЕТЕКТОРА, фиксируется здесь как ограничение,
+    но реализуется в детекторе, не в карточке.
+  RUNTIME_REALITY (обещания=реальность): система СЕЙЧАС РЕАЛЬНО производит по
+    ZWSP: HOST→HIGH, EMAIL→MEDIUM, PATH→MEDIUM, BYTE_EXACT_TOKEN→MEDIUM,
+    FREE_TEXT→NONE. Единственный самостоятельный вердикт даёт ребро
+    BOUNDARY_DISRUPTOR (PRIMARY); INVISIBLE_CLASS_COLLISION (TAXONOMY_ONLY) и
+    ABSENCE_CONFUSABLE (SUPPORTING_FACET) риска НЕ эмитят — второго
+    независимого HIGH на тот же знак они не дают. PATH намеренно MEDIUM, не
+    HIGH: из строки нельзя отличить мягкий перенос показанного URL от
+    машинного пути. Это НЕ антивирус: вердикт (PASS/QUEUE/HOLD) — РЕКОМЕНДАЦИЯ
+    человеку, не команда; ничего не режется и не удаляется, знак только
+    выносится на глаза. Невидимый БЕЗ карточки не оценивается вовсе — его
+    отдельно ОСВЕЩАЕТ реестратор INVISIBLE_UNCARDED_REGISTRAR статусом
+    UNVERIFIABLE (не «опасно», не «безопасно» — «не могу проверить»).
+
+============================================================
+13. INTEGRATION_INTERFACE_STATUS
+============================================================
+INTEGRATION_INTERFACE_STATUS:
+  STATUS: READY_PENDING_CONCRETE_INTEGRATOR
+  ATTACHED_INTEGRATOR_UID: NONE_CURRENTLY_ATTACHED
+  ACTIVE_MODULES_COUNT: 0
+  RUNTIME_ATTACHMENT: NONE
+  PERMANENT_BINDING: NO
+  SESSION_ONLY_BINDING: YES
+  AFTER_RUN_RESIDUE: FORBIDDEN
+
+END_OF_CARD
