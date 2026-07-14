@@ -1,127 +1,152 @@
 ЧАСТНЫЙ АВТОРСКИЙ ПРОЕКТ / COMMERCIAL USE PROHIBITED
 
-DOCUMENT_ID: CONVEYOR_PACKET_ZWSP_CARD_REVIEW
+DOCUMENT_ID: CONVEYOR_REVIEW_ZWSP_CARD
 VERSION: v0_1
 DATE: 2026-07-13
 STATUS: ACTIVE_PACKET
 PROJECT: MSL/MIP — Malyavsky Syntax Language / Malyavsky Invariant Protocol
 PACKET_TYPE: REVIEW
-PACKET_SUBTYPE: FILLED_CARD_PREFLIGHT_REVIEW
-TARGET: карточка ZWSP (U+200B) — ПЕРВАЯ карточка класса «невидимые знаки».
-  Цель раунда: пройти STRUCTURAL_PREFLIGHT_PASS + CONVEYOR_REVIEW_PASS (были
-  ПРОСКОЧЕНЫ — симуляция обогнала ревью). Целевой статус после раунда:
-  WORKINGLY_CLOSED_PENDING_CLASS_GUARD.
+PACKET_SUBTYPE: FILLED_CARD_REVIEW (судится КАРТОЧКА как ДОКУМЕНТ — не детектор, не код)
 
 ============================================================
-0. ОБЯЗАТЕЛЬНЫЕ ПРАВИЛА (для любого пакета)
+ВНЕШНЕЕ CONVEYOR_REVIEW — карточка ZWSP (U+200B), ПЕРВАЯ карточка класса
+НЕВИДИМЫХ знаков.
 ============================================================
-ISOLATED_PACKET_DELIVERY_MANDATORY: оценивай ТОЛЬКО содержимое этого пакета и
-  приложенной карточки (ниже, byte-exact), не по памяти о других задачах.
-VERIFY_BEFORE_TRUST_MANDATORY: ссылки на другие документы проекта — проверяй по
-  первоисточнику, не по пересказу.
-AUTHOR_DECISION_STATUS_AUTHORITY: вердикт ревьюера = РЕКОМЕНДАЦИЯ, не финальный
-  статус; статус присваивает автор через AUTHOR_DECISION.
-PER_FINDING_STATUS_AND_BASIS_MANDATORY: КАЖДАЯ находка несёт
-  FINDING_STATUS: VERIFIED | REJECTED | UNVERIFIABLE и FINDING_BASIS
-  (METHOD+TARGET+OBSERVED — чем/где/что найдено). Голое «проверил» = не основание.
+ЧТО СУДИТЬ: карточку как ДОКУМЕНТ — структура, консистентность, готовность как
+ПЕРВОЙ карточки класса невидимых (станет шаблоном для ZWNJ/ZWJ/BOM). НЕ детектор,
+НЕ код — они уже пройдены симуляцией.
+
+КОНТЕКСТ (что УЖЕ пройдено — НЕ пересматривать):
+- СИМУЛЯЦИЯ пройдена: батарея 21/21, ДВУНОГАЯ (BY_SPEC модели + BY_CODE движок),
+  reconcile по кортежу, mutation-adequacy 5/5.
+- ФАГО закрыто: PHAGO NOT_APPLICABLE, VERIFIED (conveyor 9 reviewers 8:1 + author
+  decision), PHAGO_ROBUST по 3 прочтениям, CATEGORY_E активно доказан
+  (N/A_ACTIVELY_VERIFIED, 2 активных вектора).
+- PREFLIGHT: 35 PASS / 0 FAIL / 1 PRECEDENT (полный вывод — в конце пакета).
+- Статус ЦЕЛЕВОЙ после этого ревью: WORKINGLY_CLOSED_PENDING_CLASS_GUARD.
+
+ВАЖНО ПРО ФОРМАТ: CONVEYOR_REVIEW-формат черепа УСТАРЕЛ (сложился ДО двуногой
+симуляции / mutation-adequacy / reconcile — см. foundation_layer/
+OPEN_NODE_CONVEYOR_REVIEW_FORMAT.md). ZWSP ревьюится по ТЕКУЩЕЙ дисциплине — этот
+проход СТАНЕТ прецедентом нового формата. НЕ копировать старый формат черепа.
 
 ============================================================
-КОНТЕКСТ (что УЖЕ пройдено — НЕ пере-проверять в этом раунде)
+0. ОБЯЗАТЕЛЬНО (для КАЖДОГО суждения)
 ============================================================
-- SIMULATION_GATE (TIER_2): пройдена BY_CODE. Батарея 21/21, mutation-adequacy 5/5,
-  reconcile по кортежу, oracle-манифест. Артефакт:
-  conveyor_runs/SIMULATION_ARTIFACT_ZERO_WIDTH_SPACE_U200B_TIER2_BY_CODE_v0_2_RU.md.
-- PHAGO_ENTITY_MIMICRY: NOT_APPLICABLE, VERIFIED (conveyor 9 reviewers 8:1 + author
-  decision). Критерий: RULE_PHAGO_APPLICABILITY_v0_1. Природа PHAGO — ОТКРЫТЫЙ
-  УЗЕЛ (OPEN_NODE_PHAGO_NATURE), НЕ предмет этого ревью.
-- OQ1 (классовый гард INVISIBLE_DEFAULT_IGNORABLE_GUARD) переклассифицирован в
-  CLASS_FRONT_DEPENDENCY, BLOCKS_WORKINGLY_CLOSED: NO (гард строится на классе
-  ≥3 знаков — не блокер первой карточки).
-- F-NEW-4 (query) / F-NEW-5 (userinfo) общего детектора закрыты;
-  OQ-SHARED-DETECTOR-BOUNDARY: RESOLVED.
+FINDING_STATUS: VERIFIED | REJECTED | UNVERIFIABLE — на каждое суждение.
+FINDING_BASIS: METHOD + TARGET + OBSERVED (чем проверено / где / что найдено).
+  Для Unicode-утверждений — КОДПОИНТ (U+XXXX) + СВОЙСТВО (General_Category /
+  Default_Ignorable_Code_Point / Join_Control / Bidi_Class ...). Голое «проверил /
+  очевидно» без предъявленной проверки = ОТСУТСТВИЕ FINDING_STATUS.
+ISOLATED_PACKET: оценивай ТОЛЬКО этот пакет и приложенную карточку (ниже).
+VERIFY_BEFORE_TRUST: ссылки на другие документы — по первоисточнику, не по памяти.
+AUTHOR_DECISION_STATUS_AUTHORITY: вердикт ревьюера = РЕКОМЕНДАЦИЯ; финальный статус
+  присваивает автор через AUTHOR_DECISION.
+UNVERIFIABLE — законный ответ; догадка, выданная за проверку, — нет.
 
 ============================================================
-A. МАТЕРИАЛ
+ВОПРОСЫ РЕВЬЮЕРАМ (каждый — с FINDING_STATUS + BASIS)
 ============================================================
-REQUIRED: карточка ZWSP — приложена BYTE-EXACT ниже (раздел CARD_CONTENT).
-NOT_REQUIRED_FOR_THIS_ROUND: код детектора (покрыт симуляцией),
-  OPEN_NODE_PHAGO_NATURE, классовый гард — это отдельные фронты, не ревьюить.
+C1. СТРУКТУРНАЯ ПОЛНОТА. Все обязательные разделы карточки на месте и
+    консистентны? Что пусто или противоречиво?
 
-============================================================
-B. ЗАДАНИЕ
-============================================================
-B.1 ЧТО ПРОВЕРЯЕТСЯ: (1) структурная полнота, (2) внутренняя консистентность,
-  (3) готовность как ПЕРВОЙ карточки класса невидимых (задаёт прецедент класса).
-  Против: SIGN_CORE_CARD_CONVEYOR_RULES_GEN3_v0_3_R1 (раздел 2, REQUIRED_FIELDS).
+C2. АРБИТРАЖ CONFUSABLES (★ единственный не-PASS preflight). Правило
+    (SIGN_CORE_CARD_CONVEYOR_RULES_GEN3_v0_3_R1) требует CONFUSABLES ≥5. Но ZWSP
+    НЕВИДИМ — визуальных двойников нет. Карточка ставит CONFUSABLES: NOT_APPLICABLE
+    + отдельный блок FUNCTIONAL_NEIGHBORS (5: ZWNJ U+200C / ZWJ U+200D / WJ U+2060 /
+    BOM U+FEFF / SHY U+00AD — функциональные СОСЕДИ по классу, НЕ визуальная
+    спутываемость). ВОПРОС: это ВЕРНЫЙ прецедент для класса невидимых (по аналогии
+    с PHAGO N/A и SEQUENCE_LAYER_BOUNDARY N/A, которым правило ЯВНО разрешает
+    NOT_APPLICABLE с обоснованием), ИЛИ карточка обязана дать 5 ВИЗУАЛЬНЫХ
+    confusables (которых у невидимки быть не может)? Рассудите — решение задаст
+    норму для ВСЕХ будущих невидимых.
 
-B.2 ВОПРОСЫ (каждый — с FINDING_STATUS + BASIS):
-  Q1. STRUCTURAL_PREFLIGHT: все REQUIRED_FIELDS на месте? (META 14 полей;
-      LAYER_A: BASE_MODE/FORMULA, SIGN_CATEGORY, WHAT_THIS_SIGN_IS_NOT ≥10,
-      BASE_FORMULAS ≥10; LAYER_B: SAFE ≥6, RISK ≥6, CONFUSABLES ≥5,
-      CONTRADICTION_GUARDS ≥6, SEQUENCE_LAYER_BOUNDARY, PHAGO; LAYER_C: 10
-      EFFECT_FIELDS + ALL_NONE + CLOSED_SCHEMA; DOC: ADVERSARIAL_COVERAGE
-      (3 поля), MUTATION_CHECK ≥6, KNOWN_OPEN_QUESTIONS).
-      Само-preflight автора: 33/34 PASS (единственный FAIL — Q2 ниже).
-  Q2. ★ КЛЮЧЕВОЕ (прецедент класса): CONFUSABLES у НЕВИДИМОГО знака. Правило
-      требует ≥5, но у ZWSP НЕТ визуальных двойников (он невидим) → в карточке
-      стоит CONFUSABLES: NOT_APPLICABLE + обоснование + отдельный блок
-      FUNCTIONAL_NEIGHBORS (5 соседей по КЛАССУ невидимых — НЕ спутываемость по
-      виду). ВОПРОС: приемлемо ли NOT_APPLICABLE для CONFUSABLES у невидимого
-      знака (по аналогии с SEQUENCE_LAYER_BOUNDARY и PHAGO, которым правило
-      ЯВНО разрешает NOT_APPLICABLE с обоснованием), ИЛИ правило ≥5 должно
-      строго соблюдаться? Правило ≥5 не содержит явного исключения для
-      невидимых. Это ПРЕЦЕДЕНТ — решение задаст норму для VS16/ZWJ/RLO/BOM.
-  Q3. ВНУТРЕННЯЯ КОНСИСТЕНТНОСТЬ: RISK_CASES контексты/уровни/RUNTIME_STATUS
-      совпадают с RUNTIME_REALITY (обещания=дело)? SIGN_RELATIONS (3 ребра:
-      BOUNDARY_DISRUPTOR/ABSENCE_CONFUSABLE/INVISIBLE_CLASS_COLLISION) —
-      типы/scope/verification/RUNTIME_ROLE консистентны? Нет ли поля, которое
-      обещает больше, чем система делает?
-  Q4. PHAGO: NOT_APPLICABLE + PHAGO_REVIEW: VERIFIED + PHAGO_BASIS по критерию +
-      PHAGO_INTERACTION_ROLE: ENABLER_ONLY + PHAGO_ROBUST (по 3 прочтениям).
-      Обоснование достаточно и воспроизводимо? (природу PHAGO НЕ обсуждать —
-      это OPEN_NODE).
-  Q5. СТАТУСНЫЙ БЛОК: DOCUMENT_STATUS: WORKING_DRAFT (machine-gate поле, оставлен
-      намеренно) + LIFECYCLE_STATUS: VALIDATED_BY_TOOL/PENDING_CONVEYOR_REVIEW +
-      VALIDATION_METHOD + CLASS_ROLE + PATH_TO_ARTIFACT. Честно ли отражает
-      реальность? Готова ли карточка к переходу WORKINGLY_CLOSED_PENDING_CLASS_
-      GUARD после этого ревью?
-  Q6. КАК ПЕРВАЯ КАРТОЧКА КЛАССА: какой прецедент она задаёт для невидимых, и
-      есть ли структурные пробелы, которые аукнутся на следующих (VS16/ZWJ/RLO)?
+C3. ВНУТРЕННЯЯ КОНСИСТЕНТНОСТЬ. SIGN_RELATIONS: BOUNDARY_DISRUPTOR=PRIMARY,
+    ABSENCE_CONFUSABLE=SUPPORTING_FACET, INVISIBLE_CLASS_COLLISION=TAXONOMY_ONLY —
+    согласованы между собой и со своими CONTEXT_SCOPE? Нет ли противоречий типа
+    «поле обещает, но система не производит» (сверьте с RUNTIME_REALITY /
+    RISK_CASE RUNTIME_STATUS)?
 
-B.3 КЛАССИФИКАЦИЯ НАХОДОК: CRITICAL_ISSUE / MAJOR_ISSUE / MINOR_ISSUE /
-  TRACE_ONLY_NOTE.
+C4. ГОТОВНОСТЬ КАК ОБРАЗЕЦ КЛАССА. ZWSP — первая карточка невидимых, станет
+    ШАБЛОНОМ для ZWNJ/ZWJ/BOM. Форма годится как образец, или есть то, что НЕЛЬЗЯ
+    тиражировать (специфичное только для ZWSP, выданное за классовую норму)?
 
-B.4 ЧТО НЕ ВХОДИТ В ЭТОТ РАУНД: природа PHAGO (OPEN_NODE), классовый гард,
-  код общего детектора, повторная симуляция (пройдена).
+C5. ЧЕСТНОСТЬ СТАТУСОВ. Карточка помечает: OQ1 → CLASS_FRONT_DEPENDENCY (не
+    блокер), U1/D2 → RESOLVED (F-NEW-4/5), PHAGO N/A VERIFIED, солидус →
+    REVALIDATION_REQUIRED. Статусы отражают реальность, или что-то завышено/занижено
+    (claim ≠ evidence)?
+
+C6. НЕЗАКРЫТОЕ ЧЕСТНО НАЗВАНО? Класс-гард (нужен ≥3 знака), формат конвейер-ревью
+    (устарел) вынесены как ОТКРЫТЫЕ УЗЛЫ, не спрятаны. Достаточно ли честно, или
+    что-то замазано / выдано за закрытое?
+
+РАЗДЕЛ «СЛАБЫЕ МЕСТА КАРТОЧКИ»: что ревьюер сделал бы иначе (даже если не блокер).
 
 ============================================================
-C. DELIVERABLE_FORMAT
+DELIVERABLE_FORMAT
 ============================================================
 REVIEW_RESULT:
   REVIEWER: <модель>
-  MODEL_FAMILY: <семейство> (MODEL_FAMILY_DIVERSITY_REQUIRED: ≥3 семейств суммарно)
-  ANSWERS_TO_QUESTIONS: ответ на Q1..Q6, каждый с FINDING_STATUS + FINDING_BASIS
-  CRITICAL_ISSUES: <count + список>
-  MAJOR_ISSUES: <count + список>
-  MINOR_ISSUES: <count + список>
-  TRACE_ONLY_NOTES: <список>
+  MODEL_FAMILY: <семейство>   (MODEL_FAMILY_DIVERSITY: суммарно ≥3 семейства)
+  ANSWERS: C1..C6 — каждый с FINDING_STATUS + FINDING_BASIS
+  WEAK_POINTS: <что сделал бы иначе>
+  CRITICAL_ISSUES / MAJOR_ISSUES / MINOR_ISSUES / TRACE_ONLY_NOTES: count + список
   VERDICT: ACCEPT / ACCEPT_WITH_PATCHES / REJECT
   READY_FOR_WORKINGLY_CLOSED_PENDING_CLASS_GUARD: YES / NO / YES_AFTER_PATCHES
-
-REQUIRED_REVIEWERS: минимум 3, MINIMUM_REVIEWER_FAMILIES: 3 (прецедент черепа:
-  5/5 ревьюеров — Grok/Gemini/Kimi/GPT-5.5 + 1, APPROVE / APPROVE_WITH_FIXES).
-FINDING_STATUS_RULE: VERIFIED | REJECTED | UNVERIFIABLE; UNVERIFIABLE — законный
-  ответ; догадка, выданная за проверку, — нет. BASIS_MINIMUM = METHOD+TARGET+OBSERVED.
-
-CONVEYOR_EXIT_CONDITION:
-  ALL_REVIEWERS_ACCEPT → READY_FOR: WORKINGLY_CLOSED_PENDING_CLASS_GUARD
-  ANY_CRITICAL → REJECTED, патч-цикл → возврат к WORKING_DRAFT с открытым списком
-  ACCEPT_WITH_PATCHES (большинство) → применить патчи, при необходимости повторный раунд
-  Q2 (CONFUSABLES-прецедент) — если расхождение → REQUIRES_ARBITRATION (AUTHOR_DECISION):
-    правило класса или карточка меняется, не молча.
+REQUIRED_REVIEWERS: ≥3, MINIMUM_REVIEWER_FAMILIES: 3.
+EXIT_CONDITION:
+  ALL_ACCEPT → READY_FOR WORKINGLY_CLOSED_PENDING_CLASS_GUARD (author decision).
+  C2-расхождение (CONFUSABLES-прецедент) → REQUIRES_ARBITRATION: AUTHOR_DECISION —
+    правило класса получает исключение для невидимых, ИЛИ карточка меняется. Не молча.
+  ANY_CRITICAL → REJECT, патч-цикл, возврат к WORKING_DRAFT с открытым списком.
 
 ============================================================
-CARD_CONTENT (byte-exact, приложенная карточка — источник истины для ревью)
+PREFLIGHT — механическая структурная самопроверка автора (справочно)
+============================================================
+==========================================================================
+STRUCTURAL_PREFLIGHT self-check — ZWSP card
+==========================================================================
+  [PASS     ] META.CARD_UID                              
+  [PASS     ] META.CODEPOINT                             
+  [PASS     ] META.VISIBLE_FORM                          
+  [PASS     ] META.UNICODE_NAME                          
+  [PASS     ] META.ZONE                                  
+  [PASS     ] META.DOCUMENT_STATUS                       
+  [PASS     ] META.TEMPLATE_LINE                         
+  [PASS     ] META.SOURCE_TEMPLATE                       
+  [PASS     ] META.AUTHOR                                
+  [PASS     ] META.CREATED_AT                            
+  [PASS     ] META.VERSION                               
+  [PASS     ] META.AUTHOR_DECISION_REFERENCE             
+  [PASS     ] META.RUN_CARD_REFERENCE                    
+  [PASS     ] META.RUN_CARD_STATUS                       
+  [PASS     ] A.BASE_MODE                                
+  [PASS     ] A.BASE_MODE_FORMULA                        
+  [PASS     ] A.SIGN_CATEGORY                            
+  [PASS     ] A.WHAT_THIS_SIGN_IS_NOT >=10               14 items
+  [PASS     ] A.BASE_FORMULAS >=10                       ~10 formulas
+  [PASS     ] B.SAFE_CASES >=6                           6
+  [PASS     ] B.RISK_CASES >=6                           6
+  [PRECEDENT] B.CONFUSABLES                              0 CONFUSABLE_ + NOT_APPLICABLE + 5 FUNCTIONAL_NEIGHBORS -- invisible has no VISUAL twins; N/A by analogy to PHAGO/SEQUENCE; rule >=5 has no invisible exception -> Q2 ARBITRATION (not a fakeable gap)
+  [PASS     ] B.CONTRADICTION_GUARDS >=6                 6
+  [PASS     ] B.SEQUENCE_LAYER_BOUNDARY present          
+  [PASS     ] B.PHAGO_ENTITY_MIMICRY present             
+  [PASS     ] B.PHAGO filled (NOT_APPLICABLE+VERIFIED)   
+  [PASS     ] C.EFFECT_FIELDS all 10                     10/10
+  [PASS     ] C.EFFECT_FIELDS_ALL_NONE                   
+  [PASS     ] C.CLOSED_SCHEMA                            
+  [PASS     ] DOC.ADVERSARIAL_COVERAGE 3 subfields       
+  [PASS     ] DOC.MUTATION_CHECK >=6 formal              6 semantic
+  [PASS     ] DOC.MUTATION_CHECK_RUNTIME >=6 REAL (узел 1) 6 engine-verified
+  [PASS     ] DOC.CATEGORY_E active N/A-verified (узел 2) N/A_ACTIVELY_VERIFIED + 2 active vectors
+  [PASS     ] DOC.KNOWN_OPEN_QUESTIONS present           
+  [PASS     ] REL.SIGN_RELATIONS present (mask)          3 edges
+  [PASS     ] REL.no invalid edges                       all valid
+--------------------------------------------------------------------------
+  35 PASS / 0 FAIL / 1 PRECEDENT(arbitration) / 36 checks
+
+============================================================
+CARD_CONTENT (byte-exact из текущего файла — ИСТОЧНИК ИСТИНЫ для ревью)
 ============================================================
 ЧАСТНЫЙ АВТОРСКИЙ ПРОЕКТ / COMMERCIAL USE PROHIBITED
 
@@ -568,9 +593,20 @@ CATEGORY_D: SEMANTIC_MIMICRY
   [МЯГКОЕ ТРЕНИЕ: ZWSP не ИМИТИРУЕТ; векторы сформулированы как ДИВЕРСИЯ]
   D1: ZWSP проходит там, где фильтр «разрешает zero-width» ждёт ZWJ
   D2: ZWSP имитирует ОТСУТСТВИЕ (ABSENCE_CONFUSABLE) — паддинг «как чисто»
-CATEGORY_E: PHAGO_ENTITY_MIMICRY
-  E1: NOT_APPLICABLE (см. раздел 7; ZWSP не олицетворяет сущность)
-  E2: NOT_APPLICABLE
+CATEGORY_E: PHAGO_ENTITY_MIMICRY — N/A_ACTIVELY_VERIFIED (прогон 2026-07-13)
+  [PHAGO=NOT_APPLICABLE, но правило «N/A по фаго проверяется ОТДЕЛЬНО» → это не
+   отписка «NOT_APPLICABLE», а 2 АКТИВНЫХ вектора: попытки заставить ZWSP создать
+   ложную принадлежность к сущности, которые ПРОВАЛИВАЮТСЯ на движке, подтверждая
+   N/A. RESULT = вывод детектора, не догадка.]
+  E1: попытка ZWSP как сущность-сигнал РОЛИ — «admin<ZWSP>istrator»
+    OBSERVED: детектор → BYTE_EXACT_TOKEN / MEDIUM (разрыв токена), НЕ entity-мимикрия
+    RESULT: N/A ПОДТВЕРЖДЁН — роль «administrator» несут ВИДИМЫЕ БУКВЫ (убрать ZWSP →
+      «administrator» цел); ZWSP своей функцией ложной принадлежности не создаёт
+  E2: попытка ZWSP создать принадлежность к БРЕНДУ — «paypal<ZWSP>.com»
+    OBSERVED: детектор → HOST / HIGH (разрыв домена)
+    RESULT: N/A ПОДТВЕРЖДЁН — бренд-схожесть «paypal.com» эмерджентна из СТРОКИ
+      (видимые буквы), цела без ZWSP; мимикрия (если возникает) на уровне
+      ПОСЛЕДОВАТЕЛЬНОСТИ, не одиночного знака (согласовано с PHAGO_BASIS, раздел 7)
 CATEGORY_F: SEMANTIC_LAYER_MANIPULATION
   F1: смена активной эпохи гейтом контекста (типографика → машинная)
   F2: подача ZWSP в типографическом обрамлении для сокрытия машинного риска
@@ -609,6 +645,42 @@ MUTATION_06:
   CLAIM: невидимость = отсутствие в потоке
   EXPECTED: FAIL_FALSE_ABSENCE
   RESULT: FAIL
+
+MUTATION_CHECK_RUNTIME (engine-verified, прогон msl_mip_runtime 2026-07-13 —
+  РЕАЛЬНЫЕ мутации кодпоинта/контекста/scope/типа/target_kind; RESULT = вывод
+  ДЕТЕКТОРА на прогоне, не предположение; MUTATION_01-06 выше — семантические,
+  об EFFECT_FIELDS; эти — рантаймовые, о поведении детектора):
+  MR_01_CODEPOINT_BINDING:
+    CLAIM: любой невидимый в домене срабатывает как ZWSP
+    METHOD: goog<U+2062>le.com (U+2062 вместо U+200B)
+    OBSERVED: ZWSP-ребро НЕ сработало; U+2062 → witness (UNVERIFIABLE); verdict pass
+    RESULT: FAIL (карта bound к U+200B; чужой невидимый → witness, не ZWSP-вердикт)
+  MR_02_CONTEXT_GATING:
+    CLAIM: ZWSP даёт фиксированный риск независимо от контекста
+    METHOD: goog<ZWSP>le.com / bad<ZWSP>word / «просто <ZWSP> текст»
+    OBSERVED: HOST=HIGH, BYTE_EXACT_TOKEN=MEDIUM, FREE_TEXT=NONE
+    RESULT: FAIL (риск контекст-зависим — гейтится _detect_context_at)
+  MR_03_SCOPE_PROTECTION:
+    CLAIM: риск не зависит от CONTEXT_SCOPE ребра
+    METHOD: temp-карта без HOST в scope BOUNDARY_DISRUPTOR; goog<ZWSP>le.com
+    OBSERVED: ctx=HOST, но protected=False → risk NONE, verdict pass
+    RESULT: FAIL (scope гейтит риск; HOST вне scope → NONE)
+  MR_04_UNKNOWN_TYPE_SAFETY:
+    CLAIM: неизвестный RELATION_TYPE эмитит риск как PRIMARY
+    METHOD: temp-карта RELATION_TYPE=FOOBAR_UNKNOWN_TYPE; goog<ZWSP>le.com
+    OBSERVED: INVALID_EDGE_NOT_ACTIVATED (1 ребро), исключено, риск не эмитит
+    RESULT: FAIL (неизвестный тип → INVALID_EDGE, не PRIMARY-дефолт)
+  MR_05_FACET_ROLE_GATING:
+    CLAIM: ABSENCE_CONFUSABLE не эмитит риск ни при каком типе
+    METHOD: temp-карта ABSENCE_CONFUSABLE→BOUNDARY_DISRUPTOR; goog<ZWSP>le.com
+    OBSERVED: как SUPPORTING_FACET → NONE; сменив тип на PRIMARY → HOST/HIGH
+    RESULT: FAIL (эмиссия гейтится РОЛЬЮ/типом, не фиксирована — дедуп реален)
+  MR_06_TARGET_KIND_ENFORCEMENT:
+    CLAIM: TARGET_KIND CODEPOINT без TARGET активируется молча
+    METHOD: temp-карта TARGET_KIND EMPTY_SEQUENCE→CODEPOINT (TARGET не добавлен)
+    OBSERVED: INVALID_EDGE_NOT_ACTIVATED (1 ребро), surfaced, не активирован
+    RESULT: FAIL (CODEPOINT требует TARGET; контракт-нарушение → INVALID_EDGE)
+  MUTATION_CHECK_RUNTIME_TOTAL: 6 (все FAIL = движок держит инвариант при мутации)
 
 ============================================================
 10. KNOWN_OPEN_QUESTIONS
