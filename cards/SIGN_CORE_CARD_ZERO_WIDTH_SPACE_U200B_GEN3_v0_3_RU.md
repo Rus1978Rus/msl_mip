@@ -341,7 +341,7 @@ SIGN_RELATIONS:
       [рвёт границу точного совпадения; ЕДИНСТВЕННЫЙ самостоятельный вердикт
        ZWSP — реальный контракт, VERIFIED прогоном на gоog<ZWSP>／le.com]
     TARGET_KIND: EMPTY_SEQUENCE
-    CONTEXT_SCOPE: HOST, EMAIL, BYTE_EXACT_TOKEN, PATH, HIDDEN_BOUNDARY_PADDING
+    CONTEXT_SCOPE: HOST, EMAIL, BYTE_EXACT_TOKEN, PATH, HIDDEN_BOUNDARY_PADDING, QUERY_VALUE, FRAGMENT, USERINFO
     VERIFICATION_STATUS: VERIFIED
     RUNTIME_EFFECT: RELATION_ONLY
   RELATION_002:
@@ -580,14 +580,15 @@ OQ-SHARED-DETECTOR-BOUNDARY:
   QUESTION: в TIER_2-батарее ZWSP два кейса остаются «падающими» — U1
     (?q=bad<ZWSP>word → контекст PATH вместо QUERY_VALUE) и D2
     (paypal.com<ZWSP>@evil.com → нет разбора userinfo, host не извлекается).
-  STATUS: NOT_A_ZWSP_FAILURE
-    [это НЕ провалы ZWSP: контексты QUERY_VALUE и userinfo-парсинг — свойства
-     ОБЩЕГО детектора, отсутствуют для ЛЮБОГО знака, не только невидимого.
-     ZWSP лишь их обнажил. Классифицированы как SHARED_DETECTOR_BOUNDARY,
-     вынесены на отдельный фронт (F-NEW-4 query, F-NEW-5 userinfo), НЕ
-     засчитываются как долг карточки ZWSP.]
+  STATUS: RESOLVED (F-NEW-4 + F-NEW-5, 2026-07-13)
+    [были НЕ провалами ZWSP: QUERY_VALUE и userinfo-парсинг — свойства ОБЩЕГО
+     детектора. Закрыты патчами общего детектора _detect_context_at:
+     F-NEW-4 — разбор URL на компоненты (authority/path/QUERY_VALUE/FRAGMENT);
+     F-NEW-5 — userinfo (host после ПОСЛЕДНЕГО @ внутри authority, EMAIL не
+     сломан — разведён по наличию scheme://). U1 → QUERY_VALUE/MEDIUM,
+     D2 → USERINFO/MEDIUM. Батарея ZWSP 19/21 → 21/21.]
   BLOCKS_WORKINGLY_CLOSED: NO (для ZWSP)
-  NEEDS: отдельные патчи общего детектора (F-NEW-4, F-NEW-5), своя батарея.
+  NEEDS: — (закрыто; общий детектор чинился отдельным фронтом, как и планировалось).
 ALL_OPEN_QUESTIONS_CLOSED: NO
 
 ============================================================

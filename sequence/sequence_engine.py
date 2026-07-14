@@ -516,20 +516,43 @@ def _detect_context_at(text: str, offset: int, mask_chars=frozenset()) -> str:
     rel = offset - left_bound  # mask index inside the token
 
     # --- Pass 1: SCHEME_SCOPE (P4) — scheme only inside THIS token ---
+    # Structure FIRST (F-NEW-4), then userinfo ON the structure (F-NEW-5).
     scheme_at = token.rfind("://", 0, rel)
     if scheme_at != -1:
         after = token[scheme_at + 3:]
         rel_s = rel - (scheme_at + 3)
+        # F-NEW-4 — split the URL into components:
+        #   scheme://authority/path?query#fragment
+        # The AUTHORITY ends at the FIRST of / ? # (RFC 3986). '@' is NOT a
+        # component delimiter here — it lives INSIDE the authority (userinfo@host).
         host_end = len(after)
         for sep in ("/", "?", "#"):
             p = after.find(sep)
             if p != -1:
                 host_end = min(host_end, p)
         if 0 <= rel_s < host_end:
+            # Mask is in the AUTHORITY. F-NEW-5 — userinfo@host: per RFC 3986 the
+            # host is after the LAST '@' in the authority; a mask BEFORE the last
+            # '@' sits in the USERINFO (identity region), not the host. The '@' is
+            # scoped to authority[:host_end] ONLY — a '@' in path/query is a
+            # different '@' (already separated by the component split). Schemeless
+            # user@domain is EMAIL (Pass 2) and never reaches this branch.
+            authority = after[:host_end]
+            at = authority.rfind("@")
+            if at != -1 and rel_s <= at:
+                return "USERINFO"
             return "HOST"
-        if "/" in after[:rel_s]:
-            return "PATH"
-        return "URL"
+        # Past the authority — which component holds the mask? A fragment '#'
+        # outranks a query '?' (a '?' AFTER the first '#' is part of the fragment).
+        frag_at = after.find("#")
+        q_at = after.find("?")
+        if frag_at != -1 and q_at > frag_at:
+            q_at = -1
+        if frag_at != -1 and rel_s > frag_at:
+            return "FRAGMENT"
+        if q_at != -1 and rel_s > q_at:
+            return "QUERY_VALUE"
+        return "PATH"
 
     # --- Pass 2: BARE DOMAIN (boundary G1), no scheme in the token ---
     tld_set, degraded = _tlds()
@@ -633,6 +656,12 @@ _SCOPE_RISK = {
     "BYTE_EXACT_TOKEN": RiskLevel.MEDIUM,  # no-space word going to exact compare; can't tell keyword vs identifier -> surface
     "URL": RiskLevel.MEDIUM,
     "PATH": RiskLevel.MEDIUM,           # display (soft-wrap) vs machine ambiguity -> not HIGH (Z4-05)
+    # F-NEW-4/5 URL components: an invisible break in a query/fragment/userinfo
+    # defeats exact matching of that value but is not a host-label break -> MEDIUM,
+    # never a silent pass (URL alone used to fall out of scope -> NONE).
+    "QUERY_VALUE": RiskLevel.MEDIUM,
+    "FRAGMENT": RiskLevel.MEDIUM,
+    "USERINFO": RiskLevel.MEDIUM,
     # F-NEW-2 root 2A: a hidden zero-width padding a whole domain at its edge —
     # not a label break (not HIGH), but a real evasion of byte-exact matching
     # that must be surfaced, never a silent pass -> MEDIUM.
