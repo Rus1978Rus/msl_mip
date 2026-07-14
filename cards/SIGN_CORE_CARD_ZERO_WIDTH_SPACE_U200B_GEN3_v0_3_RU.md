@@ -31,11 +31,11 @@ VERSION: v0_1
 AUTHOR_DECISION_REFERENCE: foundation_layer/AUTHOR_DECISION_20260712_INVISIBLE_SIGNS_D-INV-1_2_3.md
 AUTHOR_DECISION_REFERENCE_STATUS: foundation_layer/AUTHOR_DECISION_20260713_D-ZWSP-STATUS.md
 RUN_CARD_REFERENCE: conveyor_runs/SIMULATION_ARTIFACT_ZERO_WIDTH_SPACE_U200B_TIER2_BY_CODE_v0_2_RU.md
-RUN_CARD_STATUS: SIMULATION_DONE (BY_CODE 19/21; U1/D2 = SHARED_DETECTOR_BOUNDARY, не провал ZWSP)
+RUN_CARD_STATUS: SIMULATION_DONE (BATTERY_RESULT: 21/21; BY_CODE, mutation-adequacy 5/5; U1/D2 закрыты F-NEW-4/5)
 PATH_TO_ARTIFACT:
-  1. пройти STRUCTURAL_PREFLIGHT_PASS + CONVEYOR_REVIEW_PASS (проскочены — симуляция
-     обогнала внешнее ревью; пройти, чтобы восстановить порядок канона)
-  2. → WORKINGLY_CLOSED_PENDING_CLASS_GUARD
+  1. STRUCTURAL_PREFLIGHT_PASS + CONVEYOR_REVIEW_PASS — ПРОЙДЕНЫ (preflight 35/0/1;
+     внешний конвейер 8/8 ACCEPT, PASS_WITH_PATCHES). Порядок канона восстановлен.
+  2. → WORKINGLY_CLOSED_PENDING_CLASS_GUARD  ← СЛЕДУЮЩИЙ ШАГ (author-decision)
   3. построить INVISIBLE_DEFAULT_IGNORABLE_GUARD (из >=3 разных невидимых) + ре-валидация
   4. → ARTIFACT_CONFIRMED
 DISPLAY_NAME: невидимый пробел нулевой ширины (zero width space)
@@ -48,11 +48,11 @@ AFTER_USE_RESIDUE: FORBIDDEN
 SIGN_DATA_IS_SESSION_ONLY: YES
 STATUS_PROGRESSION_TRACKER:
   WORKING_DRAFT: YES
-  STRUCTURAL_PREFLIGHT_PASS: PENDING
-  CONVEYOR_REVIEW_PASS: PENDING
-  WORKINGLY_CLOSED: PENDING (target: WORKINGLY_CLOSED_PENDING_CLASS_GUARD)
+  STRUCTURAL_PREFLIGHT_PASS: PASS (self-check 2026-07-13: 35 PASS / 0 FAIL / 1 PRECEDENT — CONFUSABLES-арбитраж)
+  CONVEYOR_REVIEW_PASS: PASS_WITH_PATCHES (2026-07-14, 8/8 ACCEPT; BY_CODE-сверка + doc-sync применены)
+  WORKINGLY_CLOSED: PENDING (preflight+review пройдены → готова к author-decision WORKINGLY_CLOSED_PENDING_CLASS_GUARD)
   SIMULATION_GATE_TIER: TIER_2 (ZONE_2)
-  SIMULATION_GATE_PASSED: BY_TOOL_DONE (BY_CODE 19/21; формальный gate — после конвейер-ревью)
+  SIMULATION_GATE_PASSED: BY_TOOL_DONE (BY_CODE 21/21; формальный gate — после WORKINGLY_CLOSED)
   ARTIFACT_CONFIRMED: PENDING (blocked ТОЛЬКО классовым гардом — CLASS_FRONT, не дефект карточки)
 
 ============================================================
@@ -461,12 +461,14 @@ CATEGORY_F: SEMANTIC_LAYER_MANIPULATION
   F1: смена активной эпохи гейтом контекста (типографика → машинная)
   F2: подача ZWSP в типографическом обрамлении для сокрытия машинного риска
 ACTUAL_TOTAL_VECTORS: 12
-COVERAGE_STATUS: UNVERIFIED
-COVERAGE_SUFFICIENCY: UNVERIFIED
-  [ЧЕСТНО: RUN_CARD_STATUS=NOT_STARTED — 12 векторов ВЫПИСАНЫ, но не
-   ПРОГНАНЫ адверсариально. «Достаточность» нельзя объявить до прогона;
-   SUFFICIENT здесь было бы обещанием без дела. Останется UNVERIFIED, пока
-   RUN_CARD не отработает.]
+COVERAGE_STATUS: SUFFICIENT_FOR_CURRENT_CARD_SCOPE
+COVERAGE_SUFFICIENCY: SUFFICIENT_FOR_CURRENT_CARD_SCOPE
+  [ПРОГНАНО: BY_CODE-батарея 21/21 (двуногая BY_SPEC+BY_CODE, reconcile по
+   кортежу, mutation-adequacy 5/5). НЕ голое SUFFICIENT: покрывает ровно те
+   контексты, что детектор РЕАЛЬНО производит (HOST/EMAIL/PATH/BYTE_EXACT_TOKEN/
+   QUERY_VALUE/FRAGMENT/USERINFO/HIDDEN_BOUNDARY_PADDING). За scope этой карточки
+   (плотностной DoS на впуске, файловый вход) — отдельные фронты, не покрыты и
+   честно так помечены.]
 
 ============================================================
 9. MUTATION_CHECK
@@ -656,8 +658,27 @@ PATCH_HISTORY:
     Реестратор невидимых-без-карточки — в рантайме, не в карте. Найденный
     ложняк R8 (schemeless путь → ложно HOST) заведён как OQ5 NEXT_SESSION_FIX
     (общий детектор, чинится отдельным заходом с ре-гейтом 55).
-PATCHES_APPLIED: 2
-PATCHES_VERIFIED: 0/2
+  v0_1_PATCH_03: F-NEW-3 + T1-честность + D-ZWSP-STATUS (2026-07-13). SAFE_CASE_002
+    (CJK) → CURRENT_RUNTIME_EXPECTATION: MAY_QUEUE (не обещать авто-PASS, которого
+    код не даёт). Статус-блок: LIFECYCLE_STATUS / VALIDATION_METHOD / CLASS_ROLE.
+    OQ1 → CLASS_FRONT_DEPENDENCY (BLOCKS_WORKINGLY_CLOSED: NO). PHAGO: NOT_APPLICABLE
+    VERIFIED + PHAGO_ROBUST + ENABLER_ONLY (правило — RULE_PHAGO_APPLICABILITY, узел
+    PHAGO_NATURE). Солидус → REVALIDATION_REQUIRED (принцип Q7).
+  v0_1_PATCH_04: F-NEW-4/5 (2026-07-13). CONTEXT_SCOPE ребра BOUNDARY_DISRUPTOR +=
+    QUERY_VALUE, FRAGMENT, USERINFO (детектор научился разбирать URL на компоненты
+    + userinfo по последнему @). OQ-SHARED-DETECTOR-BOUNDARY → RESOLVED. U1/D2
+    закрыты → батарея 19/21 → 21/21.
+  v0_1_PATCH_05: preflight-pass (2026-07-13). MUTATION_CHECK_RUNTIME — 6 РЕАЛЬНЫХ
+    engine-verified мутаций (RESULT = прогон движка). CATEGORY_E → N/A_ACTIVELY_
+    VERIFIED (2 активных вектора доказывают фаго-N/A). OPEN_NODE CONVEYOR_REVIEW_FORMAT.
+  v0_1_PATCH_06: doc-sync (2026-07-14). Верхние слои приведены к нижним (верным):
+    21/21 везде; RUNTIME_REALITY — полный список контекстов = scope ребра; COVERAGE
+    → SUFFICIENT_FOR_CURRENT_CARD_SCOPE; RUN_CARD_STATUS/SIMULATION_GATE → 21/21;
+    STRUCTURAL_PREFLIGHT → PASS; CONVEYOR_REVIEW_PASS → PASS_WITH_PATCHES (8/8 ACCEPT).
+    OPEN_NODE CARD_SINGLE_SOURCE_OF_TRUTH. Триггер: BY_CODE-сверка вскрыла внутренний
+    рассинхрон карточки (не карта↔код).
+PATCHES_APPLIED: 6
+PATCHES_VERIFIED: 6/6 (BY_CODE-батарея 21/21 + preflight 35/0/1 + BY_CODE-сверка 2026-07-14)
 
 ============================================================
 12. LIMITATION_STATEMENT
@@ -679,8 +700,12 @@ LIMITATION_STATEMENT:
     корректен — это граница ДЕТЕКТОРА, фиксируется здесь как ограничение,
     но реализуется в детекторе, не в карточке.
   RUNTIME_REALITY (обещания=реальность): система СЕЙЧАС РЕАЛЬНО производит по
-    ZWSP: HOST→HIGH, EMAIL→MEDIUM, PATH→MEDIUM, BYTE_EXACT_TOKEN→MEDIUM,
-    FREE_TEXT→NONE. Единственный самостоятельный вердикт даёт ребро
+    ZWSP: HOST→HIGH; EMAIL→MEDIUM; PATH→MEDIUM; BYTE_EXACT_TOKEN→MEDIUM;
+    QUERY_VALUE→MEDIUM; FRAGMENT→MEDIUM; USERINFO→MEDIUM;
+    HIDDEN_BOUNDARY_PADDING→MEDIUM; FREE_TEXT→NONE. (QUERY_VALUE/FRAGMENT/
+    USERINFO — от F-NEW-4/5 разбора URL на компоненты; HIDDEN_BOUNDARY_PADDING —
+    от F-NEW-2; этот список ТОЧЬ-В-ТОЧЬ = CONTEXT_SCOPE ребра BOUNDARY_DISRUPTOR,
+    сверено BY_CODE 2026-07-14.) Единственный самостоятельный вердикт даёт ребро
     BOUNDARY_DISRUPTOR (PRIMARY); INVISIBLE_CLASS_COLLISION (TAXONOMY_ONLY) и
     ABSENCE_CONFUSABLE (SUPPORTING_FACET) риска НЕ эмитят — второго
     независимого HIGH на тот же знак они не дают. PATH намеренно MEDIUM, не
