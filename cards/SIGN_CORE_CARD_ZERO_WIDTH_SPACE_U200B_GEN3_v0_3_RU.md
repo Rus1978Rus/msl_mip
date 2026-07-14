@@ -10,14 +10,34 @@ INSPECTION_LABEL: ⟦ZWSP U+200B⟧
 UNICODE_NAME: ZERO WIDTH SPACE
 ZONE: ZONE_2
 DOCUMENT_STATUS: WORKING_DRAFT
+LIFECYCLE_STATUS: VALIDATED_BY_TOOL / PENDING_CONVEYOR_REVIEW
+  [РЕАЛЬНАЯ позиция в жизненном цикле (AUTHOR_DECISION D-ZWSP-STATUS 2026-07-13).
+   DOCUMENT_STATUS выше НАМЕРЕННО оставлен WORKING_DRAFT — это MACHINE-GATE поле
+   (module_engine._VALID_STATUSES). Карточка НЕ прошла внешний конвейер-ревью,
+   рантайм ОБЯЗАН продолжать предупреждать CARD_NOT_CONVEYOR_REVIEWED. Менять
+   DOCUMENT_STATUS на VALIDATED_* нельзя: (1) сломает код (значение не в
+   _VALID_STATUSES) при прямом запрете трогать код; (2) погасило бы ВЕРНОЕ
+   предупреждение «не отревьюено». Симуляция обогнала ревью; порядок канона
+   (card→конвейер→симуляция→код) восстанавливается прохождением ревью — см.
+   PATH_TO_ARTIFACT ниже.]
+VALIDATION_METHOD: TWO_LEGGED_SIMULATION + MUTATION_ADEQUACY_5/5 + RECONCILE_BY_TUPLE
+CLASS_ROLE: METHOD_REFERENCE_SPECIMEN
+  [первый невидимый знак класса, проведённый строгим инструментом — эталон метода]
 TEMPLATE_LINE: GEN3_v0_3
 SOURCE_TEMPLATE: SIGN_CORE_CARD_TEMPLATE_GEN3_v0_3_R1_RU
 AUTHOR: Руслан Малявский
 CREATED_AT: 2026-07-12
 VERSION: v0_1
 AUTHOR_DECISION_REFERENCE: foundation_layer/AUTHOR_DECISION_20260712_INVISIBLE_SIGNS_D-INV-1_2_3.md
-RUN_CARD_REFERENCE: PENDING
-RUN_CARD_STATUS: NOT_STARTED
+AUTHOR_DECISION_REFERENCE_STATUS: foundation_layer/AUTHOR_DECISION_20260713_D-ZWSP-STATUS.md
+RUN_CARD_REFERENCE: conveyor_runs/SIMULATION_ARTIFACT_ZERO_WIDTH_SPACE_U200B_TIER2_BY_CODE_v0_2_RU.md
+RUN_CARD_STATUS: SIMULATION_DONE (BY_CODE 19/21; U1/D2 = SHARED_DETECTOR_BOUNDARY, не провал ZWSP)
+PATH_TO_ARTIFACT:
+  1. пройти STRUCTURAL_PREFLIGHT_PASS + CONVEYOR_REVIEW_PASS (проскочены — симуляция
+     обогнала внешнее ревью; пройти, чтобы восстановить порядок канона)
+  2. → WORKINGLY_CLOSED_PENDING_CLASS_GUARD
+  3. построить INVISIBLE_DEFAULT_IGNORABLE_GUARD (из >=3 разных невидимых) + ре-валидация
+  4. → ARTIFACT_CONFIRMED
 DISPLAY_NAME: невидимый пробел нулевой ширины (zero width space)
 
 ============================================================
@@ -30,10 +50,10 @@ STATUS_PROGRESSION_TRACKER:
   WORKING_DRAFT: YES
   STRUCTURAL_PREFLIGHT_PASS: PENDING
   CONVEYOR_REVIEW_PASS: PENDING
-  WORKINGLY_CLOSED: PENDING
+  WORKINGLY_CLOSED: PENDING (target: WORKINGLY_CLOSED_PENDING_CLASS_GUARD)
   SIMULATION_GATE_TIER: TIER_2 (ZONE_2)
-  SIMULATION_GATE_PASSED: PENDING
-  ARTIFACT_CONFIRMED: PENDING
+  SIMULATION_GATE_PASSED: BY_TOOL_DONE (BY_CODE 19/21; формальный gate — после конвейер-ревью)
+  ARTIFACT_CONFIRMED: PENDING (blocked ТОЛЬКО классовым гардом — CLASS_FRONT, не дефект карточки)
 
 ============================================================
 3. REQUIRED_GENERAL_GUARDS
@@ -382,10 +402,29 @@ SEQUENCE_LAYER_BOUNDARY:
      как у маски ／, а не через литеральный кандидат последовательности]
 
 PHAGO_ENTITY_MIMICRY:
-  NOT_APPLICABLE:
-    REASON: ZWSP не выдаёт себя за СУЩНОСТЬ (лицо/бренд/систему) — он
-      разрывает границу и прячется, механизм — диверсия, не олицетворение
-    REVIEW_REQUIRED: YES
+  NOT_APPLICABLE
+  PHAGO_REVIEW: VERIFIED (conveyor 9 reviewers 8:1 + author decision 2026-07-13)
+  PHAGO_BASIS: ZWSP СВОЕЙ ФУНКЦИЕЙ (разрыв токена) НЕ создаёт ложную
+    принадлежность к сущности. Мимикрия при участии ZWSP эмерджентна на уровне
+    ПОСЛЕДОВАТЕЛЬНОСТИ (в связке с гомоглифом/доменом) → относится к
+    SEQUENCE/RELATION-слою, не свойство одиночного знака. Согласовано с якорями
+    критерия: / U+002F APPLICABLE (функция-разделитель САМА порождает ложную
+    иерархию бренда), . U+002E NOT_APPLICABLE (сама не порождает) — ZWSP как точка.
+    Тест: убрать ZWSP — целевая сущность (administrator, paypal) существует без него.
+  PHAGO_ROBUST: NOT_APPLICABLE держится по ЛЮБОМУ прочтению фаго — вердикт НЕ
+    зависит от открытого узла PHAGO_NATURE. ZWSP: (1) НЕ создаёт ложную
+    ПРИНАДЛЕЖНОСТЬ к сущности; (2) НЕ ПОГЛОЩАЕТ чужую идентичность (тест
+    фагоцитоз-гипотезы); (3) сам НЕ есть сущность-сигнал (невидимый разрыв, не
+    лицо/бренд/авторитет). → NOT_APPLICABLE при всех трёх прочтениях.
+    См. foundation_layer/OPEN_NODE_PHAGO_NATURE.md.
+  PHAGO_INTERACTION_ROLE: ENABLER_ONLY
+    [участвует в мимикрии на уровне ПОСЛЕДОВАТЕЛЬНОСТИ, НЕ PHAGO-актор на уровне
+     знака. ПРОШЛАЯ граница («своё лицо» / «служит» / «невидим») ОТКАЧЕНА как
+     неверная — конфликтовала с / U+002F (APPLICABLE). Верный критерий — в
+     foundation_layer/RULE_PHAGO_APPLICABILITY_v0_1.md.]
+  PHAGO_APPLICABILITY_RULE: каноничный источник —
+    foundation_layer/RULE_PHAGO_APPLICABILITY_v0_1.md (здесь НЕ дублируется во
+    избежание дрейфа).
 
 ============================================================
 8. ADVERSARIAL_COVERAGE — RUN_CARD SEED
@@ -452,9 +491,18 @@ MUTATION_06:
 OQ1:
   QUESTION: классовый INVISIBLE_DEFAULT_IGNORABLE_GUARD не построен —
     класс-свойства ZWSP объявить негде
-  STATUS: OPEN
-  BLOCKS_WORKINGLY_CLOSED: YES
-  NOTE: DRAFT п.4.1; зависимость раздела 3 этой карточки
+  STATUS: RECLASSIFIED (AUTHOR_DECISION D-ZWSP-STATUS 2026-07-13)
+  BLOCKS_WORKINGLY_CLOSED: NO  (было YES)
+  RECLASSIFIED_AS: CLASS_FRONT_DEPENDENCY
+    [гард — КЛАССОВАЯ зависимость, НЕ дефект этой карточки. Строить на N=1 =
+     переобучение (нарушает «не обобщай с одного», рискует сломать легитимные
+     ZWJ/ZWNJ — DEFAULT_IGNORABLE ≠ SAFE_TO_DELETE). Вынесен в class-front
+     register: foundation_layer/CLASS_FRONT_INVISIBLE_SIGNS.md. Регистратор
+     (witness) ЧАСТИЧНО покрывает под-обещание «незнакомое не молчит» → снижает
+     срочность, но НЕ заменяет (witness ≠ policy: goog<U+2063>le.com →
+     PASS+witness, не HOST/HIGH). Гард нужен позже, из >=3 знаков.]
+  NOTE: класс-свойства ZWSP объявлены inline (SIGN_CATEGORY +
+    WHAT_THIS_SIGN_IS_NOT); общий дом для них — будущий гард на уровне класса.
 OQ2:
   QUESTION: D-GUARD-2 слеп к warned-ребру с ненулевым вердиктом
     (кандидат D-GUARD-5)
