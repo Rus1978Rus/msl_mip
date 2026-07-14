@@ -9,17 +9,23 @@ INSPECTION_LABEL: ⟦ZWSP U+200B⟧
    человек не может — INSPECTION_LABEL закрывает трещину пробы.]
 UNICODE_NAME: ZERO WIDTH SPACE
 ZONE: ZONE_2
-DOCUMENT_STATUS: WORKING_DRAFT
-LIFECYCLE_STATUS: VALIDATED_BY_TOOL / PENDING_CONVEYOR_REVIEW
-  [РЕАЛЬНАЯ позиция в жизненном цикле (AUTHOR_DECISION D-ZWSP-STATUS 2026-07-13).
-   DOCUMENT_STATUS выше НАМЕРЕННО оставлен WORKING_DRAFT — это MACHINE-GATE поле
-   (module_engine._VALID_STATUSES). Карточка НЕ прошла внешний конвейер-ревью,
-   рантайм ОБЯЗАН продолжать предупреждать CARD_NOT_CONVEYOR_REVIEWED. Менять
-   DOCUMENT_STATUS на VALIDATED_* нельзя: (1) сломает код (значение не в
-   _VALID_STATUSES) при прямом запрете трогать код; (2) погасило бы ВЕРНОЕ
-   предупреждение «не отревьюено». Симуляция обогнала ревью; порядок канона
-   (card→конвейер→симуляция→код) восстанавливается прохождением ревью — см.
-   PATH_TO_ARTIFACT ниже.]
+DOCUMENT_STATUS: WORKINGLY_CLOSED
+LIFECYCLE_STATUS: WORKINGLY_CLOSED_PENDING_CLASS_GUARD
+  [РЕАЛЬНАЯ позиция в жизненном цикле (AUTHOR_DECISION D-ZWSP-WORKINGLY-CLOSED
+   2026-07-15; поднято с VALIDATED_BY_TOOL/PENDING_CONVEYOR_REVIEW по D-ZWSP-STATUS
+   2026-07-13 — шаг 2 PATH_TO_ARTIFACT закрыт).
+   DOCUMENT_STATUS выше поднят WORKING_DRAFT → WORKINGLY_CLOSED — это MACHINE-GATE
+   поле (module_engine._VALID_STATUSES). Основание флипа: код определяет
+   _VALID_STATUSES как «прошёл STRUCTURAL_PREFLIGHT_PASS + CONVEYOR_REVIEW_PASS
+   (несколько независимых ревьюеров) + AUTHOR_DECISION» — ВСЕ ТРИ условия выполнены
+   (preflight 35/0/1; внешний конвейер 8/8 ACCEPT; это решение). Держать WORKING_DRAFT
+   больше нельзя: предупреждение CARD_NOT_CONVEYOR_REVIEWED («не прошёл preflight/
+   conveyor») стало бы ЛОЖНЫМ — claim≠reality в обратную сторону. Рантайм КОРРЕКТНО
+   перестаёт предупреждать. Квалификатор _PENDING_CLASS_GUARD живёт здесь, в
+   LIFECYCLE_STATUS (код такой строки не знает — в DOCUMENT_STATUS был бы CARD_INVALID);
+   классовый гард по D-ZWSP-STATUS Q2 — КЛАССОВАЯ зависимость, НЕ блокер. Код НЕ тронут —
+   меняется только поле карточки. ARTIFACT_CONFIRMED остаётся PENDING до постройки
+   гарда — см. PATH_TO_ARTIFACT ниже.]
 VALIDATION_METHOD: TWO_LEGGED_SIMULATION + MUTATION_ADEQUACY_5/5 + RECONCILE_BY_TUPLE
 CLASS_ROLE: METHOD_REFERENCE_SPECIMEN
   [первый невидимый знак класса, проведённый строгим инструментом — эталон метода]
@@ -29,14 +35,16 @@ AUTHOR: Руслан Малявский
 CREATED_AT: 2026-07-12
 VERSION: v0_1
 AUTHOR_DECISION_REFERENCE: foundation_layer/AUTHOR_DECISION_20260712_INVISIBLE_SIGNS_D-INV-1_2_3.md
-AUTHOR_DECISION_REFERENCE_STATUS: foundation_layer/AUTHOR_DECISION_20260713_D-ZWSP-STATUS.md
+AUTHOR_DECISION_REFERENCE_STATUS: foundation_layer/AUTHOR_DECISION_20260713_D-ZWSP-STATUS.md; foundation_layer/AUTHOR_DECISION_20260715_D-ZWSP-WORKINGLY-CLOSED.md
 RUN_CARD_REFERENCE: conveyor_runs/SIMULATION_ARTIFACT_ZERO_WIDTH_SPACE_U200B_TIER2_BY_CODE_v0_2_RU.md
 RUN_CARD_STATUS: SIMULATION_DONE (BATTERY_RESULT: 21/21; BY_CODE, mutation-adequacy 5/5; U1/D2 закрыты F-NEW-4/5)
 PATH_TO_ARTIFACT:
   1. STRUCTURAL_PREFLIGHT_PASS + CONVEYOR_REVIEW_PASS — ПРОЙДЕНЫ (preflight 35/0/1;
      внешний конвейер 8/8 ACCEPT, PASS_WITH_PATCHES). Порядок канона восстановлен.
-  2. → WORKINGLY_CLOSED_PENDING_CLASS_GUARD  ← СЛЕДУЮЩИЙ ШАГ (author-decision)
+  2. → WORKINGLY_CLOSED_PENDING_CLASS_GUARD — ДОСТИГНУТО (AUTHOR_DECISION
+     D-ZWSP-WORKINGLY-CLOSED, 2026-07-15; DOCUMENT_STATUS=WORKINGLY_CLOSED).
   3. построить INVISIBLE_DEFAULT_IGNORABLE_GUARD (из >=3 разных невидимых) + ре-валидация
+       ← СЛЕДУЮЩИЙ ШАГ (CLASS_FRONT, не блокер — по D-ZWSP-STATUS Q2)
   4. → ARTIFACT_CONFIRMED
 DISPLAY_NAME: невидимый пробел нулевой ширины (zero width space)
 
@@ -47,12 +55,12 @@ BOUND_TO_SPECIFIC_SIGN: YES
 AFTER_USE_RESIDUE: FORBIDDEN
 SIGN_DATA_IS_SESSION_ONLY: YES
 STATUS_PROGRESSION_TRACKER:
-  WORKING_DRAFT: YES
+  WORKING_DRAFT: NO (superseded — DOCUMENT_STATUS поднят до WORKINGLY_CLOSED, D-ZWSP-WORKINGLY-CLOSED 2026-07-15)
   STRUCTURAL_PREFLIGHT_PASS: PASS (self-check 2026-07-13: 35 PASS / 0 FAIL / 1 PRECEDENT — CONFUSABLES-арбитраж)
   CONVEYOR_REVIEW_PASS: PASS_WITH_PATCHES (2026-07-14, 8/8 ACCEPT; BY_CODE-сверка + doc-sync применены)
-  WORKINGLY_CLOSED: PENDING (preflight+review пройдены → готова к author-decision WORKINGLY_CLOSED_PENDING_CLASS_GUARD)
+  WORKINGLY_CLOSED: DONE (WORKINGLY_CLOSED_PENDING_CLASS_GUARD — AUTHOR_DECISION D-ZWSP-WORKINGLY-CLOSED 2026-07-15; DOCUMENT_STATUS=WORKINGLY_CLOSED)
   SIMULATION_GATE_TIER: TIER_2 (ZONE_2)
-  SIMULATION_GATE_PASSED: BY_TOOL_DONE (BY_CODE 21/21; формальный gate — после WORKINGLY_CLOSED)
+  SIMULATION_GATE_PASSED: BY_TOOL_DONE (BY_CODE 21/21; формальный SIMULATION_GATE — по пути к ARTIFACT_CONFIRMED, при постройке гарда)
   ARTIFACT_CONFIRMED: PENDING (blocked ТОЛЬКО классовым гардом — CLASS_FRONT, не дефект карточки)
 
 ============================================================
