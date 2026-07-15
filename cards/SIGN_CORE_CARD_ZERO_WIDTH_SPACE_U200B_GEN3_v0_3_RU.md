@@ -36,8 +36,12 @@ CREATED_AT: 2026-07-12
 VERSION: v0_1
 AUTHOR_DECISION_REFERENCE: foundation_layer/AUTHOR_DECISION_20260712_INVISIBLE_SIGNS_D-INV-1_2_3.md
 AUTHOR_DECISION_REFERENCE_STATUS: foundation_layer/AUTHOR_DECISION_20260713_D-ZWSP-STATUS.md; foundation_layer/AUTHOR_DECISION_20260715_D-ZWSP-WORKINGLY-CLOSED.md
-RUN_CARD_REFERENCE: conveyor_runs/SIMULATION_ARTIFACT_ZERO_WIDTH_SPACE_U200B_TIER2_BY_CODE_v0_2_RU.md
+RUN_CARD_REFERENCE: conveyor_runs/SIMULATION_ARTIFACT_ZERO_WIDTH_SPACE_U200B_TIER2_BY_CODE_v0_3_RU.md
+  (проходной BY_CODE-артефакт от реального прогона 2026-07-15, ENGINE_COMMIT 9963a68,
+   RAW+хеши внутри; v0_2 = SUPERSEDED pre-patch снимок HONEST_FAIL 6/21)
 RUN_CARD_STATUS: SIMULATION_DONE (BATTERY_RESULT: 21/21; BY_CODE, mutation-adequacy 5/5; U1/D2 закрыты F-NEW-4/5)
+BY_SPEC_STATUS: NOT_AVAILABLE (ноги BY_SPEC нет; двуногость/reconcile НЕ утверждаются —
+  независимая опора прогона = машинный oracle tests/zwsp_oracle_manifest.py)
 PATH_TO_ARTIFACT:
   1. STRUCTURAL_PREFLIGHT_PASS + CONVEYOR_REVIEW_PASS — ПРОЙДЕНЫ (preflight 35/0/1;
      внешний конвейер 8/8 ACCEPT, PASS_WITH_PATCHES). Порядок канона восстановлен.

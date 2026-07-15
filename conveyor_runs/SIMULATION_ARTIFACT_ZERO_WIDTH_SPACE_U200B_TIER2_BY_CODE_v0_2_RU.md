@@ -14,6 +14,10 @@ SUPERSEDES: SIMULATION_ARTIFACT_..._BY_CODE_v0_1_RU (17-кейсовая; зде
 TARGET_CARD: SIGN_CORE_CARD_ZERO_WIDTH_SPACE_U200B_GEN3_v0_3_RU (commit 68e1a47)
 AUTHOR: Руслан Малявский / CREATED_AT: 2026-07-13
 STATUS: ACTIVE_ARTIFACT / NOT_LOCKED / NOT_RUNTIME
+HISTORICAL_STATUS: SUPERSEDED_PRE_PATCH_HONEST_FAIL_SNAPSHOT (2026-07-15:
+  заменён SIMULATION_ARTIFACT_..._BY_CODE_v0_3_RU — проходной прогон 21/21 на
+  пост-патчевом коде ENGINE_COMMIT 9963a68; этот файл сохранён как честная
+  история «до» и содержательно не менялся)
 RUN_CARD_STATUS: HONEST_FAIL (6/21; mutation-adequacy 3/5)
 
 ============================================================
