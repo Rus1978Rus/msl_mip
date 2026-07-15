@@ -165,24 +165,24 @@ for m in MANIFEST:
     results[m["id"]]=(ok,errs)
     cls_tally.setdefault(m["cls"],[0,0]); cls_tally[m["cls"]][0 if ok else 1]+=1
     for e,_ in errs: err_counts[e]=err_counts.get(e,0)+1
-    res="ВЕРНО" if ok else "ОШИБКА: "+",".join(sorted({e for e,_ in errs}))
+    res="OK" if ok else "FAIL: "+",".join(sorted({e for e,_ in errs}))
     print(f"{m['id']:3} {m['cls']:10} {cps(m['input'])[:40]:40} {meas['ctx']:16} {meas['risk']:6} {meas['verdict']:20} {(','.join(sorted(meas['witness'])) or '-'):8} {res}")
     if dec is not None:
         print(f"        └ STAGE2(decoded): ctx={dec['ctx']} risk={dec['risk']} verdict={dec['verdict']} wit={sorted(dec['witness']) or '-'}")
     if not ok:
         for e,d in errs: print(f"           - {e}: {d}")
 
-print("\n"+"="*60); print("СЧЁТ ПО КЛАССАМ"); print("="*60)
+print("\n"+"="*60); print("SCORE BY CLASS"); print("="*60)
 for cls in ("registrar","positions","combo","url","dangerous","controls"):
-    p,f=cls_tally.get(cls,[0,0]); print(f"  {cls:10}: {p}/{p+f} верно  ({f} ошибок)")
+    p,f=cls_tally.get(cls,[0,0]); print(f"  {cls:10}: {p}/{p+f} correct  ({f} errors)")
 tp=sum(v[0] for v in cls_tally.values()); tt=sum(v[0]+v[1] for v in cls_tally.values())
-print(f"  {'ИТОГО':10}: {tp}/{tt}")
-print("\nОШИБКИ ПО ТИПАМ:")
+print(f"  {'TOTAL':10}: {tp}/{tt}")
+print("\nERRORS BY TYPE:")
 for e in sorted(err_counts): print(f"  {e:32}: {err_counts[e]}")
 baseline_pass={cid for cid,(ok,_) in results.items() if ok}
 
 # ---------- MUTATION-ADEQUACY ----------
-print("\n"+"="*60); print("MUTATION-ADEQUACY (проверка самой проверки)"); print("="*60)
+print("\n"+"="*60); print("MUTATION-ADEQUACY (test of the test)"); print("="*60)
 def battery_pass_set():
     ps=set()
     for m in MANIFEST:
@@ -232,7 +232,7 @@ for name,do,undo in mutations:
     is_killed=len(regressed)>0
     killed+= 1 if is_killed else 0
     print(f"  {name:26}: {'KILLED' if is_killed else 'SURVIVED (BLIND SPOT)'}  "
-          f"(ломает {len(regressed)} baseline-верных: {sorted(regressed)[:8]})")
+          f"(breaks {len(regressed)} baseline-correct: {sorted(regressed)[:8]})")
 print(f"\n  MUTATION_ADEQUACY: {killed}/{len(mutations)} killed")
 # sanity: baseline unchanged after all undo
 after={cid for cid,(ok,_) in [(m['id'],run_case(m)[2:3]+([],)) for m in MANIFEST]}

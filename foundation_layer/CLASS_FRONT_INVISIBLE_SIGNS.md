@@ -41,7 +41,9 @@ SPECIMENS (образцы класса)
 ============================================================
 - ZWSP (U+200B) — METHOD_REFERENCE_SPECIMEN, первый; проведён строгим
   инструментом (two-legged simulation + mutation-adequacy 5/5 + reconcile).
-  Статус карточки: VALIDATED_BY_TOOL / PENDING_CONVEYOR_REVIEW.
+  Статус карточки: WORKINGLY_CLOSED_PENDING_CLASS_GUARD (AUTHOR_DECISION
+  D-ZWSP-WORKINGLY-CLOSED 45986d1; прежний VALIDATED_BY_TOOL/PENDING_CONVEYOR_REVIEW
+  устарел — конвейер-ревью пройден).
 - (нужны ещё >=2 разных: кандидаты — ZWJ/ZWNJ join-control, VS16 variation
   selector, BOM/WJ format — чтобы гард увидел РАЗБРОС класса, а не один ZWSP.)
 

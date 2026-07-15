@@ -98,7 +98,8 @@ CRITERION_STATUS: FORMULATION_FIXED / PENDING_SIMULATION_AND_CONVEYOR.
   - BY_SPEC-нога: НЕ пройдена.
   - reconcile по кортежу: НЕ выполнен.
   - конвейер-ревью (по обновлённому формату): НЕ пройдено.
-  - oracle-манифест: НЕ построен.
+  - oracle-манифест: ПОСТРОЕН (5476d9d — conveyor_runs/ORACLE_ZWSP_NEIGHBORS_2026-07-15.md
+    + oracle_zwsp_neighbors_2026-07-15.json, 22 соседа, сгенерированы из unicodedata).
   - mutation-adequacy: НЕ прогнана.
 В ШАБЛОН — ТОЛЬКО после барьера (две ноги + reconcile по кортежу + конвейер).
 Cross-version UCD 15.0.0 (§1) — подтвердить на BY_SPEC/конвейер-ноге прогоном.

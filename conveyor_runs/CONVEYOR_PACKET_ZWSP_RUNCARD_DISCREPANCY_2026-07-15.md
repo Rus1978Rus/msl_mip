@@ -183,7 +183,7 @@ EXIT_CONDITION:
   - дефект в самой постановке развилки -> LOOPHOLE, пересобрать пакет.
   Решённое в круге не переоткрывается (границы пакета жёсткие).
 
-FORK_STATUS: OPEN — PENDING_CONVEYOR + AUTHOR_DECISION. Ничего не чинить и не
-  присваивать статус до прохождения круга.
+FORK_STATUS: CLOSED_BY_AUTHOR_DECISION (D-ZWSP-RUNCARD-DISCREPANCY, 2026-07-15;
+  реализовано bde672f). Историческая рамка ниже сохранена как контекст решения.
 
 END_OF_CONVEYOR_PACKET

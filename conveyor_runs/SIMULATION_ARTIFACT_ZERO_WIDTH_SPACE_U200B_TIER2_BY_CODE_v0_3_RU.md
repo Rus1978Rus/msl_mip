@@ -38,13 +38,18 @@ CARD_SHA256: 24C66F7F967383E49416940F405125FD1B9AC15164E15BC56D787D974D53ADD2
 BATTERY_ID: ZWSP_TIER2_CORE21 (те же 21 ID, что в v0_2: R1-R6 P1 P2 P4 P5 K1 K3
   U1 U2 D1-D5 T1 N1 — батарея НЕ менялась; менялся код между v0_2 и v0_3)
 HARNESS: tests/sim_bycode_v2.py
-HARNESS_SHA256: A0C46E6A21B4B884437AE46AB0074B336FF6A5E6BA33880ED2C1FA5985FD4840
+HARNESS_SHA256: BD957235F67FC827A609563A113441C7498AE339FA62D2839395DC28072796C8
 HARNESS_PROVENANCE: перенесён из session-scratchpad (оригинал sha
-  A55AF12BEC58750201806C21E69BD1582BFE24B1164CC8E3CD3E83A392D91699); отличие
-  ТОЛЬКО в блоке путей (repo-relative вместо абсолютных; 11 строк diff);
-  батарея/oracle-импорт/measure/classify/мутации байт-идентичны. Контроль:
-  прогон из tests/ дал RAW, байт-идентичный прогону оригинала из scratchpad
-  (одинаковый RAW_SHA256 ниже).
+  A55AF12BEC58750201806C21E69BD1582BFE24B1164CC8E3CD3E83A392D91699). Отличия от
+  оригинала — ДВА, оба не трогают ЛОГИКУ (батарея/oracle-импорт/measure/classify/
+  мутации идентичны):
+    (1) блок путей: repo-relative вместо абсолютных;
+    (2) 7 строк OUTPUT-МЕТОК переведены на английский (english-only gate
+        tests/gate_english_only.py; правка 2026-07-16). Результат прогона —
+        21/21, mutation 5/5 — НЕ изменился; изменился только ЯЗЫК меток в RAW.
+  Поэтому RAW этой (repo, англ.) версии НЕ байт-идентичен RAW scratchpad-оригинала
+  (там метки кириллицей): scratchpad RAW_SHA EBB20025…, repo RAW_SHA E36C0012…
+  (см. ниже). Кортеж результатов совпадает, отличие — только метки.
 ORACLE: tests/zwsp_oracle_manifest.py (машинный, перенесён байт-в-байт)
 ORACLE_SHA256: 126B0AF413DA80BDDBDA843DDABF7250D5161371E426399C2C23E4603DA51656
 ORACLE_HUMAN_PAIR: tests/zwsp_oracle_manifest.md (человекочитаемый, был в репо)
@@ -55,7 +60,9 @@ TLD_DATA_VERSION: HERMETIC, закреплённый набор {com,org,net,ru,
   (_force_tld_state_for_test, сеть не используется)
 ENVIRONMENT: Windows 11; py -3 (Python 3.14.6); MSL_MIP_HERMETIC_TLD=1;
   PYTHONUTF8=1; PYTHONIOENCODING=utf-8
-RAW_OUTPUT_SHA256: EBB200255251084FB4DD9668EB7B12752780B7A2E15903F80F09AAC6C7975DEA
+RAW_OUTPUT_SHA256: E36C00124BD6A755B5C0BCD604DEE3B1B19F2754B6E624773CC81F55FC9D1858
+  (RAW с английскими метками — текущий харнесс; прежний scratchpad RAW_SHA
+   EBB20025… — кириллические метки, до english-gate правки 2026-07-16)
 CARDS_USED: [ZWSP U+200B, FULLWIDTH SOLIDUS U+FF0F] (как в v0_2)
 NB: CARD_WARNING (CARD_NOT_CONVEYOR_REVIEWED) в прогоне ОТСУТСТВУЕТ — карточка
   на момент прогона DOCUMENT_STATUS=WORKINGLY_CLOSED (машинный гейт пройден,
@@ -126,50 +133,50 @@ ZWSP TIER_2 BY_CODE v2 — verified core 21 (live msl_mip_runtime; cards=[ZWSP,F
 [BASELINE] measured tuple vs manifest
 ID  CLASS      INPUT                                    CTX              RISK   VERDICT              WIT      RES
 ----------------------------------------------------------------------------------------------------------------------------------
-R1  registrar  goog<U+2800>le.com                       -                -      pass                 U+2800   ВЕРНО
-R2  registrar  paypal<U+00A0>.com                       -                -      pass                 U+00A0   ВЕРНО
-R3  registrar  admin<U+202F>panel                       -                -      pass                 U+202F   ВЕРНО
-R4  registrar  line1<U+2028>line2                       -                -      pass                 U+2028   ВЕРНО
-R5  registrar  para<U+2029>break                        -                -      pass                 U+2029   ВЕРНО
-R6  registrar  text<U+200B>here                         BYTE_EXACT_TOKEN MEDIUM queue_for_review     -        ВЕРНО
-P1  positions  <U+200B>paypal.com                       HIDDEN_BOUNDARY_PADDING MEDIUM queue_for_review     -        ВЕРНО
-P2  positions  paypal.com<U+200B>                       HIDDEN_BOUNDARY_PADDING MEDIUM queue_for_review     -        ВЕРНО
-P4  positions  paypal.com<U+200B>/path                  PATH             MEDIUM queue_for_review     -        ВЕРНО
-P5  positions  docs.example.com/guide/very-long<U+200B> PATH             MEDIUM queue_for_review     -        ВЕРНО
-K1  combo      goog<U+200B><U+200D>le.com               HOST             HIGH   hold_pending_review  U+200D   ВЕРНО
-K3  combo      goog<U+200B><U+2062>le.com               HOST             HIGH   hold_pending_review  U+2062   ВЕРНО
-U1  url        https://site.example/?q=bad<U+200B>word  QUERY_VALUE      MEDIUM queue_for_review     -        ВЕРНО
-U2  url        us<U+200B>er@example.com                 EMAIL            MEDIUM queue_for_review     -        ВЕРНО
-D1  dangerous  paypal<U+200B>.com                       HOST             HIGH   hold_pending_review  -        ВЕРНО
-D2  dangerous  http://paypal.com<U+200B>@evil.com       USERINFO         MEDIUM queue_for_review     -        ВЕРНО
-D3  dangerous  paypal<U+200B>.com.                      HOST             HIGH   hold_pending_review  -        ВЕРНО
-D4  dangerous  paypal%E2%80%8Bl.com                     -                -      pass                 -        ВЕРНО
+R1  registrar  goog<U+2800>le.com                       -                -      pass                 U+2800   OK
+R2  registrar  paypal<U+00A0>.com                       -                -      pass                 U+00A0   OK
+R3  registrar  admin<U+202F>panel                       -                -      pass                 U+202F   OK
+R4  registrar  line1<U+2028>line2                       -                -      pass                 U+2028   OK
+R5  registrar  para<U+2029>break                        -                -      pass                 U+2029   OK
+R6  registrar  text<U+200B>here                         BYTE_EXACT_TOKEN MEDIUM queue_for_review     -        OK
+P1  positions  <U+200B>paypal.com                       HIDDEN_BOUNDARY_PADDING MEDIUM queue_for_review     -        OK
+P2  positions  paypal.com<U+200B>                       HIDDEN_BOUNDARY_PADDING MEDIUM queue_for_review     -        OK
+P4  positions  paypal.com<U+200B>/path                  PATH             MEDIUM queue_for_review     -        OK
+P5  positions  docs.example.com/guide/very-long<U+200B> PATH             MEDIUM queue_for_review     -        OK
+K1  combo      goog<U+200B><U+200D>le.com               HOST             HIGH   hold_pending_review  U+200D   OK
+K3  combo      goog<U+200B><U+2062>le.com               HOST             HIGH   hold_pending_review  U+2062   OK
+U1  url        https://site.example/?q=bad<U+200B>word  QUERY_VALUE      MEDIUM queue_for_review     -        OK
+U2  url        us<U+200B>er@example.com                 EMAIL            MEDIUM queue_for_review     -        OK
+D1  dangerous  paypal<U+200B>.com                       HOST             HIGH   hold_pending_review  -        OK
+D2  dangerous  http://paypal.com<U+200B>@evil.com       USERINFO         MEDIUM queue_for_review     -        OK
+D3  dangerous  paypal<U+200B>.com.                      HOST             HIGH   hold_pending_review  -        OK
+D4  dangerous  paypal%E2%80%8Bl.com                     -                -      pass                 -        OK
         └ STAGE2(decoded): ctx=HOST risk=HIGH verdict=hold_pending_review wit=-
-D5  dangerous  goog<U+200B><U+2800>le.com               HOST             HIGH   hold_pending_review  U+2800   ВЕРНО
-T1  controls   日本語<U+200B>のテキスト                         BYTE_EXACT_TOKEN MEDIUM queue_for_review     -        ВЕРНО
-N1  controls   <U+043E>бычный текст с пр<U+043E>белами  -                -      pass                 -        ВЕРНО
+D5  dangerous  goog<U+200B><U+2800>le.com               HOST             HIGH   hold_pending_review  U+2800   OK
+T1  controls   日本語<U+200B>のテキスト                         BYTE_EXACT_TOKEN MEDIUM queue_for_review     -        OK
+N1  controls   <U+043E>бычный текст с пр<U+043E>белами  -                -      pass                 -        OK
 
 ============================================================
-СЧЁТ ПО КЛАССАМ
+SCORE BY CLASS
 ============================================================
-  registrar : 6/6 верно  (0 ошибок)
-  positions : 4/4 верно  (0 ошибок)
-  combo     : 2/2 верно  (0 ошибок)
-  url       : 2/2 верно  (0 ошибок)
-  dangerous : 5/5 верно  (0 ошибок)
-  controls  : 2/2 верно  (0 ошибок)
-  ИТОГО     : 21/21
+  registrar : 6/6 correct  (0 errors)
+  positions : 4/4 correct  (0 errors)
+  combo     : 2/2 correct  (0 errors)
+  url       : 2/2 correct  (0 errors)
+  dangerous : 5/5 correct  (0 errors)
+  controls  : 2/2 correct  (0 errors)
+  TOTAL     : 21/21
 
-ОШИБКИ ПО ТИПАМ:
+ERRORS BY TYPE:
 
 ============================================================
-MUTATION-ADEQUACY (проверка самой проверки)
+MUTATION-ADEQUACY (test of the test)
 ============================================================
-  M1_HOST_PATH_SWAP         : KILLED  (ломает 8 baseline-верных: ['D1', 'D3', 'D4', 'D5', 'K1', 'K3', 'P4', 'P5'])
-  M2_WITNESS_OFF            : KILLED  (ломает 8 baseline-верных: ['D5', 'K1', 'K3', 'R1', 'R2', 'R3', 'R4', 'R5'])
-  M3_ZWSP_SCAN_OFF          : KILLED  (ломает 14 baseline-верных: ['D1', 'D2', 'D3', 'D4', 'D5', 'K1', 'K3', 'P1'])
-  M4_FACET_RISK_PRODUCING   : KILLED  (ломает 15 baseline-верных: ['D1', 'D2', 'D3', 'D4', 'D5', 'K1', 'K3', 'P1'])
-  M5_CTX_ALWAYS_FREETEXT    : KILLED  (ломает 14 baseline-верных: ['D1', 'D2', 'D3', 'D4', 'D5', 'K1', 'K3', 'P1'])
+  M1_HOST_PATH_SWAP         : KILLED  (breaks 8 baseline-correct: ['D1', 'D3', 'D4', 'D5', 'K1', 'K3', 'P4', 'P5'])
+  M2_WITNESS_OFF            : KILLED  (breaks 8 baseline-correct: ['D5', 'K1', 'K3', 'R1', 'R2', 'R3', 'R4', 'R5'])
+  M3_ZWSP_SCAN_OFF          : KILLED  (breaks 14 baseline-correct: ['D1', 'D2', 'D3', 'D4', 'D5', 'K1', 'K3', 'P1'])
+  M4_FACET_RISK_PRODUCING   : KILLED  (breaks 15 baseline-correct: ['D1', 'D2', 'D3', 'D4', 'D5', 'K1', 'K3', 'P1'])
+  M5_CTX_ALWAYS_FREETEXT    : KILLED  (breaks 14 baseline-correct: ['D1', 'D2', 'D3', 'D4', 'D5', 'K1', 'K3', 'P1'])
 
   MUTATION_ADEQUACY: 5/5 killed
   (sanity) baseline pass-set stable after mutations: True

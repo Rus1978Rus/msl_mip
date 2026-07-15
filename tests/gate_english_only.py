@@ -34,6 +34,9 @@ ALLOWLIST = {
         "HOMOGLYPH_SPECIMENS (Cyrillic letter in the test domain is the test subject)",
     os.path.join("tests", "gate_bare_domain_detector.py"):
         "HOMOGLYPH_SPECIMENS (Cyrillic homoglyph + IDN domains are the test subject)",
+    os.path.join("tests", "zwsp_oracle_manifest.py"):
+        "TEST_INPUTS + HOMOGLYPH_SPECIMENS (Cyrillic o homoglyph alias and the "
+        "N1 negative-control Russian input are the test data)",
 }
 
 CYR = re.compile(r"[\u0400-\u04FF]")

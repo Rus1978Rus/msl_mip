@@ -153,6 +153,7 @@ REVIEW_RESULT: REVIEWER / MODEL_FAMILY; ответ на §2 с FINDING_STATUS+BA
 ИНАЧЕ (путь по умолчанию): прямое AUTHOR_DECISION по §3 (V1 с выбором копии —
   минимальная форма), без ревьюеров.
 
-FORK_STATUS: OPEN — PENDING_AUTHOR_DECISION (конвейер условен, см. шапку).
+FORK_STATUS: CLOSED_BY_AUTHOR_DECISION (D-SYNTHESIS-DUPLICATE, 2026-07-15;
+  дубль устранён коммитом 7901af0).
 
 END_OF_CONVEYOR_PACKET
