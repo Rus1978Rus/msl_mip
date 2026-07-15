@@ -2,8 +2,11 @@
 
 === SESSION DRAFT — STATUS: FUTURE / NOT_NOW ===
 [Идея, выработанная в сессии и сохранённая КАК ЕСТЬ. НЕ к реализации сейчас —
- только записанная мысль. Ждёт AUTHOR_DECISION. Помещено в foundation_layer/
- drafts/ 2026-07-13. Ниже — исходный текст черновика без изменений.]
+ только записанная мысль. Ждёт AUTHOR_DECISION (форки; форк 6 закрыт
+ D-NEIGHBORS-CRITERION 2026-07-15). SESSION_ORIGIN_DATE: 2026-07-13 (помещено в
+ drafts/ в сессии); REPOSITORY_COMMIT: 29a6f71 (2026-07-14, в git).
+ ЕДИНСТВЕННАЯ КОПИЯ: root-дубль удалён по AUTHOR_DECISION D-SYNTHESIS-DUPLICATE
+ 2026-07-15. Ниже — исходный текст черновика без изменений.]
 
 
 DOCUMENT_ID: DRAFT_INVISIBLE_SIGNS_SYNTHESIS_2026-07-12
