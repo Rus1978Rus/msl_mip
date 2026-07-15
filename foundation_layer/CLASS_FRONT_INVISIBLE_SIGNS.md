@@ -40,7 +40,11 @@ BLOCKS:
 SPECIMENS (образцы класса)
 ============================================================
 - ZWSP (U+200B) — METHOD_REFERENCE_SPECIMEN, первый; проведён строгим
-  инструментом (two-legged simulation + mutation-adequacy 5/5 + reconcile).
+  инструментом BY_CODE (артефакт v0_3: 21/21, mutation-adequacy 5/5, oracle,
+  preflight 21/21). BY_SPEC-нога NOT_AVAILABLE → двуногость и reconcile НЕ
+  достигнуты (согласуется с карточкой BY_SPEC_STATUS: NOT_AVAILABLE и артефактом
+  v0_3 PAIR_WITH: BY_SPEC — NOT_AVAILABLE). Метод строг в пределах одной ноги;
+  двуногость — открытый фронт класса.
   Статус карточки: WORKINGLY_CLOSED_PENDING_CLASS_GUARD (AUTHOR_DECISION
   D-ZWSP-WORKINGLY-CLOSED 45986d1; прежний VALIDATED_BY_TOOL/PENDING_CONVEYOR_REVIEW
   устарел — конвейер-ревью пройден).
