@@ -1,0 +1,123 @@
+{
+  "target": "U+200B",
+  "predicate": "Cf & BN & DI & !tag & !deprecated",
+  "canon_bucket": "text",
+  "canon_count": 22,
+  "strict_count_reference": 40,
+  "neighbors": [
+    {
+      "cp": "U+00AD",
+      "name": "SOFT HYPHEN",
+      "in_card": true
+    },
+    {
+      "cp": "U+180E",
+      "name": "MONGOLIAN VOWEL SEPARATOR",
+      "in_card": false
+    },
+    {
+      "cp": "U+200C",
+      "name": "ZERO WIDTH NON-JOINER",
+      "in_card": true
+    },
+    {
+      "cp": "U+200D",
+      "name": "ZERO WIDTH JOINER",
+      "in_card": true
+    },
+    {
+      "cp": "U+2060",
+      "name": "WORD JOINER",
+      "in_card": true
+    },
+    {
+      "cp": "U+2061",
+      "name": "FUNCTION APPLICATION",
+      "in_card": false
+    },
+    {
+      "cp": "U+2062",
+      "name": "INVISIBLE TIMES",
+      "in_card": false
+    },
+    {
+      "cp": "U+2063",
+      "name": "INVISIBLE SEPARATOR",
+      "in_card": false
+    },
+    {
+      "cp": "U+2064",
+      "name": "INVISIBLE PLUS",
+      "in_card": false
+    },
+    {
+      "cp": "U+FEFF",
+      "name": "ZERO WIDTH NO-BREAK SPACE",
+      "in_card": true
+    },
+    {
+      "cp": "U+1BCA0",
+      "name": "SHORTHAND FORMAT LETTER OVERLAP",
+      "in_card": false
+    },
+    {
+      "cp": "U+1BCA1",
+      "name": "SHORTHAND FORMAT CONTINUING OVERLAP",
+      "in_card": false
+    },
+    {
+      "cp": "U+1BCA2",
+      "name": "SHORTHAND FORMAT DOWN STEP",
+      "in_card": false
+    },
+    {
+      "cp": "U+1BCA3",
+      "name": "SHORTHAND FORMAT UP STEP",
+      "in_card": false
+    },
+    {
+      "cp": "U+1D173",
+      "name": "MUSICAL SYMBOL BEGIN BEAM",
+      "in_card": false
+    },
+    {
+      "cp": "U+1D174",
+      "name": "MUSICAL SYMBOL END BEAM",
+      "in_card": false
+    },
+    {
+      "cp": "U+1D175",
+      "name": "MUSICAL SYMBOL BEGIN TIE",
+      "in_card": false
+    },
+    {
+      "cp": "U+1D176",
+      "name": "MUSICAL SYMBOL END TIE",
+      "in_card": false
+    },
+    {
+      "cp": "U+1D177",
+      "name": "MUSICAL SYMBOL BEGIN SLUR",
+      "in_card": false
+    },
+    {
+      "cp": "U+1D178",
+      "name": "MUSICAL SYMBOL END SLUR",
+      "in_card": false
+    },
+    {
+      "cp": "U+1D179",
+      "name": "MUSICAL SYMBOL BEGIN PHRASE",
+      "in_card": false
+    },
+    {
+      "cp": "U+1D17A",
+      "name": "MUSICAL SYMBOL END PHRASE",
+      "in_card": false
+    }
+  ],
+  "ucd_provenance": [
+    "16.0.0 (Claude Code)",
+    "15.0.0 (separate env)"
+  ]
+}
