@@ -6,6 +6,15 @@ DECISION_ID: D-NEIGHBORS-CRITERION
 DATE: 2026-07-15
 AUTHOR: Руслан Малявский (AUTHOR_DECISION_STATUS_AUTHORITY)
 PROJECT: MSL/MIP Sign Alphabet
+
+*** PREDICATE_SUPERSEDED 2026-07-16 ***
+  §1 ниже фиксирует предикат Cf∧BN∧DI∧¬tag∧¬deprecated = 22. Он ЗАМЕНЁН решением
+  D-NEIGHBORS-BORDER-138 (a88c234): граница = Cf∧Default_Ignorable = 138 (автор
+  выбрал максимум; ¬BN/¬tag/¬deprecated убраны). Актуальный критерий —
+  foundation_layer/RULE_NEIGHBORS_CRITERION_v0_2_RU.md. Этот файл сохранён КАК
+  ИСТОРИЯ решения от 2026-07-15 (что было решено в тот день), НЕ переписан.
+  Метод-часть (предикат вместо прозы, named_specimens, класс≠удаление) — в силе;
+  изменилось только ЧИСЛО границы 22 → 138.
 SCOPE: критерий «функциональных соседей» невидимого знака — пришпилить «наивный
   фильтр» к явному UCD-предикату; развести соседство (кто в классе) и функцию
   (как работает). Развилка предиката — авторская (форк 6 DRAFT_INVISIBLE_SIGNS_
