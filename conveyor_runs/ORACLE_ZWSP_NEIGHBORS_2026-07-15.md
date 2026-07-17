@@ -1,7 +1,14 @@
 ЧАСТНЫЙ АВТОРСКИЙ ПРОЕКТ / COMMERCIAL USE PROHIBITED
 
+[SUPERSEDED 2026-07-17 — предикат-22 устарел. Граница класса расширена автором до
+ Cf∧Default_Ignorable = 138 (AUTHOR_DECISION_20260716_D-NEIGHBORS-BORDER-138).
+ АКТУАЛЬНЫЙ эталон: conveyor_runs/ORACLE_ZWSP_NEIGHBORS_v0_2_2026-07-17.md
+ (+ машинный oracle_class_138_2026-07-17.json, генератор tests/gen_class138_oracle.py).
+ Этот файл (canon 22 / strict 40) сохранён как ИСТОРИЯ; для сверки НЕ использовать.
+ Условия ¬BN/¬tag/¬deprecated, дававшие 22, были необъявленным авторским сужением.]
+
 DOCUMENT_ID: ORACLE_ZWSP_NEIGHBORS_2026-07-15
-DOCUMENT_TYPE: ORACLE_MANIFEST
+DOCUMENT_TYPE: ORACLE_MANIFEST [SUPERSEDED_BY ORACLE_ZWSP_NEIGHBORS_v0_2_2026-07-17]
 DATE: 2026-07-15
 PROJECT: MSL/MIP — Malyavsky Syntax Language / Malyavsky Invariant Protocol
 BASIS: foundation_layer/AUTHOR_DECISION_20260715_D-NEIGHBORS-CRITERION.md
