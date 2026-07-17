@@ -65,6 +65,11 @@ CARD_FILENAMES = [
     "SIGN_CORE_CARD_AT_U0040_GEN3_v0_3_RU.md",
     # Mask card (relation axis): no matcher — relations only.
     "SIGN_CORE_CARD_FULLWIDTH_SOLIDUS_UFF0F_GEN3_v0_3_RU.md",
+    # First invisible-class card (ZWSP, WORKINGLY_CLOSED, battery 21/21).
+    # Was harness-only (sim_bycode_v2 loaded it by explicit path); attached to
+    # the default loadout 2026-07-17 so the shipped analyze() path actually
+    # carries the invisible-sign protection the card verifies.
+    "SIGN_CORE_CARD_ZERO_WIDTH_SPACE_U200B_GEN3_v0_3_RU.md",
 ]
 
 
