@@ -1,7 +1,15 @@
 ЧАСТНЫЙ АВТОРСКИЙ ПРОЕКТ / COMMERCIAL USE PROHIBITED
 
+[SUPERSEDED 2026-07-17 — author decision: роль прозы §2 зафиксирована как
+ EXPLANATORY_ONLY (поясняет, не определяет; истина = предикат §1, верифицирован
+ прогоном = 138). Слепой reader-прогон БОЛЬШЕ НЕ ТРЕБУЕТСЯ (прозу не нужно доказывать
+ как определение). Этот пакет — история. Прежний dispatch-батч протёк (LOOPHOLE) и в
+ доказательство не шёл в любом случае. См. RULE_NEIGHBORS_CRITERION_v0_2 §2.
+ Пакет остаётся годным ТОЛЬКО если автор когда-нибудь поднимет прозу до самостоятельного
+ определения — тогда нужен настоящий слепой прогон на СВЕЖИХ читателях.]
+
 DOCUMENT_ID: CONVEYOR_PACKET_PROSE_READER_RUN_2026-07-17
-DOCUMENT_TYPE: CONVEYOR_PACKET
+DOCUMENT_TYPE: CONVEYOR_PACKET [SUPERSEDED_BY author decision PROSE_EXPLANATORY_ONLY]
 PACKET_TYPE: BLIND_READER_RUN / PACKET_SUBTYPE: PROSE_CONVERGENCE (проверяется ПРОЗА)
 DATE: 2026-07-17
 PROJECT: MSL/MIP
