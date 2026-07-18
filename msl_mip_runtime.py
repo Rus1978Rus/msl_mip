@@ -478,6 +478,118 @@ def scan_uncarded_invisibles(text: str, cards: list) -> list:
     return records
 
 
+# --- INVISIBLE_DEFAULT_IGNORABLE_GUARD (increment 1: shadow annotator) ---------
+# Approved via conveyor (D-GUARD-IMPL-PLAN, 2026-07-18). ADDITIVE and CONTEXT-FREE:
+# it observes the supervised class (Cf AND Default_Ignorable = the 138) and emits a
+# report-ONLY field. It NEVER enters the verdict path (single/relation/semantic/
+# effective_action) and NEVER strips the stream. Increment 1 keeps canonical_view =
+# identity (no destructive canonicalization yet) and the position trace = identity.
+#
+# Mandatory patches carried here (from the approved plan):
+#   P4  is_monitored_control_138: the EXACT 138 predicate (Cf AND DI), SEPARATE from
+#       the broader _invisible_candidate (which also flags VS / braille / whitespace).
+#   P2ii exception containment: any internal error -> status GUARD_FAILURE, the caller
+#       keeps the original analysis bit-for-bit (fail-open at runtime; witness, not judge).
+#   P2iii resource bound: members are capped; on overflow status = TRACE_TRUNCATED and
+#       the total count is preserved (a megabyte flood of invisibles must not OOM the
+#       pipeline; the ZWSP battery never floods, so it cannot catch this).
+#   P5/P6 canonical_view identity-only + identity position trace in increment 1.
+# The shadow field is validated by its OWN oracle (tests/guard_shadow_oracle.py), because
+# verdict-identity cannot see a field the verdict path never reads (gate hole #1).
+
+GUARD_SCHEMA_VERSION = "class_guard/0.1"
+_GUARD_MEMBER_CAP = 4096            # resource bound (P2iii); TRACE_TRUNCATED beyond this
+_MONITORED_138_CACHE = {}
+
+
+def _monitored_138_set():
+    """The EXACT supervised class = General_Category==Cf AND Default_Ignorable
+    (from the pinned UCD via _default_ignorable_set). Cached. This is the 138,
+    NOT the broader _invisible_candidate STAGE_A set (P4)."""
+    if "set" in _MONITORED_138_CACHE:
+        return _MONITORED_138_CACHE["set"]
+    di, _src = _default_ignorable_set()
+    s = frozenset(cp for cp in di if unicodedata.category(chr(cp)) == "Cf")
+    _MONITORED_138_CACHE["set"] = s
+    return s
+
+
+def is_monitored_control_138(ch: str) -> bool:
+    """P4 exact-138 membership by pinned Unicode properties only (no rendering,
+    no heuristic, no context)."""
+    return ord(ch) in _monitored_138_set()
+
+
+# Full Bidi_Class set that marks a class-138 member as DIRECTIONAL. NOT the registrar's
+# _BIDI_CONTROL_CLASSES (which omits the strong marks L/R/AL) — the class bucket must
+# match the verified oracle (gen_class138_oracle.py): DIRECTIONAL = 12 incl LRM/RLM/ALM.
+_DIRECTIONAL_BIDI_138 = frozenset({
+    "L", "R", "AL", "LRE", "RLE", "PDF", "LRO", "RLO", "LRI", "RLI", "FSI", "PDI",
+})
+
+
+def _class_bucket_138(cp: int) -> str:
+    if cp == 0xE0001 or 0xE0020 <= cp <= 0xE007F:
+        return "TAG"
+    if 0x206A <= cp <= 0x206F:
+        return "DEPRECATED"
+    if unicodedata.bidirectional(chr(cp)) in _DIRECTIONAL_BIDI_138:
+        return "DIRECTIONAL"
+    return "PURE"
+
+
+def class_guard_annotate(text: str, carded=frozenset()) -> dict:
+    """Increment-1 shadow annotator. PURE and CONTEXT-FREE. Returns a report-only
+    GuardResult dict; it is NEVER read by the verdict path. On any internal error it
+    returns status GUARD_FAILURE so the caller keeps its analysis unchanged."""
+    try:
+        monitored = _monitored_138_set()
+        members = []
+        overflow = 0
+        for i, ch in enumerate(text):
+            cp = ord(ch)
+            if cp not in monitored:
+                continue
+            if len(members) >= _GUARD_MEMBER_CAP:
+                overflow += 1
+                continue
+            try:
+                name = unicodedata.name(ch)
+            except ValueError:
+                name = "UNNAMED / UNASSIGNED CODE POINT"
+            members.append({
+                "codepoint": "U+%04X" % cp,
+                "unicode_name": name,
+                "original_offset": i,          # codepoint index in the original (P5)
+                "class_bucket": _class_bucket_138(cp),
+                "family": "CONTROL",
+                "card_mask": cp in carded,
+            })
+        return {
+            "schema_version": GUARD_SCHEMA_VERSION,
+            "ucd_source": _default_ignorable_set()[1],
+            "original": text,                  # exact input STRING (not bytes; P5)
+            "members": members,
+            "canonical_view": text,            # identity in increment 1 (P6)
+            "position_trace": "identity",      # identity spans in increment 1 (P5)
+            "member_count": len(members) + overflow,
+            "truncated": overflow,
+            "status": "OK" if overflow == 0 else "TRACE_TRUNCATED",
+        }
+    except Exception as e:                     # P2ii: fail-open, never crash the pipeline
+        return {
+            "schema_version": GUARD_SCHEMA_VERSION,
+            "original": text,
+            "members": [],
+            "canonical_view": text,
+            "position_trace": "identity",
+            "member_count": 0,
+            "truncated": 0,
+            "status": "GUARD_FAILURE",
+            "error": type(e).__name__,
+        }
+
+
 def analyze(text: str, cards: list) -> dict:
     """Full text run through all layers. Returns a report structure
     for printing (and possible programmatic use)."""
@@ -538,12 +650,25 @@ def analyze(text: str, cards: list) -> dict:
     # witness record must never masquerade as a risk verdict. The human reads
     # it alongside the verdict, not inside it.
     uncarded_invisibles = scan_uncarded_invisibles(text, cards)
+
+    # --- INVISIBLE_DEFAULT_IGNORABLE_GUARD (increment 1, shadow, report-ONLY) ---
+    # Additive: placed in its OWN field, NEVER read by single_actions /
+    # relation_actions / semantic_action / effective_action. A broken class_guard
+    # cannot change the verdict (that is the whole safety argument, gate hole #1).
+    # MSL_MIP_GUARD_DISABLED=1 omits the field entirely — used ONLY by the
+    # full-differential gate (P7) to prove the rest of the report is byte-identical
+    # with and without the guard. Default: guard enabled.
+    if os.environ.get("MSL_MIP_GUARD_DISABLED") == "1":
+        class_guard = None
+    else:
+        _carded_cps = {ord(c.visible_form) for c in cards if len(c.visible_form) == 1}
+        class_guard = class_guard_annotate(text, carded=_carded_cps)
     # ATTENTION_STATUS (F-NEW-3): an uncarded witness alongside the verdict means
     # the interface must NOT show a clean PASS — the human sees "PASS, but hold
     # your eye: an invisible with no card is present". The verdict is untouched.
     attention_status = "WITNESS_PRESENT" if uncarded_invisibles else "NONE"
 
-    return {
+    report = {
         "text": text,
         "sign_statuses": sign_statuses,
         "single_sign_results": single_sign_results,
@@ -557,6 +682,9 @@ def analyze(text: str, cards: list) -> dict:
         "uncarded_invisibles": uncarded_invisibles,
         "attention_status": attention_status,
     }
+    if class_guard is not None:              # omitted only under MSL_MIP_GUARD_DISABLED
+        report["class_guard"] = class_guard  # increment-1 shadow field (report-only)
+    return report
 
 
 def print_report(report: dict) -> None:

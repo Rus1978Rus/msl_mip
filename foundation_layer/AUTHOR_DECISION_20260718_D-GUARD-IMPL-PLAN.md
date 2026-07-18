@@ -3,9 +3,10 @@
 DOCUMENT_ID: AUTHOR_DECISION_20260718_D-GUARD-IMPL-PLAN
 DOCUMENT_TYPE: AUTHOR_DECISION
 DECISION_ID: D-GUARD-IMPL-PLAN
-STATUS: DRAFT — план реализации инкремента-1 на реальном раскладе конвейера. КОД НЕ
-  ПИСАН. Ждёт финального author decision. ZWSP не трогать до ЗЕЛЁНОГО гейта (гейт теперь
-  = verdict-identity + shadow-оракул + robustness-кейсы).
+STATUS: APPROVED — план инкремента-1 с обязательными поправками P1-P9 УТВЕРЖДЁН автором
+  2026-07-18 на реальном раскладе (ядро 7/7; дыра гейта №1 подтверждена логикой). Код
+  инкремента-1 разрешён К НАПИСАНИЮ по этому плану. ZWSP НЕ мержить до ЗЕЛЁНОГО гейта
+  (verdict-identity + shadow-оракул class_guard + robustness). Инкремент-2 + O1 — отдельно.
 DATE: 2026-07-18
 AUTHOR: Руслан Малявский (AUTHOR_DECISION_STATUS_AUTHORITY)
 PROJECT: MSL/MIP Sign Alphabet
