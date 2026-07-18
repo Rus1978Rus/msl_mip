@@ -70,6 +70,11 @@ CARD_FILENAMES = [
     # the default loadout 2026-07-17 so the shipped analyze() path actually
     # carries the invisible-sign protection the card verifies.
     "SIGN_CORE_CARD_ZERO_WIDTH_SPACE_U200B_GEN3_v0_3_RU.md",
+    # Second invisible-class card (ZWJ, WORKING_DRAFT, probe-verified 2026-07-17).
+    # Gives the class behavioural spread: ZWSP breaks, ZWJ joins (Join_Control).
+    # Legit emoji sequences read as FREE_TEXT (no FP); Arabic/Persian joining is
+    # an honest MAY_QUEUE boundary (mirrors the ZWSP<->CJK precedent).
+    "SIGN_CORE_CARD_ZERO_WIDTH_JOINER_U200D_GEN3_v0_1_RU.md",
 ]
 
 

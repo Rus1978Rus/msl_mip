@@ -68,8 +68,15 @@ MANIFEST = [
 # ===== COMBO (2) — carded ZWSP + a second invisible =====
  C(id="K1", cls="combo", input="goog"+Z+ZWJ+"le.com", must_contain=[0x200B,0x200D],
    ctx={"HOST"}, risk={"HIGH"}, verdict={"hold_pending_review"}, witness={"U+200D"},
-   basis="ZWSP breaks the host label -> HOST/HIGH. U+200D (ZWJ) has NO card -> "
-         "witness. Record actual (if a ZWJ card exists it routes differently)."),
+   basis="ZWSP breaks the host label -> HOST/HIGH. U+200D (ZWJ) is uncarded IN THIS "
+         "ZWSP-scoped battery (it loads [ZWSP, mask] only) -> witness. This still tests "
+         "the no-suppression invariant (strong ZWSP verdict must not swallow a co-present "
+         "uncarded invisible's witness). NB 2026-07-17: a ZWJ WORKING_DRAFT card now "
+         "exists and the SHIPPED loadout (CARD_FILENAMES) cards it -> there ZWJ routes "
+         "via its own card (HOST/HIGH, no witness). This battery deliberately stays "
+         "ZWSP-scoped and does NOT load the unverified ZWJ card, so the verified ZWSP "
+         "artifact is not contaminated. Shipped ZWJ behavior is probe-verified in the "
+         "ZWJ card. K3 (U+2062) also covers no-suppression with a still-uncarded sign."),
  C(id="K3", cls="combo", input="goog"+Z+ITIM+"le.com", must_contain=[0x200B,0x2062],
    ctx={"HOST"}, risk={"HIGH"}, verdict={"hold_pending_review"}, witness={"U+2062"},
    basis="known(ZWSP)+unknown(U+2062): ZWSP -> HOST/HIGH AND the U+2062 witness "
