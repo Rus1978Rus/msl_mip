@@ -75,6 +75,12 @@ CARD_FILENAMES = [
     # Legit emoji sequences read as FREE_TEXT (no FP); Arabic/Persian joining is
     # an honest MAY_QUEUE boundary (mirrors the ZWSP<->CJK precedent).
     "SIGN_CORE_CARD_ZERO_WIDTH_JOINER_U200D_GEN3_v0_1_RU.md",
+    # Third invisible-class card (BOM, WORKING_DRAFT, probe-verified 2026-07-18).
+    # Third profile: a service/stream marker whose legitimacy is POSITIONAL (first
+    # char of a file), not functional. First carrier of the three-level signal
+    # principle on the existing pass/queue/hold outputs (leading BOM -> queue =
+    # "possible danger", not freed to pass, not escalated to hold).
+    "SIGN_CORE_CARD_BYTE_ORDER_MARK_UFEFF_GEN3_v0_1_RU.md",
 ]
 
 
