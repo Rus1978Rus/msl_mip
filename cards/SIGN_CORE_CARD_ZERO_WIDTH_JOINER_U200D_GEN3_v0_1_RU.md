@@ -16,7 +16,8 @@ LIFECYCLE_STATUS: WORKING_DRAFT
    честный WORKING_DRAFT. Содержание слоёв B/RISK/RELATIONS — на ИЗМЕРЕННОМ
    прогоне штатного analyze() (проба 2026-07-17, ENGINE-verified), не на догадке;
    но полной двуногой TIER_2-батареи (как у ZWSP) ещё нет — см. RUN_CARD_STATUS.]
-VALIDATION_METHOD: SINGLE_LEG_ENGINE_PROBE (BY_CODE, штатный analyze; двуногой BY_SPEC нет)
+VALIDATION_METHOD: ENGINE_PROBE (BY_CODE) + BY_SPEC_BLIND_LEG (5 ног) + RECONCILE
+  (RECONCILE_BYSPEC_ZWJ_BOM_2026-07-18; mutation-adequacy для ZWJ ещё НЕТ)
 CLASS_ROLE: CLASS_SPREAD_SPECIMEN
   [второй знак класса; даёт классу ПОВЕДЕНЧЕСКИЙ РАЗБРОС — ZWSP РВЁТ (break),
    ZWJ СКЛЕИВАЕТ (join, Join_Control=YES). Для будущего классового гарда нужна
@@ -32,9 +33,11 @@ AUTHOR_DECISION_REFERENCE_CLASS: foundation_layer/AUTHOR_DECISION_20260716_D-NEI
 RUN_CARD_REFERENCE: scratchpad-проба 2026-07-17 (zwj_context_probe.py / zwj_probe2.py) —
   ЭФЕМЕРНАЯ; персистентный артефакт будет при постройке ZWJ-батареи.
 RUN_CARD_STATUS: PROBE_DONE (штатный analyze, 11 кейсов: атаки ловятся, эмодзи чисты,
-  персидское соединение = MAY_QUEUE честная граница). НЕ полная TIER_2-батарея — двуногой
-  BY_SPEC+reconcile+mutation-adequacy для ZWJ ещё нет; не выдаётся за ARTIFACT.
-BY_SPEC_STATUS: NOT_AVAILABLE (ноги BY_SPEC нет; двуногость/reconcile НЕ утверждаются)
+  персидское соединение = MAY_QUEUE честная граница). Двуногая BY_SPEC+reconcile
+  ВЫПОЛНЕНА 2026-07-18 (Z1/Z2 подтверждены; Z3 закрыт правкой описания PATCH_01;
+  Z5 = OPEN-сигнал «код мягче слепых», Z4 → O1). mutation-adequacy для ZWJ ещё НЕТ;
+  не выдаётся за ARTIFACT.
+BY_SPEC_STATUS: DONE_AND_RECONCILED (5 слепых ног, RECONCILE_BYSPEC_ZWJ_BOM_2026-07-18)
 PATH_TO_ARTIFACT:
   1. WORKING_DRAFT — ДОСТИГНУТО (эта карточка, на измеренной пробе).
   2. STRUCTURAL_PREFLIGHT_PASS + CONVEYOR_REVIEW — PENDING.
@@ -209,6 +212,20 @@ SAFE_CASES:
        дать MEDIUM/QUEUE (проба 2026-07-17: می<ZWJ>خواهم → queue). Карточка НЕ
        обещает авто-PASS, которого код не даёт (claim=evidence). НЕ баг — честная
        граница до script-контекста (v0.5). Со знаком препинания рядом → FREE_TEXT/NONE.]
+    PER_OCCURRENCE_BOUNDARY: FUNCTIONAL_VS_REDUNDANT
+      [ключ уровня — ГРАНИЦА ПО ВХОЖДЕНИЮ, не по письменности. ФУНКЦИОНАЛЬНЫЙ ZWJ
+       (в этой позиции требует соединённой формы, которой иначе не было бы) = ЧИСТО.
+       REDUNDANT ZWJ (позиция, где соединение и так есть или не требуется — знак
+       ничего видимого не меняет) = ВОЗМОЖНАЯ: невидимая вставка нулевого эффекта
+       в арабской/персидской строке — та же поверхность (стего/паддинг/обход
+       byte-exact-сравнения), что и в латинице, только замаскированная легитимной
+       письменностью. Поэтому арабский/персидский контекст НЕ освобождается
+       автоматически: уровень назначается ПО ВХОЖДЕНИЮ, а различить functional/
+       redundant без script-контекста (v0.5) детектор не может → честный уровень
+       нерасчленённого вхождения = ВОЗМОЖНАЯ (MAY_QUEUE выше). Из голых свойств
+       («легитимен в арабском») это НЕ выводится: слепая нога BY_SPEC дала ЧИСТО
+       (3/5 с оговоркой alt-ВОЗМОЖНАЯ); границу functional-vs-redundant независимо
+       назвал Kimi — RECONCILE_BYSPEC_ZWJ_BOM_2026-07-18, точка Z3.]
   SAFE_CASE_003:
     INPUT: «символ ZWJ имеет кодпоинт U+200D» (упоминание знака)
     CONTEXT: учебный/цитирование
@@ -477,7 +494,15 @@ PATCH_HISTORY:
     host/token/email/pad — VERIFIED. Персонализация: Join_Control=YES, EPOCH эмодзи,
     антипод ZWNJ. Одним пакетом с подключением в CARD_FILENAMES + обновлением
     oracle K1 (ZWJ теперь карточный → маршрут не witness).
-PATCHES_APPLIED: 1
+  v0_1_PATCH_01: описание Z3 доуточнено по reconcile двуногой симуляции (2026-07-19,
+    RECONCILE_BYSPEC_ZWJ_BOM_2026-07-18, точка Z3). ТОЛЬКО ОПИСАНИЕ, поведение НЕ
+    тронуто: SAFE_CASE_002 — добавлена PER_OCCURRENCE_BOUNDARY (functional-vs-redundant:
+    функциональный ZWJ = ЧИСТО, redundant = ВОЗМОЖНАЯ; уровень по ВХОЖДЕНИЮ, письменность
+    не освобождается автоматически; из голых свойств не выводится — слепая нога дала
+    ЧИСТО с оговорками, границу назвал Kimi). Статусные поля BY_SPEC_STATUS/
+    VALIDATION_METHOD/RUN_CARD_STATUS синхронизированы с фактом выполненного reconcile.
+    Верификация: вердикты всех контекстов ИДЕНТИЧНЫ до/после (описание ≠ поведение).
+PATCHES_APPLIED: 2
 PATCHES_VERIFIED: PROBE (штатный analyze 11 кейсов; полная батарея — PENDING)
 
 ============================================================
@@ -486,7 +511,9 @@ PATCHES_VERIFIED: PROBE (штатный analyze 11 кейсов; полная б
 LIMITATION_STATEMENT:
   THIS_CARD IS A WORKING_DRAFT ARTIFACT (ранняя ступень; не WORKINGLY_CLOSED)
   NOT A FINAL_STANDARD / NOT A PARSER / NOT A RUNTIME / NOT A SECURITY_CERTIFICATE
-  PROBE ≠ FULL_BATTERY (двуногой BY_SPEC+reconcile+mutation-adequacy для ZWJ ещё нет)
+  PROBE ≠ FULL_BATTERY (двуногая BY_SPEC+reconcile для ZWJ ВЫПОЛНЕНА 2026-07-18 —
+    RECONCILE_BYSPEC_ZWJ_BOM_2026-07-18: Z1/Z2 подтверждены, Z3 закрыт правкой описания
+    PATCH_01, Z5/Z4 = задокументированные OPEN; mutation-adequacy для ZWJ ещё НЕТ)
   DETECTOR_BOUNDARY_NOTE: JOIN_CONTROL ≠ SAFE_TO_DELETE — _demask детектора НЕ должен
     слепо удалять ZWJ: удаление ломает эмодзи-секвенции и арабское/индийское
     соединение. Для ZWJ в машинном ЛАТИНСКОМ контексте demask корректен. Граница
