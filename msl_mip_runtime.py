@@ -37,6 +37,7 @@ from integrator_engine import process_output
 from sequence_engine import process_sequence
 import sequence_engine as _se   # F-NEW-3: reuse domain/context helpers for the removal probe
 from sequence_integrator_engine import process_sequence_output
+from o1_policy_engine import pending_for as _o1_pending_for  # P3: report-only disposition
 from matchers import dot_matcher
 
 
@@ -789,6 +790,23 @@ def analyze(text: str, cards: list) -> dict:
     # with and without it. Default: projection enabled.
     if os.environ.get("MSL_MIP_PROJECTION_DISABLED") != "1":
         report["canonical_projection"] = canonical_projection_annotate(text)
+    # PENDING DISPOSITION (P3): a cell that was examined and deliberately left
+    # un-escalated must not read as silence. For every occurrence landing in a cell the
+    # O1 registry documents as PENDING_PREDICATE, report BOTH honest readings plus the
+    # gap and the evidence that would unblock a rule. Report-ONLY and additive: it is
+    # never read by any action path, and a level is never derived from it.
+    _pending = []
+    for _v in seq_out.relation_verdicts:
+        _vf = _v.get("visible_form", "")
+        if len(_vf) != 1:
+            continue
+        _rec = _o1_pending_for(ord(_vf), _v.get("detected_context"))
+        if _rec is not None:
+            _entry = dict(_rec)
+            _entry["at_offset"] = _v.get("at_offset")
+            _pending.append(_entry)
+    if _pending:
+        report["pending_disposition"] = _pending
     return report
 
 

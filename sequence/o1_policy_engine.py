@@ -44,6 +44,34 @@ PolicyRow = namedtuple("PolicyRow", "sign_cp context occurrence_role target rule
 # after their own author decision + row-liveness proof (never wholesale).
 ACTIVE_POLICY_REGISTRY: tuple = ()
 
+# --- PENDING disposition (P3 of AUTHOR_DECISION_20260721_D-O1-TOKEN-CELL) -------------
+# A cell that was EXAMINED and deliberately left un-escalated must not read as silence.
+# "No rule" and "rule applied, did not fire" are different facts, and a reader of the
+# registry deserves to see WHY a known divergence carries no row: what gap blocks it and
+# what evidence would unblock it. These rows are DOCUMENTATION: they are NEVER consulted
+# by evaluate() and can never change a level (the gate pins this).
+PendingRow = namedtuple(
+    "PendingRow", "sign_cp context hypotheses blocking_gap required_evidence provenance")
+
+PENDING_PREDICATE_REGISTRY: tuple = (
+    PendingRow(
+        sign_cp=0xFEFF,
+        context="BYTE_EXACT_TOKEN",
+        # Both readings are honest and, at this seam, indistinguishable. Saying so beats
+        # a level that pretends to a precision the runtime does not have.
+        hypotheses=("ghost-token attack (exact-match / allowlist evasion)",
+                    "transport artifact (export, paste, file concatenation)"),
+        blocking_gap="no predicate at this seam separates the two readings; a direct rule "
+                     "measured 67% benign escalations",
+        required_evidence="collapse-form predicate: the token's collapse matches the "
+                          "CONSUMER's protected allowlist (measured benign FP 0% / ghost "
+                          "TP 100%); needs collapse wiring, allowlist config and its own "
+                          "author decision",
+        provenance="RECONCILE_BYSPEC_ZWJ_BOM B3 + FP-measurement 2026-07-21 + "
+                   "AUTHOR_DECISION_20260721_D-O1-TOKEN-CELL",
+    ),
+)
+
 # Outcome of one occurrence's O1 evaluation.
 #   reason: DISABLED | NO_ACTIVE_RULE | NO_OP | APPLIED
 PolicyDecision = namedtuple(
@@ -115,6 +143,53 @@ def audit_field(decision: PolicyDecision):
         "provenance": decision.provenance,
         "seam": SEAM_ID,
     }
+
+
+def pending_for(sign_cp, context):
+    """The PENDING disposition record for a cell, or None. Pure lookup over DOCUMENTATION
+    rows -- callers may only report it. It is NOT consulted by evaluate() and cannot
+    change a level."""
+    for row in PENDING_PREDICATE_REGISTRY:
+        if (row.sign_cp, row.context) == (sign_cp, context):
+            return {
+                "codepoint": "U+%04X" % row.sign_cp,
+                "context": row.context,
+                "status": "PENDING_PREDICATE",
+                "consistent_with": list(row.hypotheses),
+                "blocking_gap": row.blocking_gap,
+                "required_evidence": row.required_evidence,
+                "provenance": row.provenance,
+            }
+    return None
+
+
+def lint_pending_registry(registry=None) -> list:
+    """Form check for the PENDING rows. They never affect a verdict, but a documentation
+    row with no gap, no evidence or no provenance is worthless -- it would re-create the
+    silence it exists to remove. Returns (context, reason) failures; empty list is clean."""
+    if registry is None:
+        registry = PENDING_PREDICATE_REGISTRY
+    fails = []
+    seen = set()
+    for row in registry:
+        cid = "%s/%s" % (row.sign_cp, row.context)
+        if not isinstance(row.sign_cp, int) or isinstance(row.sign_cp, bool):
+            fails.append((cid, "sign_cp must be an int codepoint"))
+        if not isinstance(row.context, str) or not row.context:
+            fails.append((cid, "context must be a concrete non-empty string"))
+        if not row.hypotheses or len(row.hypotheses) < 2:
+            fails.append((cid, "a pending cell must name at least TWO readings (it is "
+                               "pending precisely because they are indistinguishable)"))
+        if not row.blocking_gap:
+            fails.append((cid, "missing blocking_gap (what stops a rule)"))
+        if not row.required_evidence:
+            fails.append((cid, "missing required_evidence (what would unblock it)"))
+        if not row.provenance:
+            fails.append((cid, "missing provenance"))
+        if cid in seen:
+            fails.append((cid, "duplicate pending cell"))
+        seen.add(cid)
+    return fails
 
 
 def lint_registry(registry=None) -> list:
