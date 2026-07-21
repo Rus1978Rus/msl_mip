@@ -38,6 +38,7 @@ from sequence_engine import process_sequence
 import sequence_engine as _se   # F-NEW-3: reuse domain/context helpers for the removal probe
 from sequence_integrator_engine import process_sequence_output
 from o1_policy_engine import pending_for as _o1_pending_for  # P3: report-only disposition
+from o1_policy_engine import O1Context as _O1Context         # C6: caller-supplied targets
 from matchers import dot_matcher
 
 
@@ -689,9 +690,18 @@ def canonical_projection_annotate(text: str) -> dict:
         }
 
 
-def analyze(text: str, cards: list) -> dict:
+def analyze(text: str, cards: list, protected_targets=None) -> dict:
     """Full text run through all layers. Returns a report structure
-    for printing (and possible programmatic use)."""
+    for printing (and possible programmatic use).
+
+    protected_targets — OPTIONAL set of strings the CALLER protects (exact-match
+      allowlist / policy keywords). Supplying it enables the C6 stripped-match rule: a
+      token whose written form is NOT a target but whose collapse IS is an impersonation
+      and is raised to hold. Default None = the rule is unreachable and the analysis is
+      byte-identical to before. The consumer owns these semantics; the system ships no
+      word list of its own. See AUTHOR_DECISION_20260721_D-O1-C6-NARROW for the measured
+      caveat: ORDINARY-WORD targets (system/select/root/...) also occur in prose and
+      raise false positives — keep the list narrow and specific until CONTEXT_V2 lands."""
     known_signs = {c.visible_form for c in cards}
 
     # --- Single-sign layer ---
@@ -704,8 +714,17 @@ def analyze(text: str, cards: list) -> dict:
         single_actions.append(decision.runtime_action)
 
     # --- Sequence layer ---
+    # C6 context passed DOWN as data (no import upward, no global state): the caller's
+    # protected targets plus the verified class-138 set, which lives here. With no targets
+    # the deriver returns nothing and the O1 row is unreachable.
+    _o1_ctx = None
+    if protected_targets:
+        _o1_ctx = _O1Context(
+            protected_targets=frozenset(t.lower() for t in protected_targets),
+            class138=_monitored_138_set(),
+        )
     seq_out = process_sequence(text, cards, sign_statuses=sign_statuses,
-                               known_signs=known_signs)
+                               known_signs=known_signs, o1_ctx=_o1_ctx)
     seq_decision = process_sequence_output(seq_out)
 
     # --- Relation (mask) verdicts -> actions (relation axis, D-REL-4) ---

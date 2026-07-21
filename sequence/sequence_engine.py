@@ -27,7 +27,9 @@ import unicodedata
 from sign_core_card import SignCoreCard, RiskLevel
 from sequence_output import SequenceMatch, SequenceOutput
 from public_suffix import load_single_tlds
-from o1_policy_engine import final_level as o1_final_level, audit_field as o1_audit_field
+from o1_policy_engine import (final_level as o1_final_level,
+                              audit_field as o1_audit_field,
+                              derive_occurrence_role as o1_derive_role)
 
 
 def _build_candidate_pool(cards: list) -> list:
@@ -704,7 +706,7 @@ _RELATION_RUNTIME_ROLE = {
 }
 
 
-def _assess_relation_risk(text: str, sign_statuses: list) -> list:
+def _assess_relation_risk(text: str, sign_statuses: list, o1_ctx=None) -> list:
     """STAGE_6b: verdict per active mask (D-REL-4/6).
     Barrier N3: read ONLY active_relation_candidates."""
     verdicts = []
@@ -751,14 +753,15 @@ def _assess_relation_risk(text: str, sign_statuses: list) -> list:
 
             # O1 CONTEXTUAL SEVERITY OVERLAY (seam RELATION_PATH_O1_HOOK_v0_1).
             # Additive, monotonic, RAISE-ONLY. Works on the RiskLevel ENUM HERE,
-            # BEFORE risk.value is serialized below. INCREMENT-0: the registry is
-            # empty, so final_risk == risk always and o1_audit is None -> zero
-            # delta on the verified path. NEVER calls _detect_context_at (reads the
-            # already-computed detected_context). The card owns occurrence_role;
-            # it is not wired at this seam yet (increment-1) -> passed as None.
+            # BEFORE risk.value is serialized below. NEVER calls _detect_context_at
+            # (reads the already-computed detected_context).
+            # occurrence_role is DERIVED here (C6 stripped-match signature). It is None
+            # unless the caller supplied protected targets, so with no targets no row can
+            # match and the whole layer stays inert -- the default remains zero-delta.
             vf = cand.get("visible_form", "")
             sign_cp = ord(vf) if len(vf) == 1 else None
-            final_risk, o1_decision = o1_final_level(risk, sign_cp, ctx)
+            occ_role = o1_derive_role(text, offset, o1_ctx)
+            final_risk, o1_decision = o1_final_level(risk, sign_cp, ctx, occ_role)
 
             verdict = {
                 "visible_form": vf,
@@ -788,7 +791,8 @@ def _assess_relation_risk(text: str, sign_statuses: list) -> list:
 
 def process_sequence(text: str, cards: list,
                      sign_statuses: list = None,
-                     known_signs: set = None) -> SequenceOutput:
+                     known_signs: set = None,
+                     o1_ctx=None) -> SequenceOutput:
     """The full STAGE_1-7 of the sequence layer.
 
     text          — the source text (same as fed to module_engine)
@@ -846,7 +850,7 @@ def process_sequence(text: str, cards: list,
     # --- STAGE_6b: RELATION_RISK (step 4, D-REL-4/6) — BEFORE the pool ---
     # The mask verdict does not depend on the normal candidate pool: a
     # mask is itself a reason to analyse. Barrier N3: only active ones.
-    relation_verdicts = _assess_relation_risk(text, sign_statuses)
+    relation_verdicts = _assess_relation_risk(text, sign_statuses, o1_ctx=o1_ctx)
 
     # D-DET-2: mark the whole run DEGRADED when a bare-domain mask verdict
     # was computed against an unavailable TLD registry (fail-closed by

@@ -40,9 +40,82 @@ SEAM_ID = "RELATION_PATH_O1_HOOK_v0_1"
 #   provenance      -- reconcile + author-decision id, required.
 PolicyRow = namedtuple("PolicyRow", "sign_cp context occurrence_role target rule_id provenance")
 
-# INCREMENT-0: NO active rules. Rows are added, one at a time with provenance, only
-# after their own author decision + row-liveness proof (never wholesale).
-ACTIVE_POLICY_REGISTRY: tuple = ()
+# Rows are added ONE AT A TIME, each with provenance and its own author decision.
+# The single active row fires only for an occurrence whose derived role is the
+# stripped-match signature -- which requires the caller to have supplied targets. With no
+# targets the role is never derived, so this row is unreachable and the layer is inert.
+ACTIVE_POLICY_REGISTRY: tuple = (
+    PolicyRow(
+        sign_cp=0xFEFF,
+        context="BYTE_EXACT_TOKEN",
+        occurrence_role="COLLAPSE_IMPERSONATES_PROTECTED_TARGET",
+        target=RiskLevel.HIGH,
+        rule_id="O1-BOM-TOKEN-COLLAPSE-IMPERSONATION",
+        provenance="RECONCILE_BYSPEC_ZWJ_BOM B3 + C1-vs-C6 measurement 2026-07-21 + "
+                   "AUTHOR_DECISION_20260721_D-O1-C6-NARROW",
+    ),
+)
+
+# --- C6 collapse-form deriver (AUTHOR_DECISION_20260721_D-O1-C6-NARROW) ---------------
+# The ghost-token attack has ONE necessary property: with the invisibles removed the token
+# must impersonate something the consumer actually protects. "pay<BOM>pal" is an attack
+# because it collapses to "paypal"; "paragraph<BOM>joined" is an artifact because it
+# collapses to nothing anyone protects. So the predicate is the STRIPPED-MATCH signature:
+#   the token as written is NOT a protected target, but its collapse IS.
+#
+# The consumer owns the semantics: the target list is supplied per call and is EMPTY by
+# default, so this derives nothing and the layer stays inert unless a caller opts in.
+# The system carries NO word list of its own (a system dictionary would be semantic drift,
+# and a GENERAL dictionary is worse -- it would miss "paypal" precisely because "paypal"
+# is an ordinary string to a dictionary).
+#
+# MEASURED LIMIT (why "narrow"): false positives depend on WHAT IS ON THE LIST, not on the
+# predicate. Targets that are ordinary English words (system, select, drop, login, root,
+# password) also occur in prose, where a stray invisible collapses them to a "match":
+#   list of brand/technical targets only -> benign FP 0%, ghost TP 50%
+#   typical mixed list (+admin/root/login/...) -> benign FP 50%, ghost TP 100%
+# The residue is not fixable here: the predicate cannot tell prose from a machine string.
+# That is the context-detector front (CONTEXT_V2). Until then this cell is honest only with
+# a narrow, non-dictionary target list -- documented, surfaced, and the caller's choice.
+ROLE_COLLAPSE_IMPERSONATION = "COLLAPSE_IMPERSONATES_PROTECTED_TARGET"
+
+# Data passed DOWN from the runtime (no import upward, no global state, single source of
+# truth): the consumer's targets and the verified class-138 codepoint set.
+O1Context = namedtuple("O1Context", "protected_targets class138")
+
+
+def _token_span(text, i, class138):
+    """Maximal run of [alphanumeric or class-138 member] containing index i."""
+    def ok(ch):
+        return ch.isalnum() or ord(ch) in class138
+    l = i
+    while l > 0 and ok(text[l - 1]):
+        l -= 1
+    r = i
+    while r + 1 < len(text) and ok(text[r + 1]):
+        r += 1
+    return text[l:r + 1]
+
+
+def derive_occurrence_role(text, at_offset, o1_ctx):
+    """Occurrence role for one invisible at at_offset, or None. Pure, O(token length),
+    reads only the already-available text; never touches the context detector."""
+    if not o1_ctx or not o1_ctx.protected_targets or not o1_ctx.class138:
+        return None                      # opt-in: no targets -> derive nothing -> inert
+    try:
+        if not (0 <= at_offset < len(text)):
+            return None
+        token = _token_span(text, at_offset, o1_ctx.class138)
+        collapsed = "".join(ch for ch in token if ord(ch) not in o1_ctx.class138)
+        targets = o1_ctx.protected_targets
+        # STRIPPED-MATCH: written form is not a target, the collapse is. If the token were
+        # already the target there is no impersonation -- nothing was hidden.
+        if collapsed.lower() in targets and token.lower() not in targets:
+            return ROLE_COLLAPSE_IMPERSONATION
+        return None
+    except Exception:
+        return None                      # fail-closed: derive nothing, never escalate on error
+
 
 # --- PENDING disposition (P3 of AUTHOR_DECISION_20260721_D-O1-TOKEN-CELL) -------------
 # A cell that was EXAMINED and deliberately left un-escalated must not read as silence.
@@ -88,8 +161,14 @@ _WILDCARD_ROLES = frozenset({"*", "ANY", "ALL", ""})
 
 def o1_enabled() -> bool:
     """Read the flag at CALL time (so a test can toggle OFF/ON within one process).
-    Default OFF: the seam returns the base level unchanged until O1 is switched on."""
-    return os.environ.get("MSL_MIP_O1_ENABLED", "0") == "1"
+
+    Default ON, and that is safe by CONSTRUCTION rather than by the flag: the only active
+    row requires an occurrence_role that is derived solely from caller-supplied protected
+    targets, so with no targets the role is never derived, the row is unreachable, and the
+    analysis is identical. (In increment-0 the flag itself carried the inertness because
+    the registry was empty; that job now belongs to the empty-targets property.) The flag
+    remains as an explicit kill switch: MSL_MIP_O1_ENABLED=0 disables the layer outright."""
+    return os.environ.get("MSL_MIP_O1_ENABLED", "1") == "1"
 
 
 def _lookup(sign_cp, context, occurrence_role):
