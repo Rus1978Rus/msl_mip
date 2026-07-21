@@ -31,7 +31,11 @@ DEFAULT_ACTION_MAP = {
     RiskLevel.LOW: "log_only",
     RiskLevel.MEDIUM: "queue_for_review",
     RiskLevel.HIGH: "hold_pending_review",
-    RiskLevel.CRITICAL: "escalate_to_human",
+    # Witness frame: the machine is a witness, not a judge -- no auto-escalation.
+    # CRITICAL surfaces as hold (a loud recommendation), consistent with the relation
+    # axis (_REL_ACTION, msl_mip_runtime.py) which already maps CRITICAL->hold. The
+    # divergent escalate_to_human here was a demo artifact (audit_silent_paths_2026-07-12).
+    RiskLevel.CRITICAL: "hold_pending_review",
 }
 
 

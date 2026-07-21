@@ -30,7 +30,10 @@ DEFAULT_ACTION_MAP = {
     RiskLevel.LOW: "log_only",
     RiskLevel.MEDIUM: "queue_for_review",
     RiskLevel.HIGH: "hold_pending_review",
-    RiskLevel.CRITICAL: "escalate_to_human",
+    # Witness frame: no auto-escalation. CRITICAL -> hold, consistent with the relation
+    # axis (_REL_ACTION) which already maps CRITICAL->hold. The divergent escalate_to_human
+    # was a demo artifact reconciled here (audit_silent_paths_2026-07-12).
+    RiskLevel.CRITICAL: "hold_pending_review",
 }
 
 # NON-enum SKULL.SC* risks are contextual strings. The action is
