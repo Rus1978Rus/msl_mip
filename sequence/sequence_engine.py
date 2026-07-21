@@ -27,6 +27,7 @@ import unicodedata
 from sign_core_card import SignCoreCard, RiskLevel
 from sequence_output import SequenceMatch, SequenceOutput
 from public_suffix import load_single_tlds
+from o1_policy_engine import final_level as o1_final_level, audit_field as o1_audit_field
 
 
 def _build_candidate_pool(cards: list) -> list:
@@ -748,8 +749,19 @@ def _assess_relation_risk(text: str, sign_statuses: list) -> list:
                     and risk != RiskLevel.NONE:
                 risk = _downgrade(risk)
 
-            verdicts.append({
-                "visible_form": cand.get("visible_form", ""),
+            # O1 CONTEXTUAL SEVERITY OVERLAY (seam RELATION_PATH_O1_HOOK_v0_1).
+            # Additive, monotonic, RAISE-ONLY. Works on the RiskLevel ENUM HERE,
+            # BEFORE risk.value is serialized below. INCREMENT-0: the registry is
+            # empty, so final_risk == risk always and o1_audit is None -> zero
+            # delta on the verified path. NEVER calls _detect_context_at (reads the
+            # already-computed detected_context). The card owns occurrence_role;
+            # it is not wired at this seam yet (increment-1) -> passed as None.
+            vf = cand.get("visible_form", "")
+            sign_cp = ord(vf) if len(vf) == 1 else None
+            final_risk, o1_decision = o1_final_level(risk, sign_cp, ctx)
+
+            verdict = {
+                "visible_form": vf,
                 "target": cand.get("target", ""),
                 # Level 3 (Z3-02): NO silent "CODEPOINT" fallback at this seam.
                 # module_engine always carries target_kind; an empty value here
@@ -760,11 +772,17 @@ def _assess_relation_risk(text: str, sign_statuses: list) -> list:
                 "at_offset": offset,
                 "detected_context": ctx,
                 "protected": protected,
-                "risk_level": risk.value,
+                "risk_level": final_risk.value,
                 "canon_hypothesis": None,  # probe deferred (D3)
                 "relation_id": cand.get("relation_id", ""),
                 "tld_source_degraded": tld_degraded,  # D-DET-2
-            })
+            }
+            # Audit field IFF a policy row fired (final > base). Absent otherwise,
+            # so increment-0 (empty registry) adds no key -> batteries bit-identical.
+            o1_audit = o1_audit_field(o1_decision)
+            if o1_audit is not None:
+                verdict["o1_policy"] = o1_audit
+            verdicts.append(verdict)
     return verdicts
 
 
