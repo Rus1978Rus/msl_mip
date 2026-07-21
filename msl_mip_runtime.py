@@ -620,6 +620,74 @@ def class_guard_annotate(text: str, carded=frozenset()) -> dict:
         }
 
 
+# --- CANONICAL PROJECTION (P1 of AUTHOR_DECISION_20260721_D-O1-TOKEN-CELL) -----------
+# WHY: the token cell stays at MEDIUM/queue -- measurement showed a direct escalation
+# would false-positive on 67% of benign BOM-carrying text. The value is not a louder
+# siren but SHOWING the human what the invisible does: "looks like paypal; actually
+# pay<U+FEFF>pal". The projection states a STRUCTURAL fact and judges nothing.
+#
+# HARD LIMIT: this is DISPLAY ONLY. The collapsed form must NEVER be used as the string
+# a decision is made on -- that would be a silent sanitizer, destroying the very byte
+# difference a ghost-token exploits. Like class_guard, it lives in its own report field
+# and is NEVER read by the verdict path.
+PROJECTION_SCHEMA_VERSION = "canonical_projection/0.1"
+_PROJECTION_TOKEN_CAP = 512               # resource bound; TRACE_TRUNCATED beyond this
+
+
+def canonical_projection_annotate(text: str) -> dict:
+    """Report-only projection. PURE and CONTEXT-FREE. For every whitespace-delimited
+    token carrying a class-138 member, report the token as written, its collapsed form
+    (members removed) and the members' offsets in ORIGINAL coordinates. Fail-open."""
+    try:
+        monitored = _monitored_138_set()
+        tokens = []
+        overflow = 0
+        i = 0
+        n = len(text)
+        while i < n:
+            if text[i].isspace():
+                i += 1
+                continue
+            start = i
+            while i < n and not text[i].isspace():
+                i += 1
+            tok = text[start:i]
+            members = [(start + k, ord(ch)) for k, ch in enumerate(tok)
+                       if ord(ch) in monitored]
+            if not members:
+                continue
+            if len(tokens) >= _PROJECTION_TOKEN_CAP:
+                overflow += 1
+                continue
+            collapsed = "".join(ch for ch in tok if ord(ch) not in monitored)
+            tokens.append({
+                "token_offset": start,             # original coordinates (P5 convention)
+                "original_token": tok,
+                "collapsed_token": collapsed,      # DISPLAY ONLY -- never a decision string
+                "members": [{"codepoint": "U+%04X" % cp, "original_offset": off}
+                            for off, cp in members],
+                "tag": "PROJECTION",
+            })
+        return {
+            "schema_version": PROJECTION_SCHEMA_VERSION,
+            "tokens": tokens,
+            "token_count": len(tokens) + overflow,
+            "truncated": overflow,
+            "display_only": True,                  # contract: not a normalization source
+            "status": "OK" if overflow == 0 else "TRACE_TRUNCATED",
+        }
+    except Exception as e:                         # fail-open, never crash the pipeline
+        return {
+            "schema_version": PROJECTION_SCHEMA_VERSION,
+            "tokens": [],
+            "token_count": 0,
+            "truncated": 0,
+            "display_only": True,
+            "status": "PROJECTION_FAILURE",
+            "error": type(e).__name__,
+        }
+
+
 def analyze(text: str, cards: list) -> dict:
     """Full text run through all layers. Returns a report structure
     for printing (and possible programmatic use)."""
@@ -714,6 +782,13 @@ def analyze(text: str, cards: list) -> dict:
     }
     if class_guard is not None:              # omitted only under MSL_MIP_GUARD_DISABLED
         report["class_guard"] = class_guard  # increment-1 shadow field (report-only)
+    # CANONICAL PROJECTION (P1): additive, report-ONLY, display-only. Never read by
+    # single_actions / relation_actions / semantic_action / effective_action, so a broken
+    # projection cannot change a verdict. MSL_MIP_PROJECTION_DISABLED=1 omits the field
+    # entirely -- used by the zero-delta gate to prove the rest of the report is identical
+    # with and without it. Default: projection enabled.
+    if os.environ.get("MSL_MIP_PROJECTION_DISABLED") != "1":
+        report["canonical_projection"] = canonical_projection_annotate(text)
     return report
 
 
