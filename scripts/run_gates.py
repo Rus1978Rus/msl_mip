@@ -28,6 +28,8 @@ TESTS = os.path.join(REPO, "tests")
 EXCLUDE = {
     "zwsp_oracle_manifest.py": "module (MANIFEST imported by sim_bycode_v2), not a standalone gate",
     "reconcile_byspec_probe.py": "measure-only probe (no assert; always exits 0)",
+    "verified_class_harness.py": "module (imported by zwj_bom_battery), not a standalone gate",
+    "zwj_bom_manifests.py": "module (ZWJ/BOM manifests imported by zwj_bom_battery), not a gate",
 }
 
 TIMEOUT_S = 300
