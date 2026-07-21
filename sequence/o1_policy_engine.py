@@ -49,9 +49,13 @@ ACTIVE_POLICY_REGISTRY: tuple = ()
 PolicyDecision = namedtuple(
     "PolicyDecision", "base_level final_level matched rule_id provenance reason")
 
-_FORBIDDEN_TARGETS = frozenset({RiskLevel.CRITICAL})  # witness frame: no auto-escalation
+# Witness scale for O1 targets: an overlay escalates to queue (MEDIUM) or hold (HIGH).
+# NONE (no-op), LOW (below the scale), and CRITICAL/escalate (out of the witness frame,
+# = auto-intervention) are all forbidden as targets.
+_ALLOWED_TARGETS = frozenset({RiskLevel.MEDIUM, RiskLevel.HIGH})
 _ZWSP_CP = 0x200B                                     # verified path -- never an O1 key
-_WILDCARD_CONTEXTS = frozenset({"*", "ANY", None})
+_WILDCARD_CONTEXTS = frozenset({"*", "ANY", "ALL", None})
+_WILDCARD_ROLES = frozenset({"*", "ANY", "ALL", ""})
 
 
 def o1_enabled() -> bool:
@@ -116,32 +120,55 @@ def audit_field(decision: PolicyDecision):
 def lint_registry(registry=None) -> list:
     """Structural linter for the policy registry. Returns a list of (rule_id, reason)
     failures; an empty list is clean. The increment-0 empty registry passes trivially,
-    but the linter is real and self-tested (a bad row must be rejected).
+    but the linter is real and self-tested (each malformed row must be rejected).
 
-    Rejects: ZWSP key (verified path); wildcard / class-default key; a target that is
-    not a RiskLevel; a CRITICAL/escalate target (witness frame); a NONE target (a no-op
-    that can never raise); a missing rule_id or provenance.
-    NOTE: the 'no-op vs the context base' check (a target <= the base risk of that
-    context) needs the _SCOPE_RISK base map and is wired in increment-1 when rules exist.
+    Rejects, per row:
+      - sign_cp not an int codepoint (a string like "U+FEFF" is a DEAD row: the seam
+        keys by ord(vf):int, so a string key never matches -- caught here, not at runtime);
+      - ZWSP codepoint as a key (verified path);
+      - context that is empty / not a concrete string / a wildcard / class-default;
+      - occurrence_role that is a wildcard string (None is allowed);
+      - target that is not a RiskLevel, or not in {MEDIUM, HIGH} (NONE/LOW/CRITICAL out);
+      - missing rule_id or provenance;
+      - a duplicate (sign_cp, context, occurrence_role) key (_lookup would silently
+        shadow the second row).
+    NOTE: the 'no-op vs the context base' check (target <= the base risk of that context)
+    needs the _SCOPE_RISK base map and is wired in increment-1 when rules exist.
     """
     if registry is None:
         registry = ACTIVE_POLICY_REGISTRY
     fails = []
+    seen = {}
     for row in registry:
         rid = row.rule_id or "<no-id>"
-        if row.sign_cp == _ZWSP_CP:
+        # sign_cp: an int codepoint, never a name/string/None/bool.
+        if not isinstance(row.sign_cp, int) or isinstance(row.sign_cp, bool):
+            fails.append((rid, "sign_cp must be an int codepoint (not a name/string/None)"))
+        elif row.sign_cp == _ZWSP_CP:
             fails.append((rid, "ZWSP key forbidden (verified path)"))
-        if row.sign_cp is None or row.sign_cp == "*" or row.context in _WILDCARD_CONTEXTS \
-                or row.occurrence_role == "*":
-            fails.append((rid, "wildcard / class-default key forbidden"))
+        # context: a concrete non-empty string, never a class/wildcard.
+        if not isinstance(row.context, str) or row.context == "" \
+                or row.context in _WILDCARD_CONTEXTS:
+            fails.append((rid, "context must be a concrete non-empty string (no wildcard/class-default)"))
+        # occurrence_role: None is allowed; a wildcard string is not.
+        if row.occurrence_role is not None and (
+                not isinstance(row.occurrence_role, str)
+                or row.occurrence_role in _WILDCARD_ROLES):
+            fails.append((rid, "occurrence_role must be None or a concrete role (no wildcard)"))
+        # target: raise-only escalation to a witness level (MEDIUM=queue / HIGH=hold).
         if not isinstance(row.target, RiskLevel):
             fails.append((rid, "target is not a RiskLevel"))
-        elif row.target in _FORBIDDEN_TARGETS:
-            fails.append((rid, "CRITICAL/escalate target forbidden (witness frame)"))
-        elif row.target == RiskLevel.NONE:
-            fails.append((rid, "NONE target is a no-op (cannot raise)"))
+        elif row.target not in _ALLOWED_TARGETS:
+            fails.append((rid, "target must be MEDIUM or HIGH (no NONE/LOW/CRITICAL)"))
+        # provenance + rule_id required.
         if not row.rule_id:
             fails.append((rid, "missing rule_id"))
         if not row.provenance:
             fails.append((rid, "missing provenance"))
+        # duplicate exact key -> _lookup silently takes the first; forbid it.
+        key = (row.sign_cp, row.context, row.occurrence_role)
+        if key in seen:
+            fails.append((rid, "duplicate key %r (shadows rule %s)" % (key, seen[key])))
+        else:
+            seen[key] = rid
     return fails
