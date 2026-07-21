@@ -92,20 +92,50 @@ def _find_card_file(filename: str) -> str:
     return None
 
 
-def load_all_cards() -> list:
-    """Loads all available cards. Prints a warning when one is
-    missing, but does not crash."""
+def load_cards_report() -> dict:
+    """Load all cards AND return a STRUCTURED load report, so a programmatic caller can
+    tell that a detector was dropped instead of only seeing a stdout warning.
+
+    Returns {cards, load_warnings, expected, loaded, degraded}:
+      - cards        -- the SignCoreCards that loaded (same list as load_all_cards()).
+      - load_warnings-- one entry per missing/failed card: {card, status, error}
+                        (status = MISSING | FAILED).
+      - expected/loaded/degraded -- counts + a bool flag; degraded=True means at least
+        one card did not load, so the corresponding sign will not be recognized.
+
+    A missing DETECTOR is a silent-pass risk (a threat becomes invisible to that
+    subsystem), so this must be visible in a structured form, not only on stdout.
+    load_all_cards() stays the simple list-returning entry point (CLI/back-compat)."""
     cards = []
+    warnings = []
     for fname in CARD_FILENAMES:
         path = _find_card_file(fname)
         if path is None:
-            print(f"[WARNING] Card not found: {fname} — sign will not be recognized")
+            warnings.append({"card": fname, "status": "MISSING", "error": "file not found"})
             continue
         try:
             cards.append(load_card(path))
         except Exception as e:
-            print(f"[WARNING] Failed to load {fname}: {e}")
-    return cards
+            warnings.append({"card": fname, "status": "FAILED", "error": str(e)})
+    return {
+        "cards": cards,
+        "load_warnings": warnings,
+        "expected": len(CARD_FILENAMES),
+        "loaded": len(cards),
+        "degraded": bool(warnings),
+    }
+
+
+def load_all_cards() -> list:
+    """Loads all available cards. Prints a warning when one is missing/failed, but does
+    not crash. Backward-compatible list-returning entry point; for a structured load
+    status (programmatic callers that must not silently run with a dropped detector) use
+    load_cards_report()."""
+    report = load_cards_report()
+    for w in report["load_warnings"]:
+        print(f"[WARNING] {w['status']} card {w['card']}: {w['error']} "
+              f"— sign will not be recognized")
+    return report["cards"]
 
 
 def scan_signs(text: str, cards: list) -> list:
