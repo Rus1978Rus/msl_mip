@@ -120,7 +120,7 @@ To submit a change for review, use the packet template: `templates/CONVEYOR_RUN_
 - **WORKING_DRAFT** — this is an active research project, not production software.
 - The system works with **structure only**. It does not know "PayPal" is a brand. It knows that `com` in a non-final position of a domain chain is a structural signal of mimicry.
 - **Brand-lookalike domains with a single dot** (e.g. `paypai.com`) currently pass — that requires a separate reputation/typosquatting layer, which is future work.
-- Five sign cards are currently loaded (`.` `/` `💀` `☠` `@`); card `☠` (U+2620) remains a **test card** (WORKING_DRAFT), created to validate cross-card sequence logic. The **relation axis** (mask/homoglyph verdicts) is implemented and gated (step-4 gate 12/12), but no production mask card has been authored yet — the fullwidth solidus `／` card is the next planned entry.
+- **Nine sign cards are currently loaded.** Five are `ARTIFACT_CONFIRMED` (`.` U+002E, `/` U+002F, `💀` U+1F480, `☠` U+2620, `@` U+0040). The fullwidth solidus `／` (U+FF0F) — the **relation/mask axis**, no matcher, relations only — is loaded as `WORKING_DRAFT`. Three cards of the invisible *supervised class* (Cf ∧ Default_Ignorable) are also loaded: zero-width space (U+200B, `WORKINGLY_CLOSED`, battery 21/21), zero-width joiner (U+200D) and byte order mark (U+FEFF) as `WORKING_DRAFT`. The runtime prints a `CARD_NOT_CONVEYOR_REVIEWED` warning for every `WORKING_DRAFT` card, so a draft result is never passed off as reliable. The relation axis (mask/homoglyph verdicts) is implemented and gated (step-4 gate 12/12).
 - Sign cards are written in Russian (the project's authoritative language). Code output is in English.
 
 ## Standards Alignment
@@ -282,7 +282,7 @@ templates/              Шаблоны для расширения систем�
 - **WORKING_DRAFT** — это активный исследовательский проект, не production-софт.
 - Система работает **только со структурой**. Она не знает, что «PayPal» — это бренд. Она знает, что `com` в непоследней позиции доменной цепочки — структурный сигнал имитации.
 - **Домены-двойники брендов с одной точкой** (например `paypai.com`) сейчас проходят — для них нужен отдельный слой репутации/детекции typosquatting, это будущая работа.
-- Сейчас загружены пять карточек знаков (`.` `/` `💀` `☠` `@`); карточка `☠` (U+2620) остаётся **тестовой** (WORKING_DRAFT), создана для проверки межкарточной последовательной логики. **Ось «отношение»** (вердикты по маскам/гомоглифам) реализована и закрыта gate-тестом (шаг 4: 12/12), но боевой карточки-маски ещё нет — полноширинный солидус `／` запланирован следующим.
+- **Сейчас загружены девять карточек знаков.** Пять — `ARTIFACT_CONFIRMED` (`.` U+002E, `/` U+002F, `💀` U+1F480, `☠` U+2620, `@` U+0040). Полноширинный солидус `／` (U+FF0F) — **ось «отношение»/маска**, без матчера, только отношения — загружен как `WORKING_DRAFT`. Также загружены три карточки невидимого *поднадзорного класса* (Cf ∧ Default_Ignorable): пробел нулевой ширины (U+200B, `WORKINGLY_CLOSED`, батарея 21/21), соединитель нулевой ширины (U+200D) и маркер порядка байт (U+FEFF) как `WORKING_DRAFT`. Рантайм печатает предупреждение `CARD_NOT_CONVEYOR_REVIEWED` для каждой `WORKING_DRAFT`-карточки, поэтому черновой результат никогда не выдаётся за надёжный. Ось «отношение» (вердикты по маскам/гомоглифам) реализована и закрыта gate-тестом (шаг 4: 12/12).
 - Карточки знаков написаны на русском (авторитетный язык проекта). Вывод программы — на английском.
 
 ## Соответствие стандартам
