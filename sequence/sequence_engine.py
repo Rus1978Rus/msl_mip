@@ -339,6 +339,21 @@ def _strip_label_invisibles(s: str) -> str:
     return "".join(ch for ch in s if not _is_domain_label_invisible(ch))
 
 
+def _strip_combining_marks(s: str) -> str:
+    """Strip combining marks (Mn/Mc/Me) for RECONSTRUCTION ONLY. A combining mark
+    DECORATES a base letter; for the host/email/token SHAPE test the base letters and
+    the TLD still form the structure, so a mark must not cut the label.
+
+    Without this, a single combining mark anywhere in a host (e.g. an accent, valid in
+    IDN) cuts the positive domain scan -> the context falls to FREE_TEXT -> a CARDED
+    invisible host-break is gated to NONE and, being carded, never reaches the uncarded
+    witness either: goog<ZWSP>le<U+0301>.com goes from hold to a TRUE silent pass. The
+    composition is realistic because accents are legitimate in IDN domains. Measured and
+    closed here (mirrors _strip_label_invisibles: reconstruction only, text untouched)."""
+    return "".join(ch for ch in s
+                   if unicodedata.category(ch) not in ("Mn", "Mc", "Me"))
+
+
 def _has_alnum(s: str) -> bool:
     """A side of the mask is 'content-bearing' iff it has at least one
     alphanumeric char (F-NEW-2 root 2A). Deliberately NOT '== a full domain':
@@ -586,6 +601,15 @@ def _detect_context_at(text: str, offset: int, mask_chars=frozenset()) -> str:
     left_part = _strip_label_invisibles(left_part)
     right_part = _strip_label_invisibles(right_part)
     whole = _strip_label_invisibles(whole)
+
+    # Combining marks decorate a base letter; strip them for the SHAPE checks too, or a
+    # single accent in the host (valid in IDN) cuts the domain scan -> FREE_TEXT ->
+    # silences the carded invisible host-break (measured TRUE silent pass). Reconstruction
+    # only -- the source text is not mutated, and this is a no-op when no mark is present
+    # (so the verified ZWSP/ZWJ/BOM batteries stay bit-identical).
+    left_part = _strip_combining_marks(left_part)
+    right_part = _strip_combining_marks(right_part)
+    whole = _strip_combining_marks(whole)
 
     # host substitution — a domain on BOTH sides of the mask
     # (a.com<mask>evil.com, incl. tails via _domain_prefix in _looks_like_domain)
