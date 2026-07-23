@@ -23,6 +23,19 @@
   const pick = (a) => a[Math.floor(Math.random() * a.length)];
   const rnd = (a, b) => a + Math.random() * (b - a);
 
+  // «базовые» фрагменты — задают переменную из литерала (ни от чего не зависят).
+  // При гарантированном покрытии каждый попадает хотя бы в одну стартовую тучу,
+  // иначе зависящие от переменной фрагменты падали бы вечно.
+  const BASE = ['x = 5', 'y = 3', 'n = 7', 'k = 2', 'bolt = 42', 'msg = "storm"'];
+  const SEED_N = 9;
+  const shuffle = (a) => {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+
   /* ---- ссылки на DOM ---- */
   const sky = document.getElementById('sky');
   const canvas = document.getElementById('fx');
@@ -43,6 +56,7 @@
   let buffer = [], charge = 0, strikes = 0, okLines = 0;
   let running = true, speed = 1, gustUntil = 0;
   let memory = false, skyEnv = {};   // «память неба»: общий namespace между разрядами
+  let coverage = false;              // гарантированное покрытие базовых определений
   let W = 0, H = 0;
   const dpr = Math.min(devicePixelRatio || 1, 2);
   const lastPair = new Map();
@@ -137,9 +151,15 @@
   function seed() {
     clouds.forEach((c) => c.el.remove());
     clouds = [];
-    for (let i = 0; i < 6; i++) {
-      makeCloud(rnd(20, Math.max(40, W - CW - 20)), rnd(20, Math.max(40, H - CH - 20)));
+    let frags;
+    if (coverage) {
+      frags = BASE.slice();                                  // все базовые определения
+      while (frags.length < SEED_N) frags.push(pick(POOL));  // добить случайными
+      shuffle(frags);
+    } else {
+      frags = Array.from({ length: SEED_N }, () => pick(POOL));
     }
+    frags.forEach((f) => makeCloud(rnd(20, Math.max(40, W - CW - 20)), rnd(20, Math.max(40, H - CH - 20)), f));
   }
 
   /* ---- частицы + отрисовка молнии ---- */
@@ -363,6 +383,15 @@
     e.currentTarget.classList.toggle('primary', memory);
     renderSkyVars();
     toast(memory ? '🧠 память неба включена — namespace копится между разрядами' : '🧠 память выключена — каждый разряд с чистого листа');
+  });
+  document.getElementById('btnCov').addEventListener('click', (e) => {
+    coverage = !coverage;
+    e.currentTarget.textContent = coverage ? '🎯 Покрытие: вкл' : '🎯 Покрытие: выкл';
+    e.currentTarget.classList.toggle('primary', coverage);
+    // пере-засеять небо по новому правилу; накопление начинаем заново
+    buffer = []; charge = 0; skyEnv = {}; particles = []; bolt = null; lastPair.clear();
+    seed(); renderBuf(); renderSkyVars(); updateTelemetry();
+    toast(coverage ? '🎯 покрытие включено — базовые определения гарантированы' : '🎲 покрытие выключено — фрагменты случайны');
   });
   document.getElementById('btnReset').addEventListener('click', () => {
     buffer = []; charge = 0; strikes = 0; okLines = 0; particles = []; bolt = null; lastPair.clear();
