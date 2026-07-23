@@ -360,6 +360,12 @@ main{
   display:flex;gap:8px;
 }
 .code .ln .g{color:var(--faint);user-select:none}
+.code .ln .who{
+  color:var(--neg);font-size:10px;line-height:1.7;
+  background:rgba(87,201,230,.12);border:1px solid rgba(87,201,230,.28);
+  border-radius:4px;padding:0 4px;align-self:center;
+  user-select:none;flex:0 0 auto;min-width:2.6ch;text-align:center;
+}
 .code .ln.err .src{color:var(--err);text-decoration:line-through;text-decoration-color:rgba(255,144,144,.4)}
 .code .ln.err .note{color:var(--err);opacity:.8}
 .code .ln .note{color:var(--faint)}

@@ -84,10 +84,11 @@
       return;
     }
     bufEl.innerHTML = '';
-    buffer.forEach((line) => {
+    buffer.forEach((b) => {
       const s = document.createElement('span');
       s.className = 'bchip';
-      s.textContent = line;
+      s.textContent = b.line;
+      s.title = 'от ' + b.from;
       bufEl.appendChild(s);
     });
   }
@@ -227,17 +228,20 @@
   /* ---- журнал разрядов ---- */
   function esc(s) { return s.replace(/[&<>]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m])); }
 
-  function logStrike(lines, res) {
+  function logStrike(entries, res) {
     if (emptyEl) emptyEl.style.display = 'none';
     const el = document.createElement('div');
     el.className = 'strike';
     const okc = res.trace.filter((t) => t.ok).length;
-    let html = '<div class="st-head"><span>⚡ Разряд #' + strikes + '</span><span class="meta">' + lines.length + ' фрагм. · ' + okc + '/' + lines.length + ' ok</span></div>';
+    const n = entries.length;
+    let html = '<div class="st-head"><span>⚡ Разряд #' + strikes + '</span><span class="meta">' + n + ' фрагм. · ' + okc + '/' + n + ' ok</span></div>';
     html += '<div class="code">';
     res.trace.forEach((t, i) => {
       const g = String(i + 1).padStart(2, '0');
-      if (t.ok) html += '<div class="ln"><span class="g">' + g + '</span><span class="src">' + esc(t.line) + '</span></div>';
-      else html += '<div class="ln err"><span class="g">' + g + '</span><span class="src">' + esc(t.line) + '</span><span class="note"># ' + esc(t.err) + '</span></div>';
+      const who = entries[i] ? esc(entries[i].from) : '';
+      let row = '<div class="' + (t.ok ? 'ln' : 'ln err') + '"><span class="g">' + g + '</span><span class="who">' + who + '</span><span class="src">' + esc(t.line) + '</span>';
+      if (!t.ok) row += '<span class="note"># ' + esc(t.err) + '</span>';
+      html += row + '</div>';
     });
     html += '</div>';
     if (res.out.length) {
@@ -252,7 +256,10 @@
   }
 
   /* ---- разряд ---- */
-  function pushBuf(line) { if (buffer[buffer.length - 1] !== line) buffer.push(line); }
+  function pushBuf(line, from) {
+    const last = buffer[buffer.length - 1];
+    if (!last || last.line !== line) buffer.push({ line, from });
+  }
 
   function triggerStrike(x, y) {
     if (buffer.length === 0) {
@@ -260,17 +267,18 @@
       toast('⚡ разряд вхолостую — очаг пуст', 'zap');
       return;
     }
-    const lines = buffer.slice();
+    const entries = buffer.slice();
     buffer = []; charge = 0;
+    const lines = entries.map((e) => e.line);
     // память неба: тот же namespace между разрядами → программа растёт
     const res = StormLang.runProgram(lines, memory ? skyEnv : {});
     strikes++;
     okLines += res.trace.filter((t) => t.ok).length;
     strikeAt(x || W / 2, y || H * 0.55);
-    logStrike(lines, res);
+    logStrike(entries, res);
     const okc = res.trace.filter((t) => t.ok).length;
     const printed = res.out.length;
-    toast('⚡ разряд #' + strikes + ' · ' + okc + '/' + lines.length + ' ok' + (printed ? ' · вывод ↓' : ''), 'zap');
+    toast('⚡ разряд #' + strikes + ' · ' + okc + '/' + entries.length + ' ok' + (printed ? ' · вывод ↓' : ''), 'zap');
     clouds.forEach((c) => { c.charge *= 0.3; paintCloud(c); });
     renderBuf();
     renderSkyVars();
@@ -377,7 +385,7 @@
               charge += Math.abs(delta);
               const mx = (a.x + b.x) / 2 + CW / 2, my = (a.y + b.y) / 2 + CH / 2;
               spark(mx, my, delta > 0 ? '#ffca4a' : '#57c9e6');
-              pushBuf(a.frag); pushBuf(b.frag);
+              pushBuf(a.frag, a.id); pushBuf(b.frag, b.id);
               paintCloud(a); paintCloud(b);
               renderBuf();
               if (charge >= THRESH || buffer.length >= MAXBUF) triggerStrike(mx, my);
