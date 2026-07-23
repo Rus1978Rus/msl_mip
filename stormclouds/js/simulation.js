@@ -1,31 +1,32 @@
 /*
- * StormClouds — движок симуляции.
+ * StormClouds — simulation engine.
  *
- * Тучи (каждая несёт фрагмент кода) дрейфуют от «ветра», сталкиваются,
- * обмениваются зарядом и сбрасывают свой фрагмент в «грозовой очаг».
- * Когда заряд очага достигает порога — молния: очаг исполняется
- * через StormLang.runProgram(), результат уходит в журнал.
+ * Clouds (each carrying a code fragment) drift on the "wind", collide,
+ * exchange charge and drop their fragment into a "storm cell". Once the
+ * cell's charge reaches a threshold, lightning strikes: the buffered
+ * fragments are assembled and actually executed via StormLang.runProgram(),
+ * and the result goes to the discharge log.
  *
- * Зависит от js/interpreter.js (глобальный StormLang) и разметки index.html.
+ * Depends on js/interpreter.js (global StormLang) and the index.html markup.
  */
 (function () {
   'use strict';
 
-  /* ---- пул фрагментов, что носят тучи ---- */
+  /* ---- pool of fragments carried by clouds ---- */
   const POOL = [
     'x = 5', 'y = 3', 'n = 7', 'k = 2', 'bolt = 42', 'msg = "storm"',
     'x = x + 1', 'y = y * 2', 'n = n - 1', 'k = k * k', 'x = x % 4',
     'print(x)', 'print(y)', 'print(x + y)', 'print(x * y)', 'print(bolt)', 'print(msg)',
-    'if x > 3: print("удар!")', 'if n > 5: print(n)',
+    'if x > 3: print("strike!")', 'if n > 5: print(n)',
     'for i in range(3): print(i)', 'for i in range(x): print(i)',
     'while k < 30: k = k + 7',
   ];
   const pick = (a) => a[Math.floor(Math.random() * a.length)];
   const rnd = (a, b) => a + Math.random() * (b - a);
 
-  // «базовые» фрагменты — задают переменную из литерала (ни от чего не зависят).
-  // При гарантированном покрытии каждый попадает хотя бы в одну стартовую тучу,
-  // иначе зависящие от переменной фрагменты падали бы вечно.
+  // "base" fragments — define a variable from a literal (no dependencies).
+  // With coverage on, each is dealt to at least one starting cloud; otherwise
+  // fragments that depend on a missing variable would fail forever.
   const BASE = ['x = 5', 'y = 3', 'n = 7', 'k = 2', 'bolt = 42', 'msg = "storm"'];
   const SEED_N = 9;
   const shuffle = (a) => {
@@ -36,7 +37,7 @@
     return a;
   };
 
-  /* ---- ссылки на DOM ---- */
+  /* ---- DOM references ---- */
   const sky = document.getElementById('sky');
   const canvas = document.getElementById('fx');
   const ctx = canvas.getContext('2d');
@@ -49,21 +50,21 @@
   const skyvarsEl = document.getElementById('skyvars');
   const reduced = matchMedia('(prefers-reduced-motion:reduce)').matches;
 
-  /* ---- параметры и состояние ---- */
-  const CW = 132, CH = 88;         // размер тучи
-  const THRESH = 12, MAXBUF = 8;   // порог разряда, макс. фрагментов в очаге
+  /* ---- parameters and state ---- */
+  const CW = 132, CH = 88;         // cloud size
+  const THRESH = 12, MAXBUF = 8;   // discharge threshold, max fragments in the cell
   let clouds = [], particles = [], bolt = null;
   let buffer = [], charge = 0, strikes = 0, okLines = 0;
   let running = true, speed = 1, gustUntil = 0;
-  let memory = false, skyEnv = {};   // «память неба»: общий namespace между разрядами
-  let coverage = false;              // гарантированное покрытие базовых определений
-  let evolution = false, replacements = 0;   // отбор: удачные фрагменты вытесняют неудачные
-  const EVOLVE_EVERY = 2, MUT_RATE = 0.15;   // как часто отбор, шанс мутации
+  let memory = false, skyEnv = {};   // "sky memory": namespace shared across strikes
+  let coverage = false;              // guaranteed coverage of base definitions
+  let evolution = false, replacements = 0;   // selection: useful fragments outcompete useless ones
+  const EVOLVE_EVERY = 2, MUT_RATE = 0.15;   // how often selection runs, mutation chance
   let W = 0, H = 0;
   const dpr = Math.min(devicePixelRatio || 1, 2);
   const lastPair = new Map();
 
-  /* всплывающая подсказка — «что вышло из клика» */
+  /* transient hint — "what did that click do" */
   function toast(msg, kind) {
     const t = document.createElement('div');
     t.className = 'toast' + (kind ? ' ' + kind : '');
@@ -74,13 +75,13 @@
     while (toastsEl.children.length > 4) toastsEl.removeChild(toastsEl.firstChild);
   }
 
-  /* живой рендер грозового очага */
+  /* live render of the storm cell */
   function renderBuf() {
     const near = charge >= THRESH * 0.75;
     cChargeEl.textContent = Math.round(charge) + ' / ' + THRESH;
     cChargeEl.classList.toggle('hot', near);
     if (buffer.length === 0) {
-      bufEl.innerHTML = '<span class="c-empty">пусто — ждём столкновений туч</span>';
+      bufEl.innerHTML = '<span class="c-empty">empty — waiting for clouds to collide</span>';
       return;
     }
     bufEl.innerHTML = '';
@@ -88,23 +89,23 @@
       const s = document.createElement('span');
       s.className = 'bchip';
       s.textContent = b.line;
-      s.title = 'от ' + b.from;
+      s.title = 'from ' + b.from;
       bufEl.appendChild(s);
     });
   }
 
-  /* формат значения переменной в питоновском стиле */
+  /* format a value Python-style */
   function fmtVal(v) {
     return v === true ? 'True' : v === false ? 'False' : (typeof v === 'string' ? '"' + v + '"' : String(v));
   }
 
-  /* живой namespace «памяти неба» */
+  /* live namespace of the "sky memory" */
   function renderSkyVars() {
     if (!memory) { skyvarsEl.hidden = true; return; }
     skyvarsEl.hidden = false;
     const keys = Object.keys(skyEnv);
-    let html = '<span class="sv-lbl">Память неба</span>';
-    if (keys.length === 0) html += '<span class="sv-empty">пусто — ещё ни одна переменная не пережила разряд</span>';
+    let html = '<span class="sv-lbl">Sky memory</span>';
+    if (keys.length === 0) html += '<span class="sv-empty">empty — no variable has survived a strike yet</span>';
     else html += keys.map((k) => '<span class="svar">' + esc(k + ' = ' + fmtVal(skyEnv[k])) + '</span>').join('');
     skyvarsEl.innerHTML = html;
   }
@@ -140,7 +141,7 @@
     c.frag = pick(POOL);
     c.el.querySelector('.chip').textContent = c.frag;
     spark(c.x + CW / 2, c.y + CH / 2, '#8fb4ff', 8);
-    toast(c.id + ' сменил код → ' + c.frag);
+    toast(c.id + ' recoded -> ' + c.frag);
   }
 
   function paintCloud(c) {
@@ -156,8 +157,8 @@
     clouds = [];
     let frags;
     if (coverage) {
-      frags = BASE.slice();                                  // все базовые определения
-      while (frags.length < SEED_N) frags.push(pick(POOL));  // добить случайными
+      frags = BASE.slice();                                  // all base definitions
+      while (frags.length < SEED_N) frags.push(pick(POOL));  // fill the rest at random
       shuffle(frags);
     } else {
       frags = Array.from({ length: SEED_N }, () => pick(POOL));
@@ -165,7 +166,7 @@
     frags.forEach((f) => makeCloud(rnd(20, Math.max(40, W - CW - 20)), rnd(20, Math.max(40, H - CH - 20)), f));
   }
 
-  /* ---- частицы + отрисовка молнии ---- */
+  /* ---- particles + lightning drawing ---- */
   function spark(x, y, color, count) {
     count = count || 14;
     for (let i = 0; i < count; i++) {
@@ -225,7 +226,7 @@
     if (bolt.life <= 0) bolt = null;
   }
 
-  /* ---- журнал разрядов ---- */
+  /* ---- discharge log ---- */
   function esc(s) { return s.replace(/[&<>]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m])); }
 
   function logStrike(entries, res) {
@@ -234,7 +235,7 @@
     el.className = 'strike';
     const okc = res.trace.filter((t) => t.ok).length;
     const n = entries.length;
-    let html = '<div class="st-head"><span>⚡ Разряд #' + strikes + '</span><span class="meta">' + n + ' фрагм. · ' + okc + '/' + n + ' ok</span></div>';
+    let html = '<div class="st-head"><span>⚡ Strike #' + strikes + '</span><span class="meta">' + n + ' frags · ' + okc + '/' + n + ' ok</span></div>';
     html += '<div class="code">';
     res.trace.forEach((t, i) => {
       const g = String(i + 1).padStart(2, '0');
@@ -245,7 +246,7 @@
     });
     html += '</div>';
     if (res.out.length) {
-      html += '<div class="out"><span class="lbl">вывод</span>' + esc(res.out.join('\n')) + '</div>';
+      html += '<div class="out"><span class="lbl">output</span>' + esc(res.out.join('\n')) + '</div>';
     }
     el.innerHTML = html;
     logEl.appendChild(el);
@@ -255,7 +256,7 @@
     logEl.scrollTop = logEl.scrollHeight;
   }
 
-  /* ---- разряд ---- */
+  /* ---- discharge ---- */
   function pushBuf(line, from) {
     const last = buffer[buffer.length - 1];
     if (!last || last.line !== line) buffer.push({ line, from });
@@ -264,13 +265,13 @@
   function triggerStrike(x, y) {
     if (buffer.length === 0) {
       strikeAt(x || W / 2, y || H / 2);
-      toast('⚡ разряд вхолостую — очаг пуст', 'zap');
+      toast('⚡ empty discharge — the storm cell is empty', 'zap');
       return;
     }
     const entries = buffer.slice();
     buffer = []; charge = 0;
     const lines = entries.map((e) => e.line);
-    // память неба: тот же namespace между разрядами → программа растёт
+    // sky memory: the same namespace across strikes -> the program grows
     const res = StormLang.runProgram(lines, memory ? skyEnv : {});
     strikes++;
     okLines += res.trace.filter((t) => t.ok).length;
@@ -278,7 +279,7 @@
     logStrike(entries, res);
     const okc = res.trace.filter((t) => t.ok).length;
     const printed = res.out.length;
-    toast('⚡ разряд #' + strikes + ' · ' + okc + '/' + entries.length + ' ok' + (printed ? ' · вывод ↓' : ''), 'zap');
+    toast('⚡ strike #' + strikes + ' · ' + okc + '/' + entries.length + ' ok' + (printed ? ' · output ↓' : ''), 'zap');
     clouds.forEach((c) => { c.charge *= 0.3; paintCloud(c); });
     renderBuf();
     renderSkyVars();
@@ -286,12 +287,13 @@
     updateTelemetry();
   }
 
-  /* отбор: по итогам разряда обновляем «приспособленность» фрагментов.
-     Считаем СРЕДНЮЮ награду за одно появление (fitScore/fitCount), а не сумму —
-     иначе фитнес склеивается с частотой, и часто сталкивающиеся присваивания
-     побеждают редкие, но полезные принты. Печать ценнее простого успеха
-     (+2 за вывод, +1 за успех, -1 за ошибку). Раз в EVOLVE_EVERY разрядов
-     худшая из поучаствовавших туч уступает место потомку лучшей (с мутацией). */
+  /* Selection: after each strike, update fragment "fitness". We use the AVERAGE
+     reward per appearance (fitScore/fitCount), not the sum — otherwise fitness
+     couples to frequency and often-colliding assignments beat rare but useful
+     prints. Printing is worth more than a bare success (+2 for output, +1 for
+     success, -1 for an error). Every EVOLVE_EVERY strikes the worst participating
+     cloud is replaced by an offspring of the best (with a mutation chance), so
+     useful fragments outcompete useless ones. */
   const fit = (c) => (c.fitCount ? c.fitScore / c.fitCount : 0);
 
   function evolveStep(res) {
@@ -307,25 +309,25 @@
   }
 
   function evolve() {
-    const rated = clouds.filter((c) => c.fitCount > 0); // только реально участвовавшие
+    const rated = clouds.filter((c) => c.fitCount > 0); // only clouds that actually took part
     if (rated.length < 2) return;
     let best = rated[0], worst = rated[0];
     for (const c of rated) {
       if (fit(c) > fit(best)) best = c;
       if (fit(c) < fit(worst)) worst = c;
     }
-    if (best === worst || fit(best) <= fit(worst)) return; // учиться не у кого
+    if (best === worst || fit(best) <= fit(worst)) return; // nothing to learn from
     const before = worst.frag;
     const mutated = Math.random() < MUT_RATE;
-    worst.frag = mutated ? pick(POOL) : best.frag; // потомок лучшей либо мутация
+    worst.frag = mutated ? pick(POOL) : best.frag; // offspring of the best, or a mutation
     worst.fitScore = 0; worst.fitCount = 0;
     worst.el.querySelector('.chip').textContent = worst.frag;
     spark(worst.x + CW / 2, worst.y + CH / 2, mutated ? '#c88bff' : '#7ee0a6', 12);
     replacements++;
-    toast('🧬 ' + worst.id + ': ' + before + ' → ' + worst.frag + (mutated ? ' (мутация)' : ' (потомок ' + best.id + ')'));
+    toast('🧬 ' + worst.id + ': ' + before + ' -> ' + worst.frag + (mutated ? ' (mutation)' : ' (offspring of ' + best.id + ')'));
   }
 
-  /* ---- телеметрия ---- */
+  /* ---- telemetry ---- */
   const T = {
     c: document.getElementById('tClouds'),
     ch: document.getElementById('tCharge'),
@@ -344,7 +346,7 @@
     T.f.style.right = (100 - pct * 100) + '%';
   }
 
-  /* ---- главный цикл ---- */
+  /* ---- main loop ---- */
   let last = performance.now();
   function loop(now) {
     const dt = Math.min(50, now - last) / 16.67;
@@ -353,7 +355,7 @@
 
     const boost = now < gustUntil ? 1.8 : 1;
     if (running) {
-      // движение (ветер)
+      // motion (wind)
       for (const c of clouds) {
         c.x += c.vx * speed * boost * dt;
         c.y += c.vy * speed * boost * dt * 0.8;
@@ -366,7 +368,7 @@
         c.vy = Math.max(-1.1, Math.min(1.1, c.vy));
         paintCloud(c);
       }
-      // столкновения
+      // collisions
       for (let i = 0; i < clouds.length; i++) {
         for (let j = i + 1; j < clouds.length; j++) {
           const a = clouds[i], b = clouds[j];
@@ -374,7 +376,7 @@
           const d = Math.hypot(dx, dy);
           if (d < CW * 0.62) {
             const key = a.id + '|' + b.id, t0 = lastPair.get(key) || 0;
-            // расталкивание, чтобы не слипались
+            // push apart so they don't clump
             const nx = dx / (d || 1), ny = dy / (d || 1);
             a.vx += nx * 0.04; a.vy += ny * 0.04;
             b.vx -= nx * 0.04; b.vy -= ny * 0.04;
@@ -396,7 +398,7 @@
       }
     }
 
-    // частицы
+    // particles
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
       p.x += p.vx; p.y += p.vy; p.vy += 0.04; p.life -= 0.03;
@@ -411,63 +413,63 @@
     requestAnimationFrame(loop);
   }
 
-  /* ---- управление ---- */
+  /* ---- controls ---- */
   document.getElementById('btnRun').addEventListener('click', (e) => {
     running = !running;
-    e.currentTarget.textContent = running ? '⏸ Пауза' : '▶ Пуск';
+    e.currentTarget.textContent = running ? '⏸ Pause' : '▶ Play';
     e.currentTarget.classList.toggle('primary', !running);
   });
   document.getElementById('btnGust').addEventListener('click', () => {
     gustUntil = performance.now() + 1100;
     clouds.forEach((c) => { c.vx = rnd(-1.2, 1.2); c.vy = rnd(-1, 1); });
-    toast('🌬 порыв ветра — тучи разлетелись');
+    toast('🌬 gust — clouds scattered');
   });
   document.getElementById('btnAdd').addEventListener('click', () => {
     const c = makeCloud(rnd(20, Math.max(40, W - CW - 20)), rnd(20, Math.max(40, H - CH - 20)));
-    toast('＋ ' + c.id + ' в небе · несёт ' + c.frag);
+    toast('＋ ' + c.id + ' in the sky · carries ' + c.frag);
     updateTelemetry();
   });
   document.getElementById('btnStrike').addEventListener('click', () => triggerStrike(W / 2, H * 0.5));
   document.getElementById('btnMem').addEventListener('click', (e) => {
     memory = !memory;
-    skyEnv = {}; // при переключении начинаем накопление с чистого листа
-    e.currentTarget.textContent = memory ? '🧠 Память: вкл' : '🧠 Память: выкл';
+    skyEnv = {}; // start accumulation from a clean slate on toggle
+    e.currentTarget.textContent = memory ? '🧠 Memory: on' : '🧠 Memory: off';
     e.currentTarget.classList.toggle('primary', memory);
     renderSkyVars();
-    toast(memory ? '🧠 память неба включена — namespace копится между разрядами' : '🧠 память выключена — каждый разряд с чистого листа');
+    toast(memory ? '🧠 sky memory on — namespace persists across strikes' : '🧠 sky memory off — each strike starts fresh');
   });
   document.getElementById('btnCov').addEventListener('click', (e) => {
     coverage = !coverage;
-    e.currentTarget.textContent = coverage ? '🎯 Покрытие: вкл' : '🎯 Покрытие: выкл';
+    e.currentTarget.textContent = coverage ? '🎯 Coverage: on' : '🎯 Coverage: off';
     e.currentTarget.classList.toggle('primary', coverage);
-    // пере-засеять небо по новому правилу; накопление начинаем заново
+    // re-seed the sky by the new rule; restart accumulation
     buffer = []; charge = 0; skyEnv = {}; particles = []; bolt = null; lastPair.clear();
     seed(); renderBuf(); renderSkyVars(); updateTelemetry();
-    toast(coverage ? '🎯 покрытие включено — базовые определения гарантированы' : '🎲 покрытие выключено — фрагменты случайны');
+    toast(coverage ? '🎯 coverage on — base definitions guaranteed' : '🎲 coverage off — fragments are random');
   });
   document.getElementById('btnEvo').addEventListener('click', (e) => {
     evolution = !evolution;
-    e.currentTarget.textContent = evolution ? '🧬 Эволюция: вкл' : '🧬 Эволюция: выкл';
+    e.currentTarget.textContent = evolution ? '🧬 Evolution: on' : '🧬 Evolution: off';
     e.currentTarget.classList.toggle('primary', evolution);
     clouds.forEach((c) => { c.fitScore = 0; c.fitCount = 0; });
-    toast(evolution ? '🧬 эволюция включена — удачные фрагменты вытесняют неудачные' : '🧬 эволюция выключена');
+    toast(evolution ? '🧬 evolution on — useful fragments outcompete useless ones' : '🧬 evolution off');
   });
   document.getElementById('btnReset').addEventListener('click', () => {
     buffer = []; charge = 0; strikes = 0; okLines = 0; particles = []; bolt = null; lastPair.clear();
     skyEnv = {}; replacements = 0;
     logEl.innerHTML = ''; logEl.appendChild(emptyEl); emptyEl.style.display = '';
     seed(); renderBuf(); renderSkyVars(); updateTelemetry();
-    toast('↺ небо сброшено');
+    toast('↺ sky reset');
   });
   document.getElementById('spd').addEventListener('input', (e) => { speed = parseFloat(e.target.value); });
   sky.addEventListener('click', (e) => {
     const r = sky.getBoundingClientRect();
     const c = makeCloud(e.clientX - r.left - CW / 2, e.clientY - r.top - CH / 2);
-    toast('＋ ' + c.id + ' в небе · несёт ' + c.frag);
+    toast('＋ ' + c.id + ' in the sky · carries ' + c.frag);
     updateTelemetry();
   });
 
-  /* ---- старт ---- */
+  /* ---- start ---- */
   new ResizeObserver(resize).observe(sky);
   requestAnimationFrame(() => {
     resize(); seed(); renderBuf(); renderSkyVars(); updateTelemetry();

@@ -257,7 +257,7 @@ main{
 .dot{width:7px;height:7px;border-radius:50%;background:var(--bolt);box-shadow:0 0 8px var(--bolt);animation:pulse 1.6s infinite}
 @keyframes pulse{50%{opacity:.35}}
 
-/* грозовой очаг — живой буфер */
+/* storm cell — live buffer */
 .cauldron{
   padding:10px 14px;
   border-bottom:1px solid var(--line);
@@ -287,7 +287,7 @@ main{
 }
 @keyframes pop{from{opacity:0;transform:scale(.85)}}
 
-/* память неба — живой namespace между разрядами */
+/* sky memory — live namespace across strikes */
 .skyvars{
   display:flex;flex-wrap:wrap;gap:5px;align-items:center;
   margin-top:10px;padding-top:9px;
@@ -308,7 +308,7 @@ main{
   animation:pop .2s ease both;
 }
 
-/* всплывающие подсказки в небе */
+/* transient hints in the sky */
 .toasts{
   position:absolute;top:12px;left:50%;transform:translateX(-50%);
   display:flex;flex-direction:column;gap:6px;align-items:center;
