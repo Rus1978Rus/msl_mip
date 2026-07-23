@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StormClouds — гроза кода</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Ctext%20y='.9em'%20font-size='88'%3E%E2%9B%88%EF%B8%8F%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="brand">
+        <span class="eyebrow">Гроза кода · симуляция облаков и молний</span>
+        <h1><span class="spark">⚡</span> StormClouds</h1>
+        <p>Каждая туча несёт фрагмент Python. Ветер гоняет их по небу; при столкновении тучи обмениваются зарядом и сбрасывают свой код в грозовой очаг. Когда заряд достигает порога — молния: собранная программа <b>по‑настоящему исполняется</b>, а результат уходит в журнал.</p>
+      </div>
+      <div class="telemetry">
+        <div class="stat"><span class="k">Тучи</span><span class="v" id="tClouds">0</span></div>
+        <div class="stat charge"><span class="k">Заряд очага</span><span class="v" id="tCharge">0</span><div class="bar"><div class="fill" id="tFill"></div></div></div>
+        <div class="stat"><span class="k">Разрядов</span><span class="v accent" id="tStrikes">0</span></div>
+        <div class="stat"><span class="k">Строк исполнено</span><span class="v" id="tLines">0</span></div>
+      </div>
+    </header>
+
+    <div class="controls">
+      <button class="primary" id="btnRun">⏸ Пауза</button>
+      <button id="btnGust">🌬 Порыв ветра</button>
+      <button id="btnAdd">＋ Туча</button>
+      <button id="btnStrike">⚡ Разряд</button>
+      <button id="btnMem">🧠 Память: выкл</button>
+      <button id="btnCov">🎯 Покрытие: выкл</button>
+      <button id="btnReset">↺ Сбросить</button>
+      <div class="slider"><label for="spd">Скорость</label><input type="range" id="spd" min="0.2" max="3" step="0.1" value="1"></div>
+      <span class="hint">клик по небу — новая туча · клик по туче — новый фрагмент</span>
+    </div>
+
+    <main>
+      <div class="sky" id="sky">
+        <canvas id="fx"></canvas>
+        <div class="flash" id="flash"></div>
+        <div class="toasts" id="toasts"></div>
+      </div>
+
+      <section class="panel">
+        <div class="head">
+          <h2><span class="dot"></span> Журнал разрядов</h2>
+          <span class="sub">REPL · общий namespace на разряд</span>
+        </div>
+        <div class="cauldron">
+          <div class="c-top">
+            <span class="c-lbl">Грозовой очаг</span>
+            <span class="c-charge" id="cCharge">0 / 12</span>
+          </div>
+          <div class="c-chips" id="buf"><span class="c-empty">пусто — ждём столкновений туч</span></div>
+          <div class="skyvars" id="skyvars" hidden></div>
+        </div>
+        <div class="log" id="log">
+          <div class="empty" id="empty">Небо спокойно.<br>Тучи ещё не столкнулись.<br><br>Дождись первой молнии — или нажми «⚡ Разряд».</div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="leg"><span class="ic">🌬️</span><div><div class="t">Ветер</div><div class="d">Случайный дрейф туч по сетке</div></div></div>
+      <div class="leg"><span class="ic">💥</span><div><div class="t">Столкновение</div><div class="d">Обмен зарядом · вклад кода в очаг</div></div></div>
+      <div class="leg"><span class="ic">⚡</span><div><div class="t">Молния</div><div class="d">Исполнение собранной программы</div></div></div>
+    </footer>
+  </div>
+
+  <script src="js/interpreter.js"></script>
+  <script src="js/simulation.js"></script>
+</body>
+</html>
