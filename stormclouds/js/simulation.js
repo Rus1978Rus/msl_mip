@@ -57,6 +57,8 @@
   let running = true, speed = 1, gustUntil = 0;
   let memory = false, skyEnv = {};   // «память неба»: общий namespace между разрядами
   let coverage = false;              // гарантированное покрытие базовых определений
+  let evolution = false, replacements = 0;   // отбор: удачные фрагменты вытесняют неудачные
+  const EVOLVE_EVERY = 2, MUT_RATE = 0.15;   // как часто отбор, шанс мутации
   let W = 0, H = 0;
   const dpr = Math.min(devicePixelRatio || 1, 2);
   const lastPair = new Map();
@@ -121,7 +123,7 @@
     const c = {
       el, x, y,
       vx: rnd(-0.5, 0.5) || 0.3, vy: rnd(-0.4, 0.4) || 0.2,
-      charge: 0, frag: frag || pick(POOL),
+      charge: 0, fitScore: 0, fitCount: 0, frag: frag || pick(POOL),
       id: 'C' + (clouds.length + 1),
     };
     el.querySelector('.id').textContent = c.id;
@@ -272,7 +274,47 @@
     clouds.forEach((c) => { c.charge *= 0.3; paintCloud(c); });
     renderBuf();
     renderSkyVars();
+    if (evolution) evolveStep(res);
     updateTelemetry();
+  }
+
+  /* отбор: по итогам разряда обновляем «приспособленность» фрагментов.
+     Считаем СРЕДНЮЮ награду за одно появление (fitScore/fitCount), а не сумму —
+     иначе фитнес склеивается с частотой, и часто сталкивающиеся присваивания
+     побеждают редкие, но полезные принты. Печать ценнее простого успеха
+     (+2 за вывод, +1 за успех, -1 за ошибку). Раз в EVOLVE_EVERY разрядов
+     худшая из поучаствовавших туч уступает место потомку лучшей (с мутацией). */
+  const fit = (c) => (c.fitCount ? c.fitScore / c.fitCount : 0);
+
+  function evolveStep(res) {
+    clouds.forEach((c) => {
+      const mine = res.trace.filter((t) => t.line === c.frag);
+      if (!mine.length) return;
+      const printed = mine.some((t) => t.ok && t.produced && t.produced.length);
+      const okAny = mine.some((t) => t.ok);
+      c.fitScore += printed ? 2 : (okAny ? 1 : -1);
+      c.fitCount += 1;
+    });
+    if (strikes % EVOLVE_EVERY === 0) evolve();
+  }
+
+  function evolve() {
+    const rated = clouds.filter((c) => c.fitCount > 0); // только реально участвовавшие
+    if (rated.length < 2) return;
+    let best = rated[0], worst = rated[0];
+    for (const c of rated) {
+      if (fit(c) > fit(best)) best = c;
+      if (fit(c) < fit(worst)) worst = c;
+    }
+    if (best === worst || fit(best) <= fit(worst)) return; // учиться не у кого
+    const before = worst.frag;
+    const mutated = Math.random() < MUT_RATE;
+    worst.frag = mutated ? pick(POOL) : best.frag; // потомок лучшей либо мутация
+    worst.fitScore = 0; worst.fitCount = 0;
+    worst.el.querySelector('.chip').textContent = worst.frag;
+    spark(worst.x + CW / 2, worst.y + CH / 2, mutated ? '#c88bff' : '#7ee0a6', 12);
+    replacements++;
+    toast('🧬 ' + worst.id + ': ' + before + ' → ' + worst.frag + (mutated ? ' (мутация)' : ' (потомок ' + best.id + ')'));
   }
 
   /* ---- телеметрия ---- */
@@ -281,6 +323,7 @@
     ch: document.getElementById('tCharge'),
     st: document.getElementById('tStrikes'),
     ln: document.getElementById('tLines'),
+    evo: document.getElementById('tEvo'),
     f: document.getElementById('tFill'),
   };
   function updateTelemetry() {
@@ -288,6 +331,7 @@
     T.ch.textContent = Math.round(charge);
     T.st.textContent = strikes;
     T.ln.textContent = okLines;
+    T.evo.textContent = replacements;
     const pct = Math.min(1, charge / THRESH);
     T.f.style.right = (100 - pct * 100) + '%';
   }
@@ -393,9 +437,16 @@
     seed(); renderBuf(); renderSkyVars(); updateTelemetry();
     toast(coverage ? '🎯 покрытие включено — базовые определения гарантированы' : '🎲 покрытие выключено — фрагменты случайны');
   });
+  document.getElementById('btnEvo').addEventListener('click', (e) => {
+    evolution = !evolution;
+    e.currentTarget.textContent = evolution ? '🧬 Эволюция: вкл' : '🧬 Эволюция: выкл';
+    e.currentTarget.classList.toggle('primary', evolution);
+    clouds.forEach((c) => { c.fitScore = 0; c.fitCount = 0; });
+    toast(evolution ? '🧬 эволюция включена — удачные фрагменты вытесняют неудачные' : '🧬 эволюция выключена');
+  });
   document.getElementById('btnReset').addEventListener('click', () => {
     buffer = []; charge = 0; strikes = 0; okLines = 0; particles = []; bolt = null; lastPair.clear();
-    skyEnv = {};
+    skyEnv = {}; replacements = 0;
     logEl.innerHTML = ''; logEl.appendChild(emptyEl); emptyEl.style.display = '';
     seed(); renderBuf(); renderSkyVars(); updateTelemetry();
     toast('↺ небо сброшено');

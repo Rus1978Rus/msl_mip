@@ -8,6 +8,18 @@
 
 ---
 
+## 🌩 Also in this repo: StormClouds
+
+Alongside the analyzer, this repository hosts **[StormClouds](stormclouds/)** — a
+self-contained interactive side-project: a *"code storm"* where clouds carry
+Python fragments, wind makes them collide, and lightning **actually executes**
+the assembled code (with optional *sky memory*, *coverage*, and *evolution*
+toggles). It is unrelated to MSL/MIP and lives entirely in its own folder.
+
+**→ Open the project: [`stormclouds/`](stormclouds/)** — code, docs, and how to run.
+
+---
+
 ## What is this?
 
 MSL/MIP analyzes text character by character to detect potential threats — phishing, injections, path traversal, brand mimicry. Unlike systems that rely on word lists or domain reputation databases, MSL/MIP works purely with **structure**: it treats each sign (`.`, `/`, 💀, ☠) as an object with a history, a function, and a context, and evaluates what that sign *does* in the surrounding text.
