@@ -33,6 +33,7 @@
   const toastsEl = document.getElementById('toasts');
   const bufEl = document.getElementById('buf');
   const cChargeEl = document.getElementById('cCharge');
+  const skyvarsEl = document.getElementById('skyvars');
   const reduced = matchMedia('(prefers-reduced-motion:reduce)').matches;
 
   /* ---- параметры и состояние ---- */
@@ -41,6 +42,7 @@
   let clouds = [], particles = [], bolt = null;
   let buffer = [], charge = 0, strikes = 0, okLines = 0;
   let running = true, speed = 1, gustUntil = 0;
+  let memory = false, skyEnv = {};   // «память неба»: общий namespace между разрядами
   let W = 0, H = 0;
   const dpr = Math.min(devicePixelRatio || 1, 2);
   const lastPair = new Map();
@@ -72,6 +74,22 @@
       s.textContent = line;
       bufEl.appendChild(s);
     });
+  }
+
+  /* формат значения переменной в питоновском стиле */
+  function fmtVal(v) {
+    return v === true ? 'True' : v === false ? 'False' : (typeof v === 'string' ? '"' + v + '"' : String(v));
+  }
+
+  /* живой namespace «памяти неба» */
+  function renderSkyVars() {
+    if (!memory) { skyvarsEl.hidden = true; return; }
+    skyvarsEl.hidden = false;
+    const keys = Object.keys(skyEnv);
+    let html = '<span class="sv-lbl">Память неба</span>';
+    if (keys.length === 0) html += '<span class="sv-empty">пусто — ещё ни одна переменная не пережила разряд</span>';
+    else html += keys.map((k) => '<span class="svar">' + esc(k + ' = ' + fmtVal(skyEnv[k])) + '</span>').join('');
+    skyvarsEl.innerHTML = html;
   }
 
   function resize() {
@@ -222,7 +240,8 @@
     }
     const lines = buffer.slice();
     buffer = []; charge = 0;
-    const res = StormLang.runProgram(lines);
+    // память неба: тот же namespace между разрядами → программа растёт
+    const res = StormLang.runProgram(lines, memory ? skyEnv : {});
     strikes++;
     okLines += res.trace.filter((t) => t.ok).length;
     strikeAt(x || W / 2, y || H * 0.55);
@@ -232,6 +251,7 @@
     toast('⚡ разряд #' + strikes + ' · ' + okc + '/' + lines.length + ' ok' + (printed ? ' · вывод ↓' : ''), 'zap');
     clouds.forEach((c) => { c.charge *= 0.3; paintCloud(c); });
     renderBuf();
+    renderSkyVars();
     updateTelemetry();
   }
 
@@ -336,10 +356,19 @@
     updateTelemetry();
   });
   document.getElementById('btnStrike').addEventListener('click', () => triggerStrike(W / 2, H * 0.5));
+  document.getElementById('btnMem').addEventListener('click', (e) => {
+    memory = !memory;
+    skyEnv = {}; // при переключении начинаем накопление с чистого листа
+    e.currentTarget.textContent = memory ? '🧠 Память: вкл' : '🧠 Память: выкл';
+    e.currentTarget.classList.toggle('primary', memory);
+    renderSkyVars();
+    toast(memory ? '🧠 память неба включена — namespace копится между разрядами' : '🧠 память выключена — каждый разряд с чистого листа');
+  });
   document.getElementById('btnReset').addEventListener('click', () => {
     buffer = []; charge = 0; strikes = 0; okLines = 0; particles = []; bolt = null; lastPair.clear();
+    skyEnv = {};
     logEl.innerHTML = ''; logEl.appendChild(emptyEl); emptyEl.style.display = '';
-    seed(); renderBuf(); updateTelemetry();
+    seed(); renderBuf(); renderSkyVars(); updateTelemetry();
     toast('↺ небо сброшено');
   });
   document.getElementById('spd').addEventListener('input', (e) => { speed = parseFloat(e.target.value); });
@@ -353,7 +382,7 @@
   /* ---- старт ---- */
   new ResizeObserver(resize).observe(sky);
   requestAnimationFrame(() => {
-    resize(); seed(); renderBuf(); updateTelemetry();
+    resize(); seed(); renderBuf(); renderSkyVars(); updateTelemetry();
     requestAnimationFrame(loop);
   });
 })();

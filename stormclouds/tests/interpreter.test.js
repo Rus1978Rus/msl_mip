@@ -44,6 +44,23 @@ eq(out(['k = 2', 'while k < 10: k = k + 3', 'print(k)']), ['11'], 'while');
 eq(okCount(['print(x)', 'x = 5', 'print(x)']), 2, 'строка с ошибкой пропускается, остальные ok');
 eq(out(['print(x)', 'x = 5', 'print(x)']), ['5'], 'после ошибки вывод продолжается');
 
+// --- память неба: общий env между вызовами ---
+{
+  const sky = {};
+  StormLang.runProgram(['x = 5'], sky);          // разряд 1: объявили x
+  const r = StormLang.runProgram(['print(x)'], sky); // разряд 2: x пережил
+  eq(r.out, ['5'], 'общий env: переменная переживает разряд');
+  eq(sky.x, 5, 'общий env мутируется на месте');
+}
+{
+  const sky = {};
+  StormLang.runProgram(['n = 10'], sky);
+  StormLang.runProgram(['n = n - 3'], sky);
+  const r = StormLang.runProgram(['print(n)'], sky);
+  eq(r.out, ['7'], 'общий env: накопление за три разряда');
+}
+eq(out(['x = 5', 'print(x)']), ['5'], 'без env — как раньше, чистый лист');
+
 // --- защита от зацикливания ---
 eq(okCount(['while k < 5: k = k']), 0, 'необъявленная k → ошибка, не вечный цикл');
 {
