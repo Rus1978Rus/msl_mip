@@ -128,6 +128,14 @@ These come from headless-browser runs and are what motivated each toggle:
 - A custom mini-language, tuned for assembly from random pieces, instead of a
   Python subset.
 
+## License
+
+Free to use — including commercially and inside your own projects — but if you
+make money from a product that includes this code, **7% of that revenue goes to
+the author**. See [`LICENSE`](LICENSE). The author keeps full ownership and can
+license it separately. This is a custom royalty license, not a standard
+open-source one.
+
 ---
 
 A standalone, educational/toy side-project. Unrelated to any analyzer — it
