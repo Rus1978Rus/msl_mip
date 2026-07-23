@@ -769,6 +769,34 @@ def analyze(text: str, cards: list, protected_targets=None) -> dict:
     # it alongside the verdict, not inside it.
     uncarded_invisibles = scan_uncarded_invisibles(text, cards)
 
+    # --- UNCARDED class-138 host-break -> a VERDICT, not only a witness (D-INV-GEN) ---
+    # AUTHOR-directed generalization (2026-07-22): an invisible that breaks a HOST label is
+    # the same byte-exact evasion whether or not it happens to be carded. Only ZWSP/ZWJ/BOM
+    # are carded, so the other ~135 supervised code points (invisible math operators, word
+    # joiner, soft hyphen, tag chars, ...) previously reached the human only as a
+    # non-blocking witness. In a HOST the case is UNAMBIGUOUS (no invisible is legitimate
+    # inside a domain), so it is escalated here. FIRST CUT: HOST only (token/email/other stay
+    # witness-only, pending the follow-up conveyor). ADDITIVE: the witness channel is
+    # untouched and this only RAISES effective_action; it never lowers a verdict. A
+    # combining mark can no longer hide the host (419cae2), so this reconstruction is robust.
+    # mask=EMPTY on purpose: _detect_context_at strips residual invisibles for the
+    # reconstruction itself (F-NEW-1), so the uncarded char at the offset is removed anyway;
+    # passing the carded alphabet here would wrongly demask a structural '.' (the DOT card)
+    # and break domain reconstruction -> BYTE_EXACT_TOKEN instead of HOST.
+    try:
+        _mon138 = _monitored_138_set()
+        for _u in uncarded_invisibles:
+            _off = _u.get("at_offset")
+            if _off is None or not (0 <= _off < len(text)):
+                continue
+            if ord(text[_off]) not in _mon138:
+                continue                   # only the supervised class; braille/VS/whitespace stay witness
+            if _se._detect_context_at(text, _off, frozenset()) == "HOST":
+                effective_action = most_severe([effective_action, "hold_pending_review"])
+                break
+    except Exception:
+        pass                               # fail-open: on any error keep the verdict, never crash
+
     # --- INVISIBLE_DEFAULT_IGNORABLE_GUARD (increment 1, shadow, report-ONLY) ---
     # Additive: placed in its OWN field, NEVER read by single_actions /
     # relation_actions / semantic_action / effective_action. A broken class_guard

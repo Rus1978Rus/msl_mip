@@ -182,13 +182,22 @@ check("surfaced as UNVERIFIABLE (not safe, not dangerous)",
 check("surfaced card_status NOT_CREATED", recs and recs[0]["card_status"] == "NOT_CREATED", recs)
 recs2 = rt.scan_uncarded_invisibles("goog" + ZWSP + "le.com", cards)
 check("carded ZWSP is NOT re-reported by the registrar", recs2 == [], recs2)
-# the registrar must not change the verdict: analyze() keeps it out of the action
+# D-INV-GEN (AUTHOR_DECISION 2026-07-22): an uncarded class-138 member that breaks a HOST
+# now escalates -- an invisible in a domain is the same byte-exact evasion whether or not it
+# is carded. The MAIN path (semantic_action) is unchanged (the uncarded member has no card /
+# relation candidate); the escalation is an ADDITIVE effective_action raise, and the witness
+# record is still present. So: semantic stays pass, effective becomes hold, witness surfaced.
 rep = rt.analyze("goog" + ITIMES + "le.com", cards)
-check("registrar record does NOT enter the verdict (stays pass)",
-      rep["semantic_action"] == "pass" and rep["effective_action"] == "pass",
+check("uncarded host-break: main path unchanged, effective RAISED to hold (D-INV-GEN)",
+      rep["semantic_action"] == "pass" and rep["effective_action"] == "hold_pending_review",
       (rep["semantic_action"], rep["effective_action"]))
-check("registrar record IS present in the report (surfaced to the human)",
+check("registrar record IS still present in the report (witness intact)",
       len(rep["uncarded_invisibles"]) == 1, rep["uncarded_invisibles"])
+# ... and a NON-host uncarded invisible still stays fully witness-only (verdict unchanged)
+rep_tok = rt.analyze("bad" + ITIMES + "word", cards)
+check("uncarded in a NON-host context stays witness-only (verdict pass)",
+      rep_tok["effective_action"] == "pass" and len(rep_tok["uncarded_invisibles"]) == 1,
+      (rep_tok["effective_action"], rep_tok["uncarded_invisibles"]))
 
 print("\n" + "=" * 60)
 print(f"TOTAL: {PASSED} OK / {FAILED} FAIL")
