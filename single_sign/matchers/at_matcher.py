@@ -51,6 +51,21 @@ INTERPRETATION = {
 }
 
 
+def _ends_in_valid_tld(label: str) -> bool:
+    """True iff the last dot-label of `label` is a registered TLD. Distinguishes a real
+    brand domain (paypal.com -> 'com') from a dotted email local part (john.doe -> 'doe').
+    Uses the runtime TLD registry lazily (imported at call time so there is no import-order
+    or layering coupling); on any failure returns False (fail-closed -> stays a legit email,
+    never a false spoof alarm)."""
+    try:
+        from sequence_engine import _tlds
+        tld_set, _degraded = _tlds()
+        last = label.rstrip(".").rsplit(".", 1)[-1].lower()
+        return bool(last) and last in tld_set
+    except Exception:
+        return False
+
+
 def _url_context_around(text: str, offset: int):
     """Extracts the URL-like token containing @ at the offset.
     Token = the contiguous whitespace-free run around the offset."""
@@ -128,8 +143,19 @@ def match(text: str, offset: int):
         safe.append("SAFE_CASE_007")
         return safe, risk, INTERPRETATION["SAFE_CASE_007"]
 
-    # email: word@domain.tld without a scheme, single @
+    # email OR schemeless userinfo spoofing: word@domain.tld, single @
     if token.count("@") == 1 and _DOMAIN_RE.search(token[token.find("@"):]):
+        before = token[:token.find("@")]
+        # brand.tld@other-domain.tld with NO scheme is the classic display spoof: to the
+        # EYE (the witness-frame target, not the URL parser) it reads as a plain email
+        # anchored on the brand BEFORE the @, while the resolvable domain is AFTER it.
+        # Previously gated on has_scheme and so passed silently (measured 2026-07, agent #9).
+        # The tell must be a REAL brand domain: the label before the @ must end in a valid
+        # TLD. A dotted email local part (john.doe) ends in a non-TLD and stays a legit
+        # email -- that guard removes the false positive the shape-only check produced.
+        if _DOMAIN_RE.search(before) and _ends_in_valid_tld(before):
+            risk.append("RISK_CASE_001")
+            return safe, risk, INTERPRETATION["RISK_CASE_001"]
         safe.append("SAFE_CASE_001")
         return safe, risk, INTERPRETATION["SAFE_CASE_001"]
 
