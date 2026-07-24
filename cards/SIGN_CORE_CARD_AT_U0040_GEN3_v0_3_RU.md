@@ -359,6 +359,21 @@ RISK_CASES:
       СТАТУС: HYPOTHESIS (PHAGO-измерение, TIER 1) — требует накопления
       кейсов; не эскалировать как HIGH до подтверждения
 
+  RISK_CASE_005:
+    NAME: SCHEMELESS_USERINFO_DISPLAY_SPOOF
+    INPUT: "paypal.com@evil.ru" (БЕЗ URL-схемы)
+    CONTEXT: без схемы структура хоста НЕОДНОЗНАЧНА по WHATWG (парсер не
+      даёт host=evil.ru), но человеческий глаз якорится на brand.tld ДО @.
+    RISK: MEDIUM
+    ATTACK: display-спуф на уровне ОТОБРАЖЕНИЯ (не подтверждён парсером);
+      бренд-домен до @, другой домен после — визуальная имитация.
+    GUARD: AT_FORM ≠ HOST_IDENTITY. Уровень ВОЗМОЖНАЯ (не РЕАЛЬНАЯ):
+      без схемы неоднозначность реальна, и ИЗМЕРЕНО (2026-07-22), что hold
+      будит 5/6 обычных корпоративных адресов (dept.org@corp.com) — цена
+      слишком велика. SUFFIX-SUPPRESSION: если левая часть — суффикс правой
+      (mail.corp.com@corp.com), это легит-поддомен, НЕ сигнал. Со схемой —
+      отдельный RISK_CASE_001 (HIGH), там неоднозначности нет.
+
 CONFUSABLES:
   CONFUSABLE_001:
     VISIBLE_FORM: ＠

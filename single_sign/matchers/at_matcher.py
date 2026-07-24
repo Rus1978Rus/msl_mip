@@ -48,7 +48,20 @@ INTERPRETATION = {
     "RISK_CASE_002": "userinfo_brand_non_final",
     "RISK_CASE_003": "multiple_at_obfuscation",
     "RISK_CASE_004": "false_verified_account",
+    "RISK_CASE_005": "schemeless_userinfo_display_spoof",
 }
+
+
+def _left_is_suffix_of_right(left: str, right: str) -> bool:
+    """True if the userinfo domain (left of @) is the same as, or a sub/parent-domain of,
+    the host (right of @) -- e.g. mail.corp.com@corp.com. That is a legitimate internal
+    relation (a mail subdomain writing on behalf of the parent), NOT a display spoof, so it
+    is suppressed. Compared on the bare host part only."""
+    l = left.rstrip(".").lower()
+    r = right.split("/")[0].split("?")[0].split("#")[0].rstrip(".").lower()
+    if not l or not r:
+        return False
+    return l == r or l.endswith("." + r) or r.endswith("." + l)
 
 
 def _ends_in_valid_tld(label: str) -> bool:
@@ -143,19 +156,24 @@ def match(text: str, offset: int):
         safe.append("SAFE_CASE_007")
         return safe, risk, INTERPRETATION["SAFE_CASE_007"]
 
-    # email OR schemeless userinfo spoofing: word@domain.tld, single @
+    # email OR schemeless userinfo display spoof: word@domain.tld, single @
     if token.count("@") == 1 and _DOMAIN_RE.search(token[token.find("@"):]):
         before = token[:token.find("@")]
-        # brand.tld@other-domain.tld with NO scheme is the classic display spoof: to the
-        # EYE (the witness-frame target, not the URL parser) it reads as a plain email
-        # anchored on the brand BEFORE the @, while the resolvable domain is AFTER it.
-        # Previously gated on has_scheme and so passed silently (measured 2026-07, agent #9).
-        # The tell must be a REAL brand domain: the label before the @ must end in a valid
-        # TLD. A dotted email local part (john.doe) ends in a non-TLD and stays a legit
-        # email -- that guard removes the false positive the shape-only check produced.
-        if _DOMAIN_RE.search(before) and _ends_in_valid_tld(before):
-            risk.append("RISK_CASE_001")
-            return safe, risk, INTERPRETATION["RISK_CASE_001"]
+        after = token[token.find("@") + 1:]
+        # brand.tld@other.tld with NO scheme reads (to the eye) as a plain email anchored on
+        # the brand before the @, while the resolvable domain is after it. Surface it -- but
+        # at MEDIUM/queue, NOT hold: without a scheme the structure is genuinely ambiguous
+        # (WHATWG), and hold was measured to fire on 5/6 ordinary dotted corporate addresses
+        # (dept.org@corp.com). RISK_CASE_005 = POSSIBLE (queue). Guards that keep it honest:
+        #   - the left must be a REAL brand domain (last label a valid TLD): a dotted local
+        #     part (john.doe) ends in a non-TLD -> stays a legit email.
+        #   - SUFFIX-SUPPRESSION: mail.corp.com@corp.com (left is a sub/parent of right) is a
+        #     legitimate internal relation, not a spoof.
+        # The scheme'd case stays RISK_CASE_001 (HIGH) above -- there the host is unambiguous.
+        if _DOMAIN_RE.search(before) and _ends_in_valid_tld(before) \
+                and not _left_is_suffix_of_right(before, after):
+            risk.append("RISK_CASE_005")
+            return safe, risk, INTERPRETATION["RISK_CASE_005"]
         safe.append("SAFE_CASE_001")
         return safe, risk, INTERPRETATION["SAFE_CASE_001"]
 

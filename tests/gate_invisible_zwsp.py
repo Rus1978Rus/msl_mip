@@ -188,8 +188,8 @@ check("carded ZWSP is NOT re-reported by the registrar", recs2 == [], recs2)
 # relation candidate); the escalation is an ADDITIVE effective_action raise, and the witness
 # record is still present. So: semantic stays pass, effective becomes hold, witness surfaced.
 rep = rt.analyze("goog" + ITIMES + "le.com", cards)
-check("uncarded host-break: main path unchanged, effective RAISED to hold (D-INV-GEN)",
-      rep["semantic_action"] == "pass" and rep["effective_action"] == "hold_pending_review",
+check("uncarded host-break: main path unchanged, effective RAISED to queue (D-INV-GEN, quieter)",
+      rep["semantic_action"] == "pass" and rep["effective_action"] == "queue_for_review",
       (rep["semantic_action"], rep["effective_action"]))
 check("registrar record IS still present in the report (witness intact)",
       len(rep["uncarded_invisibles"]) == 1, rep["uncarded_invisibles"])

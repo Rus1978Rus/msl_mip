@@ -50,10 +50,13 @@ def rep(text):
 
 
 # ------------------------------------------------------------------ A ESCALATES
+# Level is QUEUE, not hold (corrected 2026-07-22): the escalation fires on ordinary prose
+# that reconstructs to a "word.tld" shape too (measured 5/8 benign), so hold was
+# over-alarming. queue surfaces the anomaly quietly; hold returns with CONTEXT_V2.
 for cp, name in UNCARDED.items():
     r = rep("goog" + chr(cp) + "le.com")
-    if r["effective_action"] != "hold_pending_review":
-        fails.append("A uncarded %s (U+%04X) host-break did not escalate: %s"
+    if r["effective_action"] != "queue_for_review":
+        fails.append("A uncarded %s (U+%04X) host-break did not surface at queue: %s"
                      % (name, cp, r["effective_action"]))
     if not r["uncarded_invisibles"]:
         fails.append("A uncarded %s lost its witness record while escalating" % name)

@@ -783,6 +783,15 @@ def analyze(text: str, cards: list, protected_targets=None) -> dict:
     # reconstruction itself (F-NEW-1), so the uncarded char at the offset is removed anyway;
     # passing the carded alphabet here would wrongly demask a structural '.' (the DOT card)
     # and break domain reconstruction -> BYTE_EXACT_TOKEN instead of HOST.
+    #
+    # LEVEL = queue, NOT hold (correction, ratification round 2026-07-22): the escalation was
+    # measured to fire on ordinary PROSE that merely reconstructs to a "word.tld" shape
+    # ("open readme<WJ>.com", "the total<WJ>.com of it") -- 5/8 benign strings would hold.
+    # The context detector cannot yet tell prose from a real host (the CONTEXT_V2 front), so
+    # HOLD was over-alarming. queue_for_review (POSSIBLE -- "look when you can")
+    # surfaces the anomaly to the human WITHOUT the loud false alarm; it does not reintroduce
+    # a silent pass (attention_status is already raised). hold returns once CONTEXT_V2 makes
+    # the host predicate precise.
     try:
         _mon138 = _monitored_138_set()
         for _u in uncarded_invisibles:
@@ -792,7 +801,7 @@ def analyze(text: str, cards: list, protected_targets=None) -> dict:
             if ord(text[_off]) not in _mon138:
                 continue                   # only the supervised class; braille/VS/whitespace stay witness
             if _se._detect_context_at(text, _off, frozenset()) == "HOST":
-                effective_action = most_severe([effective_action, "hold_pending_review"])
+                effective_action = most_severe([effective_action, "queue_for_review"])
                 break
     except Exception:
         pass                               # fail-open: on any error keep the verdict, never crash
