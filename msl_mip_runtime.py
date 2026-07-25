@@ -933,7 +933,15 @@ def print_report(report: dict) -> None:
     att_tag = ("   [⚠ ATTENTION: WITNESS_PRESENT — uncarded invisible above; "
                "hold your eye]" if attention == "WITNESS_PRESENT" else "")
     if status == "OK":
-        print(f"FINAL VERDICT: {sem.upper()}{att_tag}")
+        # W2 (Kimi 2026-07-26, reproduced): the headline must be the ACTIONABLE
+        # (effective) verdict. An independent safeguard (e.g. D-INV-GEN) can raise
+        # effective ABOVE semantic without an integrity VIOLATION (status stays OK);
+        # printing only `sem` then showed FINAL VERDICT: PASS while effective was
+        # queue/hold -- exactly the field the human reads. Show effective; when it
+        # differs, name the un-raised main path underneath so nothing is hidden.
+        print(f"FINAL VERDICT: {eff.upper()}{att_tag}")
+        if eff != sem:
+            print(f"  (main path: {sem.upper()}; raised by an independent safeguard)")
     else:
         # D-GUARD-4: show BOTH so the human sees the discrepancy in the window.
         print(f"SEMANTIC VERDICT (main path): {sem.upper()}")

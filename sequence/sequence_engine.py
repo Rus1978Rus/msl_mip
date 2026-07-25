@@ -784,8 +784,18 @@ def _assess_relation_risk(text: str, sign_statuses: list, o1_ctx=None) -> list:
             # match and the whole layer stays inert -- the default remains zero-delta.
             vf = cand.get("visible_form", "")
             sign_cp = ord(vf) if len(vf) == 1 else None
-            occ_role = o1_derive_role(text, offset, o1_ctx)
-            final_risk, o1_decision = o1_final_level(risk, sign_cp, ctx, occ_role)
+            # Level 2 contract: O1 is an INDEPENDENT risk driver, so it may act
+            # ONLY on a PRIMARY edge. A SUPPORTING_FACET / TAXONOMY_ONLY (or an
+            # INVALID_EDGE) must NOT emit an independent risk on the same sign.
+            # Finding W3 (Kimi 2026-07-26, reproduced): the seam applied final_level
+            # to every edge regardless of runtime_role, raising base-NONE
+            # non-PRIMARY edges to HIGH and reviving the Z1 duplicate-verdict that
+            # Level 2 removed. Gate the overlay to PRIMARY; others keep base risk.
+            if role == "PRIMARY":
+                occ_role = o1_derive_role(text, offset, o1_ctx)
+                final_risk, o1_decision = o1_final_level(risk, sign_cp, ctx, occ_role)
+            else:
+                final_risk, o1_decision = risk, None
 
             verdict = {
                 "visible_form": vf,
@@ -806,7 +816,9 @@ def _assess_relation_risk(text: str, sign_statuses: list, o1_ctx=None) -> list:
             }
             # Audit field IFF a policy row fired (final > base). Absent otherwise,
             # so increment-0 (empty registry) adds no key -> batteries bit-identical.
-            o1_audit = o1_audit_field(o1_decision)
+            # o1_decision is None on a non-PRIMARY edge (overlay skipped, W3 fix) ->
+            # no audit field, same as "no row fired".
+            o1_audit = o1_audit_field(o1_decision) if o1_decision is not None else None
             if o1_audit is not None:
                 verdict["o1_policy"] = o1_audit
             verdicts.append(verdict)
