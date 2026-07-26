@@ -14,6 +14,7 @@ see the dot_matcher.py docstring for the same class of caveat):
 """
 
 
+import os
 import re
 
 
@@ -39,6 +40,62 @@ _API_WORDS = {"api", "v1", "v2", "v3"}
 # via _word_at (which stops at "." and therefore never sees the
 # dot — the root of the bug).
 _DOMAIN_BEFORE_SLASH_RE = re.compile(r"[\w-]+\.[A-Za-z]{2,}$")
+
+# --- round 4 (D-ONSQ-SUBSTRATE-FIX): O(1) per-offset substrate facts ---
+# detect_substrate was O(m^2) on a slash flood: per occurrence it ran
+# `_DOMAIN_BEFORE_SLASH_RE.search(text[:offset])` (O(offset) prefix slice) and
+# `text.count("/")` (O(n)). Both are token-level facts; compute ONCE per text.
+# ZERO-DELTA: MSL_MIP_ONSQ3_REFERENCE=1 forces the original regex/count (the
+# differential oracle, tests/gate_onsq_substrate_zero_delta.py).
+_SUB_CACHE = {}   # id(text) -> (text, slash_count, letrun)
+_WORDISH_RE = re.compile(r"[\w-]")
+
+
+def _is_wordish(ch: str) -> bool:
+    """Exactly the regex class [\\w-] on one char (Unicode \\w + hyphen)."""
+    return bool(_WORDISH_RE.match(ch))
+
+
+def _sub_facts(text: str):
+    entry = _SUB_CACHE.get(id(text))
+    if entry is not None and entry[0] is text:
+        return entry[1], entry[2]
+    slash_count = text.count("/")
+    n = len(text)
+    letrun = [0] * (n + 1)          # letrun[i] = trailing ASCII-letter run ending at i-1
+    run = 0
+    for i in range(n):
+        c = text[i]
+        if "a" <= c <= "z" or "A" <= c <= "Z":
+            run += 1
+        else:
+            run = 0
+        letrun[i + 1] = run
+    if len(_SUB_CACHE) > 512:
+        _SUB_CACHE.clear()
+    _SUB_CACHE[id(text)] = (text, slash_count, letrun)
+    return slash_count, letrun
+
+
+def _dom_end_at(text: str, pos: int, letrun: list) -> bool:
+    """True iff text[:pos] ends with [\\w-]+\\.[A-Za-z]{2,} (the $-anchored regex,
+    end-of-string case). Equivalent by construction; proven by the differential gate."""
+    L = letrun[pos]                 # ASCII letters immediately before pos
+    if L < 2:
+        return False
+    r = pos - L                     # start of that trailing letter run
+    return r - 1 >= 0 and text[r - 1] == "." and r - 2 >= 0 and _is_wordish(text[r - 2])
+
+
+def _dom_before_slash_fast(text: str, offset: int, letrun: list) -> bool:
+    """O(1) equivalent of `_DOMAIN_BEFORE_SLASH_RE.search(text[:offset])`. Python
+    `$` matches at end OR just before a single trailing newline, so also test the
+    position before a trailing '\\n' at offset-1."""
+    if _dom_end_at(text, offset, letrun):
+        return True
+    if offset >= 1 and text[offset - 1] == "\n":
+        return _dom_end_at(text, offset - 1, letrun)
+    return False
 
 _INTERPRETATION_NAMES = {
     "SAFE_CASE_001": "path_or_choice_separator",
@@ -88,14 +145,24 @@ def detect_substrate(text: str, offset: int) -> str:
     if offset > 0 and text[offset - 1] == "\\":
         return "FILESYSTEM"
 
+    # domain-before-"/" and slash-count: O(1) from per-text facts (round 4,
+    # D-ONSQ-SUBSTRATE-FIX). MSL_MIP_ONSQ3_REFERENCE=1 forces the O(m^2) original.
+    if os.environ.get("MSL_MIP_ONSQ3_REFERENCE") == "1":
+        _dom_before = bool(_DOMAIN_BEFORE_SLASH_RE.search(text[:offset]))
+        _many_slash = text.count("/") >= 2
+    else:
+        _sc, _letrun = _sub_facts(text)
+        _dom_before = _dom_before_slash_fast(text, offset, _letrun)
+        _many_slash = _sc >= 2
+
     # FIXED: a domain-like segment right before "/"
     # (with no "://" required) — e.g. "trusted.com/verified"
-    if _DOMAIN_BEFORE_SLASH_RE.search(text[:offset]):
+    if _dom_before:
         return "URL_AUTHORITY"
 
     if left in "./" or text[max(0, offset - 2):offset] == "..":
         return "FILESYSTEM"
-    if text.count("/") >= 2:
+    if _many_slash:
         return "FILESYSTEM"
 
     return "AMBIGUOUS"
