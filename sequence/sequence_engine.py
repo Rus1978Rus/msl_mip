@@ -22,7 +22,10 @@ SOLIDUS), '://' (SOLIDUS.SC7).
 
 from __future__ import annotations
 
+import bisect
+import os
 import unicodedata
+from functools import lru_cache
 
 from sign_core_card import SignCoreCard, RiskLevel
 from sequence_output import SequenceMatch, SequenceOutput
@@ -312,6 +315,7 @@ _DI_EXTRA_RANGES = ((0x034F, 0x034F), (0x115F, 0x1160), (0x17B4, 0x17B5),
                     (0xFFA0, 0xFFA0), (0xE0100, 0xE01EF))
 
 
+@lru_cache(maxsize=8192)
 def _is_domain_label_invisible(ch: str) -> bool:
     """True if ch is an invisible / zero-advance code point that can hide
     INSIDE a domain label (F-NEW-1). Ordinary whitespace is EXCLUDED on
@@ -350,8 +354,16 @@ def _strip_combining_marks(s: str) -> str:
     witness either: goog<ZWSP>le<U+0301>.com goes from hold to a TRUE silent pass. The
     composition is realistic because accents are legitimate in IDN domains. Measured and
     closed here (mirrors _strip_label_invisibles: reconstruction only, text untouched)."""
-    return "".join(ch for ch in s
-                   if unicodedata.category(ch) not in ("Mn", "Mc", "Me"))
+    return "".join(ch for ch in s if not _is_combining_mark(ch))
+
+
+@lru_cache(maxsize=8192)
+def _is_combining_mark(ch: str) -> bool:
+    """Pure per-codepoint predicate for _strip_combining_marks. Cached because
+    unicodedata.category is called per char on the reconstruction path O(m) times
+    per token (ONsq-fix V2, D-ONSQ-FIX): zero-delta by construction (same result
+    as the inline `category(ch) in (Mn,Mc,Me)` check)."""
+    return unicodedata.category(ch) in ("Mn", "Mc", "Me")
 
 
 def _has_alnum(s: str) -> bool:
@@ -509,9 +521,16 @@ def _is_byte_exact_token(s: str) -> bool:
     return any(ch.isalpha() for ch in s)
 
 
-def _detect_context_at(text: str, offset: int, mask_chars=frozenset()) -> str:
+def _detect_context_at_reference(text: str, offset: int, mask_chars=frozenset()) -> str:
     """Context detector around the mask position (step 4, D2): URL / HOST /
     EMAIL / PATH / BYTE_EXACT_TOKEN / FREE_TEXT.
+
+    REFERENCE ORACLE (D-ONSQ-FIX): the original per-offset implementation, kept
+    verbatim as the correctness oracle for the O(n^2) sweep fix. Not on the hot
+    path in production (the fast `_detect_context_at` below is), but the
+    differential gate asserts the fast path returns identical results to THIS
+    for every corpus input. Do NOT edit for behaviour — a change here changes
+    the oracle.
 
     Two passes:
       1. SCHEME (P4): a 'scheme://' is honoured ONLY inside the mask's own
@@ -668,6 +687,185 @@ def _detect_context_at(text: str, offset: int, mask_chars=frozenset()) -> str:
     return "FREE_TEXT"
 
 
+# --- O(n^2) fix (D-ONSQ-FIX): per-token facts cache + O(1) per-offset lookup ---
+# Root of the quadratic (measured, cProfile): the reference recomputes the whole
+# token's demask/strip/domain-scan on EVERY mask occurrence. On a no-space run
+# (token = whole input, m masks) that is O(m*token) = O(m^2). The facts a token
+# exposes are shared across ALL its masks; only detected_context is offset-
+# specific. So we compute the facts ONCE per (token, mask_chars, tld_state) and
+# answer each offset from precomputed prefix/suffix arrays in O(1)/O(log).
+#
+# ZERO-DELTA is the invariant: _detect_context_at MUST return exactly what
+# _detect_context_at_reference returns for every input. Proven by
+# tests/gate_onsq_zero_delta.py (unit differential over a corpus + full-analyze
+# battery/mutation gates). The fast path is DISABLED (falls back to the
+# reference) by env MSL_MIP_ONSQ_REFERENCE=1 for A/B differential harnessing.
+
+_ONSQ_FACTS_CACHE = {}   # (id(text), left, right, mask_chars, id(tld_set), degraded) -> facts
+_ONSQ_WS_CACHE = {}      # id(text) -> sorted list of whitespace indices
+
+
+def _onsq_cache_reset():
+    """Clear the per-run caches. Called once per _assess_relation_risk so id()
+    keys can never go stale across runs and memory stays bounded."""
+    _ONSQ_FACTS_CACHE.clear()
+    _ONSQ_WS_CACHE.clear()
+
+
+def _build_token_facts(token: str, mask_chars, tld_set, degraded: bool):
+    """Compute EVERYTHING that is shared across all mask offsets of a token, ONCE.
+    Per-offset the fast path then answers in O(1). Mirrors _detect_context_at_reference
+    exactly (see the zero-delta gate). Only bare-domain (no-scheme) tokens with the
+    mask char removed and rel>=lead0 use these facts; every other shape delegates to
+    the reference (short, non-flood)."""
+    n = len(token)
+    # lead0 = first domain-ish char; had0 = a structural stop lived in the lead prefix
+    lead0 = 0
+    while lead0 < n and not (token[lead0].isalnum() or token[lead0] in ".-"):
+        lead0 += 1
+    had0 = any(token[i] in _LEADING_STRUCTURAL_STOPS for i in range(lead0))
+    has_scheme = token.find("://") != -1
+
+    seg = token[lead0:]
+    # a char survives reconstruction iff it is not a mask AND not a label-invisible
+    # AND not a combining mark (== demask -> strip_label -> strip_combining, a
+    # conjunction of per-char removals; order-independent).
+    survives = []
+    proj_parts = []
+    survcount = [0]                       # survcount[k] = surviving chars in seg[:k]
+    for ch in seg:
+        s = (ch not in mask_chars) and (not _is_domain_label_invisible(ch)) \
+            and (not _is_combining_mark(ch))
+        survives.append(s)
+        if s:
+            proj_parts.append(ch)
+        survcount.append(survcount[-1] + (1 if s else 0))
+    proj = "".join(proj_parts)
+    L = len(proj)
+
+    # alnum prefix/suffix flags: alnum_pref[p] == _has_alnum(proj[:p])
+    alnum_pref = [False] * (L + 1)
+    acc = False
+    for i in range(L):
+        alnum_pref[i] = acc
+        if proj[i].isalnum():
+            acc = True
+    alnum_pref[L] = acc
+    alnum_suf = [False] * (L + 1)
+    acc = False
+    for i in range(L - 1, -1, -1):
+        alnum_suf[i + 1] = acc
+        if proj[i].isalnum():
+            acc = True
+    alnum_suf[0] = acc
+
+    # domain-shape of every prefix / suffix. The O(n^2) DoS inputs are DOTLESS
+    # floods (masks removed -> "aaaa..."), where no prefix/suffix can be a domain
+    # (a domain needs >=2 dot-separated labels) -> all False in O(1). Only a
+    # token that actually contains a dot pays the per-position _looks_like_domain
+    # cost, and such tokens are short (a real domain) / input-capped by Mode A.
+    projc = _canon_domain_seps(proj)
+    if "." in projc:
+        dom_pref = [_looks_like_domain(proj[:p], tld_set, degraded) for p in range(L + 1)]
+        dom_suf = [_looks_like_domain(proj[p:], tld_set, degraded) for p in range(L + 1)]
+    else:
+        dom_pref = None                   # all False
+        dom_suf = None
+
+    whole_dom = _looks_like_domain(proj, tld_set, degraded)
+    # mask-inside-domain branch: recon == proj (rel char removed), so host/host_end
+    # are token constants. _domain_prefix runs on the NON-canonicalised recon.
+    if whole_dom:
+        host = _domain_prefix(proj)
+        host_end_whole = proj.find(host) + len(host)
+    else:
+        host_end_whole = -1
+    # EMAIL branch on whole == proj
+    whole_email = False
+    if "@" in proj:
+        at = proj.rfind("@")
+        local, dom = proj[:at], proj[at + 1:]
+        whole_email = bool(local) and _looks_like_domain(dom, tld_set, degraded)
+    whole_byte_exact = _is_byte_exact_token(proj)
+
+    return {
+        "lead0": lead0, "had0": had0, "has_scheme": has_scheme,
+        "survives": survives, "survcount": survcount,
+        "alnum_pref": alnum_pref, "alnum_suf": alnum_suf,
+        "dom_pref": dom_pref, "dom_suf": dom_suf,
+        "whole_dom": whole_dom, "host_end_whole": host_end_whole,
+        "whole_email": whole_email, "whole_byte_exact": whole_byte_exact,
+    }
+
+
+def _detect_context_at(text: str, offset: int, mask_chars=frozenset()) -> str:
+    """Fast per-offset context detector (D-ONSQ-FIX). ZERO-DELTA vs
+    _detect_context_at_reference (proven by tests/gate_onsq_zero_delta.py). The
+    hard/rare shapes delegate to the reference; the hot bare-domain path is served
+    from per-token facts in O(1)."""
+    if os.environ.get("MSL_MIP_ONSQ_REFERENCE") == "1":
+        return _detect_context_at_reference(text, offset, mask_chars)
+
+    # token boundaries via precomputed whitespace spans (O(log n) bisect instead
+    # of an O(token) scan per offset — that scan was itself a source of the O(n^2)).
+    # The cache holds a REFERENCE to `text` and verifies identity: while an entry is
+    # cached the text cannot be GC'd, so its id() cannot be reused for a different
+    # object -> no stale-by-id-reuse (this also protects the id(text)-keyed facts
+    # cache below). Cleared per run by _onsq_cache_reset.
+    entry = _ONSQ_WS_CACHE.get(id(text))
+    if entry is None or entry[0] is not text:
+        ws = [i for i, ch in enumerate(text) if ch.isspace()]
+        _ONSQ_WS_CACHE[id(text)] = (text, ws)
+    else:
+        ws = entry[1]
+    k = bisect.bisect_left(ws, offset)
+    left_bound = ws[k - 1] + 1 if k > 0 else 0
+    right_bound = ws[k] if k < len(ws) else len(text)
+    token = text[left_bound:right_bound]
+    rel = offset - left_bound
+
+    tld_set, degraded = _tlds()
+    # key on the span (ints) + id(text), NOT the token string — hashing a
+    # flood-length token per offset would re-introduce O(n^2) in the cache lookup.
+    key = (id(text), left_bound, right_bound, mask_chars, id(tld_set), degraded)
+    facts = _ONSQ_FACTS_CACHE.get(key)
+    if facts is None:
+        facts = _build_token_facts(token, mask_chars, tld_set, degraded)
+        _ONSQ_FACTS_CACHE[key] = facts
+
+    lead0 = facts["lead0"]
+    # Delegate the shapes the fast path deliberately does not model:
+    #   - a scheme in the token (Pass 1) — short URLs, never the flood;
+    #   - the mask inside the leading non-domain prefix (rel < lead0);
+    #   - a "kept-rel" (the char at rel survives reconstruction) — recon != whole
+    #     then; unreachable today (carded masks are all removed) but kept exact.
+    if facts["has_scheme"] or rel < lead0 or rel >= len(token) \
+            or facts["survives"][rel - lead0]:
+        return _detect_context_at_reference(text, offset, mask_chars)
+
+    p = facts["survcount"][rel - lead0]
+    had = facts["had0"]
+    dp = facts["dom_pref"][p] if facts["dom_pref"] is not None else False
+    ds = facts["dom_suf"][p] if facts["dom_suf"] is not None else False
+    ap = facts["alnum_pref"][p]
+    as_ = facts["alnum_suf"][p]
+
+    # --- exact mirror of the reference bare-domain tail (P0..P5) ---
+    if dp and ds:
+        return "HOST"
+    if facts["whole_dom"] and not (ap and as_):
+        return "HIDDEN_BOUNDARY_PADDING"
+    if ap and as_ and facts["whole_dom"] and p < facts["host_end_whole"]:
+        return "HOST"
+    if facts["whole_email"]:
+        return "EMAIL"
+    if dp:
+        return "FREE_TEXT" if had else "PATH"
+    if facts["whole_byte_exact"]:
+        return "BYTE_EXACT_TOKEN"
+    return "FREE_TEXT"
+
+
 # FRAMING: this is a WITNESS, not a judge. Every level here maps to a
 # RECOMMENDATION surfaced to the human (HIGH -> "hold, look"; MEDIUM ->
 # "queue, look"), never to an automatic block. HOST (a domain break) is the
@@ -733,6 +931,7 @@ _RELATION_RUNTIME_ROLE = {
 def _assess_relation_risk(text: str, sign_statuses: list, o1_ctx=None) -> list:
     """STAGE_6b: verdict per active mask (D-REL-4/6).
     Barrier N3: read ONLY active_relation_candidates."""
+    _onsq_cache_reset()   # D-ONSQ-FIX: fresh per-token facts cache each run
     verdicts = []
     # ARCH constraint: the mask alphabet for this run is taken from the
     # cards (SIGN_RELATIONS -> visible_form), never hardcoded. D-DET-1
