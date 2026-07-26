@@ -36,6 +36,7 @@ from module_engine import process_sign
 from integrator_engine import process_output
 from sequence_engine import process_sequence
 import sequence_engine as _se   # F-NEW-3: reuse domain/context helpers for the removal probe
+import input_guard as _ig_mod   # Input-Guard Mode A: DoS cost budget on the input
 from sequence_integrator_engine import process_sequence_output
 from o1_policy_engine import pending_for as _o1_pending_for  # P3: report-only disposition
 from o1_policy_engine import O1Context as _O1Context         # C6: caller-supplied targets
@@ -702,6 +703,18 @@ def analyze(text: str, cards: list, protected_targets=None) -> dict:
       word list of its own. See AUTHOR_DECISION_20260721_D-O1-C6-NARROW for the measured
       caveat: ORDINARY-WORD targets (system/select/root/...) also occur in prose and
       raise false positives — keep the list narrow and specific until CONTEXT_V2 lands."""
+    # --- INPUT_GUARD Mode A (DoS cost budget, D-INPUT-GUARD-MODE-A-DESIGN) ---
+    # First operation. On a pathological flood the heavy layers analyse the VISIBLE
+    # PROJECTION (invisibles stripped / long runs collapsed) instead of the flood:
+    # `text` is locally reassigned to the projection so every layer below sees the
+    # short view (anti-smokescreen G10 -- a flood cannot hide a phishing tail), while
+    # the ORIGINAL text is preserved for the report. For OK / DENSITY_SIGNAL inputs
+    # (the common case) the projection is not used and the analysis is byte-identical
+    # to before, plus the additive `input_guard` field. WITNESS frame: never blocks.
+    _ig = _ig_mod.input_guard_scan(text)
+    _orig_text = text
+    if _ig["status"] == "INGESTION_HOLD_SUMMARY":
+        text = _ig_mod.visible_projection(text)
     known_signs = {c.visible_form for c in cards}
 
     # --- Single-sign layer ---
@@ -823,8 +836,15 @@ def analyze(text: str, cards: list, protected_targets=None) -> dict:
     # your eye: an invisible with no card is present". The verdict is untouched.
     attention_status = "WITNESS_PRESENT" if uncarded_invisibles else "NONE"
 
+    # INPUT_GUARD verdict raise (additive, WITNESS frame -- a recommendation, never a
+    # block). A collapse raises to hold; a density signal forbids a bare pass (queue).
+    if _ig["status"] == "INGESTION_HOLD_SUMMARY":
+        effective_action = most_severe([effective_action, "hold_pending_review"])
+    elif _ig["status"] == "DENSITY_SIGNAL":
+        effective_action = most_severe([effective_action, "queue_for_review"])
+
     report = {
-        "text": text,
+        "text": _orig_text,
         "sign_statuses": sign_statuses,
         "single_sign_results": single_sign_results,
         "sequence_output": seq_out,
@@ -836,6 +856,7 @@ def analyze(text: str, cards: list, protected_targets=None) -> dict:
         "integrity_concerns": integrity_concerns,
         "uncarded_invisibles": uncarded_invisibles,
         "attention_status": attention_status,
+        "input_guard": _ig,     # Mode A cost-budget report (additive, always present)
     }
     if class_guard is not None:              # omitted only under MSL_MIP_GUARD_DISABLED
         report["class_guard"] = class_guard  # increment-1 shadow field (report-only)
