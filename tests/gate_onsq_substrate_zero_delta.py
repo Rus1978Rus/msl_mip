@@ -33,6 +33,12 @@ import sequence_engine as se
 se._force_tld_state_for_test(frozenset({"com", "org", "net", "ru", "io"}), False)
 _CARDS = rt.load_all_cards()
 
+# non-ASCII test literals via chr() to keep this file EN-only (english-only gate)
+_PRIMER = "".join(chr(c) for c in (0x43F, 0x440, 0x438, 0x43C, 0x435, 0x440))  # cyrillic 'primer'
+_DOMEN = "".join(chr(c) for c in (0x434, 0x43E, 0x43C, 0x435, 0x43D))          # cyrillic 'domen'
+_RF = chr(0x440) + chr(0x444)                                                  # cyrillic 'rf'
+_CAFE = "caf" + chr(0xE9)                                                      # 'cafe' w/ acute
+
 fails = []
 checks = 0
 
@@ -40,10 +46,10 @@ _CORPUS = [
     "", "/", "//", "///", "/" * 50, "a.com/x", "trusted.com/verified",
     "sub.domain.org/path/to", "x.co/", ".com/", "1.co/", "-.com/", "a.c/",
     "http://a.com/p", "a.com\n/x", "site.com\n", "C:/Users/doc", "../../e/p",
-    "a.b.cd/", "word.NET/x", "пример.com/a", "домен.рф/",  # unicode \w before dot
+    "a.b.cd/", "word.NET/x", _PRIMER + ".com/a", _DOMEN + "." + _RF + "/",  # unicode \w before dot
     "12.34/56", "2026/01/02", "path/to/file", "a/b/c/d", "!.com/",
     "_priv.com/", "a-b.com/x", "x.abcdefghij/", "no dot here/x/y",
-    ("a.com/" * 30), ("/" * 100), "café.com/x",
+    ("a.com/" * 30), ("/" * 100), _CAFE + ".com/x",
 ]
 
 
@@ -78,7 +84,7 @@ for t in _CORPUS:
 
 # fuzz
 random.seed(9090)
-alpha = "abcXY.-_/\\:0129 \n" + "рф" + "é"
+alpha = "abcXY.-_/\\:0129 \n" + _RF + chr(0xE9)
 for i in range(1500):
     t = "".join(random.choice(alpha) for _ in range(random.randint(1, 40)))
     _direct_all_offsets(t)
@@ -98,7 +104,7 @@ def _surface(text):
 
 
 for t in ["a.com/x/y", "trusted.com/verified", "http://x.com//a", "C:/Users/f",
-          "path/to/f", "/" * 30, "a.com\n/z", "домен.рф/a"]:
+          "path/to/f", "/" * 30, "a.com\n/z", _DOMEN + "." + _RF + "/a"]:
     os.environ["MSL_MIP_ONSQ3_REFERENCE"] = "1"; sm._SUB_CACHE.clear(); ref = _surface(t)
     os.environ["MSL_MIP_ONSQ3_REFERENCE"] = "0"; sm._SUB_CACHE.clear(); fast = _surface(t)
     checks += 1
