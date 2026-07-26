@@ -65,6 +65,41 @@ def _valid_scheme_before(text: str, colon_idx: int) -> bool:
     return len(scheme) >= 1 and scheme[0].isalpha()
 
 
+class _PrefixMax:
+    """Fenwick (BIT) for point-update-max + prefix-max query over integer
+    positions 0..n-1 (D-ONSQ-CLAIMED-FIX). ZERO-DELTA replacement for the O(m^2)
+    `any(c_start <= idx and end <= c_end for c_start, c_end in claimed)`:
+    store at position c_start the value c_end (keeping the max), then
+        covered  ==  query(idx) >= end
+    because the existential "exists a claimed interval that CONTAINS [idx,end]"
+    is exactly  max(c_end : c_start <= idx) >= end. Not union, not overlap.
+    O(log n) per op; source positions are already 0..len(text) so no coordinate
+    compression is needed. See tests/gate_onsq_claimed_zero_delta.py."""
+    __slots__ = ("_t", "_n")
+
+    def __init__(self, n: int):
+        self._n = n
+        self._t = [-1] * (n + 1)          # 1-indexed; -1 = empty
+
+    def update(self, pos: int, val: int) -> None:
+        i = pos + 1
+        t = self._t
+        while i <= self._n:
+            if t[i] < val:
+                t[i] = val
+            i += i & (-i)
+
+    def query(self, pos: int) -> int:     # max value at any position <= pos
+        i = pos + 1
+        t = self._t
+        r = -1
+        while i > 0:
+            if t[i] > r:
+                r = t[i]
+            i -= i & (-i)
+        return r
+
+
 def _find_literal_matches(text: str, pool: list,
                           validated_offsets: set = None,
                           card_signs: set = None,
@@ -109,7 +144,12 @@ def _find_literal_matches(text: str, pool: list,
 
     strict=False: validated_offsets not passed -> text mode."""
     matches = []
-    claimed = []
+    # D-ONSQ-CLAIMED-FIX: prefix-max containment (O(log m)) replaces the O(m^2)
+    # `any(...)` scan of `claimed`. MSL_MIP_ONSQ2_REFERENCE=1 forces the old list
+    # scan (reference oracle for the zero-delta differential).
+    _use_ref = os.environ.get("MSL_MIP_ONSQ2_REFERENCE") == "1"
+    claimed = []                              # reference containment
+    _pm = None if _use_ref else _PrefixMax(len(text))   # fast containment
     card_signs = card_signs or set()
     registry = known_signs if known_signs is not None else card_signs
 
@@ -143,7 +183,8 @@ def _find_literal_matches(text: str, pool: list,
             if idx < 0:
                 break
             end = idx + len(seq)
-            covered = any(c_start <= idx and end <= c_end for c_start, c_end in claimed)
+            covered = (any(c_start <= idx and end <= c_end for c_start, c_end in claimed)
+                       if _use_ref else _pm.query(idx) >= end)
             if not covered and _candidate_validated(sc, idx, end):
                 # ── SOLIDUS_SCHEME_PATCH (variant "b", AUTHOR_DECISION 2026-07-07) ──
                 # If "//" immediately follows ":" it is the scheme link
@@ -174,7 +215,10 @@ def _find_literal_matches(text: str, pool: list,
                     url_context_flag=url_ctx,
                     scheme_neutralized=scheme_neut,
                 ))
-                claimed.append((idx, end))
+                if _use_ref:
+                    claimed.append((idx, end))
+                else:
+                    _pm.update(idx, end)     # logical claimed.append, AFTER match append
             start = idx + 1
     matches.sort(key=lambda m: (m.match_start, -(m.match_end - m.match_start)))
     return matches
@@ -184,11 +228,27 @@ def _attach_source_offsets(matches: list, sign_statuses: list) -> None:
     """PATCH_25: per match — which single signs (by their
     SIGN_OFFSET) fell into [match_start, match_end).
     Fills source_sign_offsets with real data (SOURCE_SIGN_LIST),
-    made possible by PATCH_23 (offset in OutputStatus)."""
+    made possible by PATCH_23 (offset in OutputStatus).
+
+    D-ONSQ-CLAIMED-FIX: the old matches x statuses nested loop is O(m*s). The fast
+    path sorts sign offsets ONCE and takes a bisect range [start,end) per match
+    (O(s log s + m log s)); ZERO-DELTA — same multiset (duplicates kept), same
+    per-match .sort(), same append semantics (extend, not replace).
+    MSL_MIP_ONSQ2_REFERENCE=1 forces the old nested loop (differential oracle)."""
+    if os.environ.get("MSL_MIP_ONSQ2_REFERENCE") == "1":
+        for m in matches:
+            for st in sign_statuses:
+                if m.match_start <= st.sign_offset_start < m.match_end:
+                    m.source_sign_offsets.append(st.sign_offset_start)
+            m.source_sign_offsets.sort()
+        return
+    if not matches:                     # old loop never reads statuses when empty
+        return
+    offs = sorted(st.sign_offset_start for st in sign_statuses)
     for m in matches:
-        for st in sign_statuses:
-            if m.match_start <= st.sign_offset_start < m.match_end:
-                m.source_sign_offsets.append(st.sign_offset_start)
+        lo = bisect.bisect_left(offs, m.match_start)
+        hi = bisect.bisect_left(offs, m.match_end)   # half-open [start, end)
+        m.source_sign_offsets.extend(offs[lo:hi])
         m.source_sign_offsets.sort()
 
 
