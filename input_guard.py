@@ -34,9 +34,15 @@ _BYTE_BACKSTOP = 500_000          # ~0.5 MB free backstop (honest long input is 
 _COMPUTE_MIN = 2048               # below this, never collapse (short input is cheap)
 
 # --- collapse (T_collapse) thresholds (conjunctive with _COMPUTE_MIN) ---
-_DOMINANT_COLLAPSE = 0.50         # one code point is >50% of the input
-_INVIS_SHARE_COLLAPSE = 0.30      # invisibles (Cf) are >30% of the input
-_TRIGGER_COLLAPSE = 1024          # invisibles + url-structural chars
+# Calibrated 2026-07-26 on a broad honest corpus (prose/code/CSV/base64/json/log/
+# CJK/markdown/URL-lists): the per-char DoS these once guarded is now removed
+# algorithmically (D-ONSQ-FIX + D-ONSQ-CLAIMED-FIX + substrate round 4), so the
+# thresholds are relaxed to stop false-collapsing legit dense/repetitive content
+# (deeply-indented code was ~0.89 dominant; a single-digit CSV is exactly 0.50).
+# Only a near-pure single-char flood (>=0.95) or a large invisible/trigger flood trips.
+_DOMINANT_COLLAPSE = 0.95         # one code point is >=95% of the input (near-pure flood)
+_INVIS_SHARE_COLLAPSE = 0.30      # invisibles (Cf) are >30% of the input (hidden channel)
+_TRIGGER_COLLAPSE = 4096          # invisibles + url-structural chars (legit URL lists are fine)
 
 # --- signal (T_signal) thresholds (count-floor: count AND ratio) ---
 _SIGNAL_INVIS_COUNT = 20
