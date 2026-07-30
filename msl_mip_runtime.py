@@ -463,6 +463,48 @@ def _whitespace_witnesses(text: str, i: int):
     return None
 
 
+_VS_ALL = set(range(0xFE00, 0xFE10)) | set(range(0xE0100, 0xE01F0))
+
+
+def _vs_emoji_base(ch: str) -> bool:
+    if not ch:
+        return False
+    o = ord(ch)
+    return o >= 0x1F000 or unicodedata.category(ch).startswith("S") or ch in "#*0123456789"
+
+
+def _vs_cjk_base(ch: str) -> bool:
+    o = ord(ch) if ch else -1
+    return (0x3400 <= o <= 0x9FFF) or (0x20000 <= o <= 0x2FFFF) or (0xF900 <= o <= 0xFAFF)
+
+
+def _vs_verdict(text: str, i: int) -> str:
+    """W4/VS-AXIS (D-W4-VS-AXIS D3/D6): classify a variation selector at i.
+    SINGLE_ON_BASE (one selector on a valid emoji/CJK base) = legitimate presentation
+    -> silenced (no witness, no escalation). CHAIN (>=2 adjacent selectors) = data
+    carrier; ORPHAN (leading / on a non-base) = anomalous carrier -> witness + queue.
+    First-cut base validity is APPROXIMATED (emoji planes / symbol cat / CJK ranges),
+    per D4; exact emoji-VS/IVD tables are a follow-up. CHAIN = adjacency (D6), not
+    ">=2 anywhere" (two separate emoji each carrying VS16 are two singles)."""
+    cp = ord(text[i])
+    prev_vs = i > 0 and ord(text[i - 1]) in _VS_ALL
+    next_vs = i + 1 < len(text) and ord(text[i + 1]) in _VS_ALL
+    if prev_vs or next_vs:
+        return "CHAIN"
+    prev = text[i - 1] if i > 0 else ""
+    if cp in (0xFE0F, 0xFE0E):
+        return "SINGLE_ON_BASE" if _vs_emoji_base(prev) else "ORPHAN"
+    return "SINGLE_ON_BASE" if _vs_cjk_base(prev) else "ORPHAN"
+
+
+def _vs_has_carrier(text: str) -> bool:
+    """True if any variation selector in text is a CHAIN or ORPHAN (carrier/anomaly)."""
+    for i, ch in enumerate(text):
+        if ord(ch) in _VS_ALL and _vs_verdict(text, i) in ("CHAIN", "ORPHAN"):
+            return True
+    return False
+
+
 def _witness_record(ch, i, family, tag, context_note):
     try:
         name = unicodedata.name(ch)
@@ -502,7 +544,12 @@ def scan_uncarded_invisibles(text: str, cards: list) -> list:
         if family is None:
             continue
         note = ""
-        if family == "WHITESPACE":
+        if tag == "VARIATION_SELECTOR":
+            v = _vs_verdict(text, i)
+            if v == "SINGLE_ON_BASE":
+                continue                  # W4/VS-AXIS: legit presentation -> silenced (anti-flood)
+            note = f"variation-selector {v}"
+        elif family == "WHITESPACE":
             wctx = _whitespace_witnesses(text, i)
             if wctx is None:
                 continue                  # STAGE_B gate: prose/typography -> no flood
@@ -818,6 +865,19 @@ def analyze(text: str, cards: list, protected_targets=None) -> dict:
                 break
     except Exception:
         pass                               # fail-open: on any error keep the verdict, never crash
+
+    # --- W4/VS-AXIS: variation-selector carrier -> queue (D-W4-VS-AXIS D3/D9) ---
+    # VS are category Mn (outside class-138), so D-INV-GEN above cannot see them. A
+    # CHAIN (>=2 adjacent selectors = data carrier) or ORPHAN (selector with no valid
+    # base) is escalated to queue_for_review; a legit single-selector-on-base is
+    # silenced (no witness) in scan_uncarded_invisibles above. ADDITIVE, raise-only,
+    # fail-open. First-cut level = queue (base-rate unmeasured; a KNOWN_CARRIER decode
+    # -> hold and host-chain -> hold are follow-ups per D3/D9).
+    try:
+        if _vs_has_carrier(text):
+            effective_action = most_severe([effective_action, "queue_for_review"])
+    except Exception:
+        pass
 
     # --- INVISIBLE_DEFAULT_IGNORABLE_GUARD (increment 1, shadow, report-ONLY) ---
     # Additive: placed in its OWN field, NEVER read by single_actions /
