@@ -879,6 +879,26 @@ def analyze(text: str, cards: list, protected_targets=None) -> dict:
     except Exception:
         pass
 
+    # --- W5/WHITESPACE-HOST: a whitespace-lookalike breaking a host label -> queue ---
+    # (D-W5-WHITESPACE-HOST D3/D4). Non-ASCII whitespace (NBSP/NNBSP/Zl/Zp/...) is
+    # category Zs/Zl/Zp, OUTSIDE class-138, so D-INV-GEN cannot see it. The existing
+    # whitespace witness-family already reconstructs the context via _reconstructed_context
+    # (ASCII-boundary removal probe, so paypal<NBSP>.com -> HOST); this seam only ADDS the
+    # escalation. host-only first-cut; witness records are reused (no new O(n^2)).
+    # DEGRADED-TLD policy (D5): escalate ONLY under an AUTHORITATIVE registry — the degraded
+    # alphabetic-TLD fallback would false-escalate 'Mr.<NBSP>Smith' (measured). In degraded
+    # mode the witness is kept but the verdict is not raised. Additive, raise-only, fail-open.
+    try:
+        _ws_tld, _ws_degraded = _se._tlds()
+        if not _ws_degraded:
+            for _wu in uncarded_invisibles:
+                if _wu.get("family") == "WHITESPACE" \
+                        and (_wu.get("context_note") or "").endswith("HOST"):
+                    effective_action = most_severe([effective_action, "queue_for_review"])
+                    break
+    except Exception:
+        pass
+
     # --- INVISIBLE_DEFAULT_IGNORABLE_GUARD (increment 1, shadow, report-ONLY) ---
     # Additive: placed in its OWN field, NEVER read by single_actions /
     # relation_actions / semantic_action / effective_action. A broken class_guard
