@@ -112,6 +112,11 @@ REVIEW_RESULT: REVIEWER / MODEL_FAMILY (семейств >=3, РАЗНЫХ). П�
 EXIT: сходится → AUTHOR_DECISION → код + delta-census + полная ре-валидация; расходятся → материал
   автору; подход неверен → LOOPHOLE, пере-собрать.
 
-FORK_STATUS: OPEN — PENDING_CONVEYOR + AUTHOR_DECISION (дизайн whitespace-host-оси). Код заблокирован.
+FORK_STATUS: RESOLVED — конвейер пройден (4 семейства: DeepSeek/Kimi/OpenAI/Gemini), AUTHOR_DECISION
+  принят 2026-07-26 (foundation_layer/AUTHOR_DECISION_20260726_D-W5-WHITESPACE-HOST.md, D1–D8):
+  класс = White_Space−ASCII-WS; аддитивный шов на СУЩЕСТВУЮЩЕЙ whitespace witness-семье +
+  _reconstructed_context (не base _detect_context_at — рвёт на NBSP); host-разрыв Zs И Zl/Zp → queue
+  (развилка Zl/Zp решена в queue, не hold — та же CONTEXT_V2-неоднозначность); асимметричный host-span
+  предикат; multi-whitespace + degraded-TLD политика; near-linear span-facts. КОД под acceptance-гейтом.
 
 END_OF_CONVEYOR_PACKET
