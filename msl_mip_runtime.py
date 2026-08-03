@@ -37,6 +37,7 @@ from integrator_engine import process_output
 from sequence_engine import process_sequence
 import sequence_engine as _se   # F-NEW-3: reuse domain/context helpers for the removal probe
 import input_guard as _ig_mod   # Input-Guard Mode A: DoS cost budget on the input
+import confusable_axis as _cf_mod  # W7 visible-confusable class axis (D-W7-CONFUSABLE)
 from sequence_integrator_engine import process_sequence_output
 from o1_policy_engine import pending_for as _o1_pending_for  # P3: report-only disposition
 from o1_policy_engine import O1Context as _O1Context         # C6: caller-supplied targets
@@ -899,6 +900,27 @@ def analyze(text: str, cards: list, protected_targets=None) -> dict:
     except Exception:
         pass
 
+    # --- W7/CONFUSABLE-AXIS: visible homoglyph host spoof (D-W7-CONFUSABLE D1-D3) ---
+    # Letters that LOOK Latin (Cyrillic a/o, Greek alpha, Roman numerals, ...) and
+    # fullwidth dot-lookalikes are VISIBLE, so every invisible-oriented layer above is
+    # blind to them by design. The class axis (core/confusable_axis.py) rides the
+    # pinned UTS#39/UCD tables: tier 1 = mixed-script/lookalike confusable inside ONE
+    # host label -> queue; tier 2 = skeleton collision with a CALLER-supplied protected
+    # target -> hold (the only hold source; user text cannot define targets). Separator
+    # lookalikes emit their event BEFORE canonicalisation (S4.1). ADDITIVE, raise-only,
+    # fail-open; witness lines live in their own report field. Under a DEGRADED TLD
+    # registry the axis reports witness but never raises (W5 parity). If the pinned
+    # tables fail verification the axis is OFF fail-visible (status in the report).
+    try:
+        _cf_tld, _cf_degraded = _se._tlds()
+        _cf = _cf_mod.scan_confusables(text, _cf_tld, _cf_degraded,
+                                       protected_targets=protected_targets)
+        if _cf["level"] in ("queue_for_review", "hold_pending_review"):
+            effective_action = most_severe([effective_action, _cf["level"]])
+    except Exception:
+        _cf = {"status": "AXIS_ERROR", "records": [], "separator_events": [],
+               "ace_failures": [], "witness": [], "level": "pass", "truncated": False}
+
     # --- INVISIBLE_DEFAULT_IGNORABLE_GUARD (increment 1, shadow, report-ONLY) ---
     # Additive: placed in its OWN field, NEVER read by single_actions /
     # relation_actions / semantic_action / effective_action. A broken class_guard
@@ -937,6 +959,7 @@ def analyze(text: str, cards: list, protected_targets=None) -> dict:
         "uncarded_invisibles": uncarded_invisibles,
         "attention_status": attention_status,
         "input_guard": _ig,     # Mode A cost-budget report (additive, always present)
+        "confusable_axis": _cf,  # W7 visible-confusable axis (additive, always present)
     }
     if class_guard is not None:              # omitted only under MSL_MIP_GUARD_DISABLED
         report["class_guard"] = class_guard  # increment-1 shadow field (report-only)
@@ -1023,6 +1046,20 @@ def print_report(report: dict) -> None:
             print(f"        card: {r['card_status']}   finding: {r['finding_status']}")
             print(f"        basis: {r['finding_basis']}")
             print(f"        -> to the human: {r['recommendation']}")
+
+    _cf = report.get("confusable_axis") or {}
+    if _cf.get("witness") or _cf.get("status") not in (None, "OK"):
+        # W7 (B7): the 'look with your eyes' channel for VISIBLE lookalikes --
+        # codepoints expanded, scripts + skeleton + xn-- form shown, because the
+        # eye cannot tell a Cyrillic 'a' from a Latin one unaided.
+        print("\n--- VISIBLE CONFUSABLES (WITNESS, not a verdict) ---")
+        if _cf.get("status") not in (None, "OK"):
+            print(f"  [!] axis status: {_cf.get('status')}"
+                  + (f" ({_cf.get('reason')})" if _cf.get("reason") else ""))
+        for line in _cf.get("witness", []):
+            print("  " + line)
+        if _cf.get("truncated"):
+            print("  [!] record list truncated at cap — input has more findings")
 
     print("\n" + "=" * 60)
     sem = report["semantic_action"]
