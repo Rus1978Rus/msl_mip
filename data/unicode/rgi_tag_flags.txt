@@ -1,0 +1,7 @@
+# RGI_Emoji_Tag_Sequence whitelist (closed-world, exactly 3)
+# Source: Unicode RGI_Emoji_Tag_Sequence (emoji-sequences), unchanged since Emoji 5.0 (2017).
+# Basis: AUTHOR_DECISION_20260804_D-TAG-COVERT-TEXT D2 + spec B2.
+# Format: <tag_spec decoded to ASCII> ; <description>
+gbeng ; Flag: England
+gbsct ; Flag: Scotland
+gbwls ; Flag: Wales

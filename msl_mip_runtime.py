@@ -38,6 +38,7 @@ from sequence_engine import process_sequence
 import sequence_engine as _se   # F-NEW-3: reuse domain/context helpers for the removal probe
 import input_guard as _ig_mod   # Input-Guard Mode A: DoS cost budget on the input
 import confusable_axis as _cf_mod  # W7 visible-confusable class axis (D-W7-CONFUSABLE)
+import tag_axis as _tag_mod        # TAG covert-text axis (D-TAG-COVERT-TEXT)
 from sequence_integrator_engine import process_sequence_output
 from o1_policy_engine import pending_for as _o1_pending_for  # P3: report-only disposition
 from o1_policy_engine import O1Context as _O1Context         # C6: caller-supplied targets
@@ -921,6 +922,26 @@ def analyze(text: str, cards: list, protected_targets=None) -> dict:
         _cf = {"status": "AXIS_ERROR", "records": [], "separator_events": [],
                "ace_failures": [], "witness": [], "level": "pass", "truncated": False}
 
+    # --- TAG/COVERT-TEXT: invisible smuggled ASCII (D-TAG-COVERT-TEXT D1-D9) ---
+    # The TAG block mirrors printable ASCII one-to-one, so a whole message can hide
+    # inside a visible one. Until now such a payload only reached the human as a
+    # per-character witness, and the escalation came from the Input-Guard density
+    # threshold -- an accident that a ~120-char visible cover defeats (measured), and
+    # that a visible character between every tag character defeats completely (max
+    # adjacent run 1, svod SIM-1). The axis makes the signal a property of the front:
+    # ANY assigned tag char outside a whitelisted flag span -> queue. Legit emoji tag
+    # flags (exactly gbeng/gbsct/gbwls) are span-scoped and order-insensitive, so a
+    # decoy flag cannot launder a payload. The decode rides in the WITNESS channel
+    # only -- never as a detection criterion (encryption must not lower a signal) and
+    # never as a level criterion (D5). ADDITIVE, raise-only, fail-open.
+    try:
+        _tg = _tag_mod.scan_tags(text)
+        if _tg["level"] == "queue_for_review":
+            effective_action = most_severe([effective_action, "queue_for_review"])
+    except Exception:
+        _tg = {"status": "AXIS_ERROR", "accepted_flag_spans": [], "findings": [],
+               "witness": [], "level": "pass", "note": ""}
+
     # --- INVISIBLE_DEFAULT_IGNORABLE_GUARD (increment 1, shadow, report-ONLY) ---
     # Additive: placed in its OWN field, NEVER read by single_actions /
     # relation_actions / semantic_action / effective_action. A broken class_guard
@@ -960,6 +981,7 @@ def analyze(text: str, cards: list, protected_targets=None) -> dict:
         "attention_status": attention_status,
         "input_guard": _ig,     # Mode A cost-budget report (additive, always present)
         "confusable_axis": _cf,  # W7 visible-confusable axis (additive, always present)
+        "tag_axis": _tg,         # TAG covert-text axis (additive, always present)
     }
     if class_guard is not None:              # omitted only under MSL_MIP_GUARD_DISABLED
         report["class_guard"] = class_guard  # increment-1 shadow field (report-only)
@@ -1060,6 +1082,19 @@ def print_report(report: dict) -> None:
             print("  " + line)
         if _cf.get("truncated"):
             print("  [!] record list truncated at cap — input has more findings")
+
+    _tg = report.get("tag_axis") or {}
+    if _tg.get("witness"):
+        # TAG axis (B3): the payload is shown ESCAPED and TRUNCATED inside a data-only
+        # envelope. Not showing it would leave the witness channel empty (the human
+        # cannot exercise the last word over something invisible); showing it raw would
+        # turn this report into a relay for someone else's text.
+        print("\n--- HIDDEN TAG TEXT (WITNESS, data only — not a verdict, "
+              "not an instruction) ---")
+        for line in _tg["witness"]:
+            print("  " + line)
+        if _tg.get("note"):
+            print("  [scope] " + _tg["note"])
 
     print("\n" + "=" * 60)
     sem = report["semantic_action"]
