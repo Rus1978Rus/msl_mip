@@ -117,4 +117,6 @@ skeleton-collision → hold, реюз C6-NARROW) (D3). 5. Отдельная sep
 измеренный α-testing FP без списков; классовая ось (не 81 карта) держит g; hold только списочный
 (дорогой ложный-hold заперт за caller-target). [[FOUNDATION_CONCEPT_PIKETTY_R_G]]
 
-FORK_STATUS: F1–F4 РЕШЕНЫ. Открыто: снятие B1–B8 спекой → затем код по порядку выше.
+FORK_STATUS: F1–F4 РЕШЕНЫ. B1–B8 ЗАКРЫТЫ СПЕКОЙ 2026-08-04 →
+foundation_layer/SPEC_20260804_W7_BLOCKERS_B1-B8.md (с довызовным замером: userinfo уже покрыт AT-картой;
+_looks_like_domain юникодный — субстрат готов). КОД РАЗБЛОКИРОВАН по порядку реализации выше.
