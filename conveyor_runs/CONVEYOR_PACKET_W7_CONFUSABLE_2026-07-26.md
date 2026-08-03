@@ -116,6 +116,7 @@ REVIEW_RESULT: REVIEWER / MODEL_FAMILY (семейств >=3, РАЗНЫХ). П�
 EXIT: сходится → AUTHOR_DECISION → код + delta-census + полная ре-валидация; расходятся → материал
   автору; подход неверен → LOOPHOLE, пере-собрать.
 
-FORK_STATUS: OPEN — PENDING_CONVEYOR + AUTHOR_DECISION (дизайн confusable-фронта). Код заблокирован.
+FORK_STATUS: CLOSED 2026-08-04 — свод+sim: conveyor_runs/W7_SVOD_AND_SIM_2026-08-04.md;
+  AUTHOR_DECISION: foundation_layer/AUTHOR_DECISION_20260804_D-W7-CONFUSABLE.md. Код под блокерами B1-B8.
 
 END_OF_CONVEYOR_PACKET
