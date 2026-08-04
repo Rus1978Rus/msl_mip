@@ -1,1 +1,2 @@
 data/unicode/*.txt -text
+data/unicode/conformance/*.txt -text

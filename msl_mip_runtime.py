@@ -1243,8 +1243,14 @@ def print_report(report: dict) -> None:
         if ms:
             print(f"  directional marks: {ms['count']} x {'+'.join(ms['types'])} "
                   f"at {ms['first_offset']}..{ms['last_offset']} (collapsed, no signal)")
+        if _bd.get("reference_visual_view"):
+            # PHASE 2: the difference itself, both sides inert (non-ASCII escaped) so
+            # neither line can reorder again inside the reader's own terminal.
+            print(f"  logical order  : {_bd['logical_view']}")
+            print(f"  reference order: {_bd['reference_visual_view']}")
         if _bd.get("note"):
-            print("  [scope] " + _bd["note"])
+            print("  [scope] " + _bd["note"]
+                  + f" (UAX#9 rev {_bd.get('uax9_revision', '?')})")
 
     print("\n" + "=" * 60)
     sem = report["semantic_action"]

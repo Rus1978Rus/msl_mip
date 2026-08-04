@@ -15,6 +15,9 @@
 | StandardizedVariants.txt | UCD 16.0.0 (1306 пар) | 36e799b2c5d902af094b4dd2cb60622bffc079824bfd0bf62e3a636d698b3fb5 | https://www.unicode.org/Public/16.0.0/ucd/StandardizedVariants.txt | 2026-08-04 |
 | emoji-variation-sequences.txt | UCD 16.0.0 (742 пары / 371 база) | 71d93ec015011371a027ba2bc0a63155d381c6e0b94a586c1a88a49400cd6864 | https://www.unicode.org/Public/16.0.0/ucd/emoji/emoji-variation-sequences.txt | 2026-08-04 |
 | IVD_Sequences.txt | **IVD release 2022-09-13** (29437 пар / 15290 баз) — НЕ версия UCD | e6168c2ed8e0834d3eccb8a6d43aad004c97c8216e237101f1c2e8347be2b523 | https://www.unicode.org/ivd/data/2022-09-13/IVD_Sequences.txt | 2026-08-04 |
+| BidiBrackets.txt | UCD 16.0.0 (правило N0) | b8f32554c6f658821fb0ee742d21c5b1f2086b9bf13071fed04894b022f93d67 | https://www.unicode.org/Public/16.0.0/ucd/BidiBrackets.txt | 2026-08-05 |
+| conformance/BidiTest.txt | UCD 16.0.0 (770241 кейс) — ТЕСТ-артефакт | 93e5eb9d88ca89dcf895f5576486a3363762ad2aa8f2db2fa56fe60cb82b9520 | https://www.unicode.org/Public/16.0.0/ucd/BidiTest.txt | 2026-08-05 |
+| conformance/BidiCharacterTest.txt | UCD 16.0.0 (91707 кейсов) — ТЕСТ-артефакт | d04a51a90052dcd71c4e91ee5b3a9d973ee35c12406b5a99875ac8163c8f2804 | https://www.unicode.org/Public/16.0.0/ucd/BidiCharacterTest.txt | 2026-08-05 |
 
 Требуемая среда: `unicodedata.unidata_version == '16.0.0'` (assert в загрузчике).
 

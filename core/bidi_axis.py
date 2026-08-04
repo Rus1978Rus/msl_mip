@@ -29,6 +29,8 @@ runs to the matching PDF (nesting-aware) or to the end of the paragraph (X8).
 """
 import unicodedata
 
+import uax9 as _uax9
+
 # The 12 controls, by family. Classes come from unicodedata.bidirectional(), which is
 # authoritative here; the literal codepoints only anchor the family split.
 OVERRIDES = {0x202D: "LRO", 0x202E: "RLO"}
@@ -92,11 +94,65 @@ def _scope(text, i):
     return payload, len(text), False
 
 
+def _order_without(text, drop):
+    """Reference visual order of `text` with the codepoints in `drop` removed, expressed
+    as indices into the ORIGINAL text so two orders can be compared directly."""
+    keep = [i for i, ch in enumerate(text) if ord(ch) not in drop]
+    stripped = "".join(text[i] for i in keep)
+    return [keep[j] for j in _uax9.visual_order(stripped)]
+
+
+def _reordering_fact(text):
+    """PHASE 2: does the presence of the controls actually change the visible order?
+
+    The signal is defined relative to the PINNED standard -- 'the controls change the
+    display order compared with their absence, per UAX#9 revision 50' -- which is an
+    objective property of the string, not a guess about the reader's renderer. That
+    reformulation is what keeps this axis out of the C6 root: we never claim to know
+    what the consumer displays (residual BYPASS_CONSUMER_RENDERER).
+
+    Attribution follows the same method: overrides are held responsible only when
+    removing them (and nothing else) changes the order.
+    """
+    present = {ord(ch) for ch in text} & ALL_CONTROLS
+    if not present:
+        return None
+    with_controls = [i for i in _uax9.visual_order(text)
+                     if ord(text[i]) not in ALL_CONTROLS]
+    without_any = _order_without(text, ALL_CONTROLS)
+    changed = with_controls != without_any
+    override_involved = False
+    if changed and (present & set(OVERRIDES)):
+        # Remove only the overrides; if the order still differs from the full-text
+        # order, the overrides are part of the cause.
+        without_overrides = _order_without(text, set(OVERRIDES))
+        override_involved = without_overrides != with_controls
+    return {
+        "changed": changed,
+        "override_involved": override_involved,
+        "visual_order": with_controls,
+        "logical_order": without_any,
+    }
+
+
+def _inert(text, order):
+    """Render a character sequence so it can NEVER re-bidi inside the reader's terminal:
+    printable ASCII as itself, everything else as <U+XXXX>. Stripping the controls alone
+    would not be enough -- the surviving RTL letters would be reordered again by the
+    consumer's own renderer, making this report a carrier of the effect it describes."""
+    out = []
+    for i in order:
+        cp = ord(text[i])
+        out.append(text[i] if 0x20 <= cp <= 0x7E else "<U+%04X>" % cp)
+    return "".join(out)
+
+
 def scan_bidi(text):
-    """Pure scan, phase 1. Never raises. `level` is raise-only material for the seam."""
+    """Pure scan. Never raises. `level` is raise-only material for the seam."""
     findings = []
     marks = []
     annotations = []
+    candidates = []
     for i, ch in enumerate(text):
         cp = ord(ch)
         fam = _family(cp)
@@ -117,14 +173,33 @@ def scan_bidi(text):
             "bidi_class": unicodedata.bidirectional(ch),
             "scope_chars": payload, "scope_end": end, "balanced": balanced,
         }
-        if fam == "override" and payload >= _MIN_SCOPE:
-            record["finding"] = "REORDERING_CAPABLE"
-            findings.append(record)
-        else:
-            # Embedding (level deferred to phase 2) or a no-op override over <2 chars.
-            record["finding"] = ("EMBEDDING_ANNOTATION" if fam == "embedding"
-                                 else "OVERRIDE_NO_OP")
+        candidates.append((fam, payload, record))
+    # PHASE 2 (D-BIDI-REORDER phase 2): the level now follows the REAL reordering fact,
+    # not the mere capability. An override that holds a span but changes nothing (a no-op
+    # wrapper inside an already-RTL paragraph, or an LRO over Latin) no longer raises a
+    # queue it does not deserve -- that was the honest phase-1 residual R5, and computing
+    # UAX#9 is what retires it. Conversely an embedding that DOES reorder is reported as
+    # a witness without a level, per the round's C-modifier.
+    fact = None
+    try:
+        fact = _reordering_fact(text)
+    except Exception:
+        fact = None
+    for fam, payload, record in candidates:
+        if fact is None:
+            record["finding"] = "UNVERIFIABLE_PROJECTION"
             annotations.append(record)
+        elif fam == "override" and payload >= _MIN_SCOPE and fact["override_involved"]:
+            record["finding"] = "REORDERS_VISIBLE_ORDER"
+            findings.append(record)
+        elif fact["changed"]:
+            record["finding"] = ("EMBEDDING_REORDERS" if fam == "embedding"
+                                 else "OVERRIDE_NOT_RESPONSIBLE")
+            annotations.append(record)
+        else:
+            record["finding"] = "NO_REORDERING"
+            annotations.append(record)
+
     marks_summary = {}
     if marks:
         # D7: the axis collapses marks in ITS OWN field. The shared uncarded_invisibles
@@ -137,14 +212,24 @@ def scan_bidi(text):
             "collapsed": True,
         }
     level = "queue_for_review" if findings else "pass"
-    return {
+    out = {
         "status": "OK",
-        "phase": 1,
+        "phase": 2,
         "findings": findings,
         "annotations": annotations,
         "marks_summary": marks_summary,
         "level": level,
         "contributed": bool(findings),        # D8: this axis's own attribution
-        "note": ("phase 1: reordering capability only -- the UAX#9 reordering fact was "
-                 "NOT computed"),
+        "uax9_revision": "50 (Unicode 16.0.0)",
+        "note": ("reference display order under the pinned UAX#9; a consumer's renderer "
+                 "may differ"),
     }
+    if fact is not None and fact["changed"]:
+        # Safe dual view (D6 + spec B3): both strings inert, so neither can reorder
+        # again inside the reader's own viewer.
+        out["logical_view"] = _inert(text, fact["logical_order"])
+        out["reference_visual_view"] = _inert(text, fact["visual_order"])
+        out["reordered"] = True
+    else:
+        out["reordered"] = bool(fact) and fact["changed"]
+    return out
