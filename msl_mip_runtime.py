@@ -41,6 +41,7 @@ import input_guard as _ig_mod   # Input-Guard Mode A: DoS cost budget on the inp
 import confusable_axis as _cf_mod  # W7 visible-confusable class axis (D-W7-CONFUSABLE)
 import tag_axis as _tag_mod        # TAG covert-text axis (D-TAG-COVERT-TEXT)
 import variation_registry as _vreg  # sanctioned variation sequences (D-VS-STEGO D4)
+import bidi_axis as _bidi_mod      # bidi reordering axis, phase 1 (D-BIDI-REORDER)
 from sequence_integrator_engine import process_sequence_output
 from o1_policy_engine import pending_for as _o1_pending_for  # P3: report-only disposition
 from o1_policy_engine import O1Context as _O1Context         # C6: caller-supplied targets
@@ -1030,6 +1031,26 @@ def analyze(text: str, cards: list, protected_targets=None) -> dict:
         _tg = {"status": "AXIS_ERROR", "accepted_flag_spans": [], "findings": [],
                "witness": [], "level": "pass", "note": ""}
 
+    # --- BIDI/REORDER: an override holding a span of text (D-BIDI-REORDER, phase 1) ---
+    # The fourth kind of threat: nothing is hidden and no byte is swapped, but the eye
+    # reads a different string than the machine (`invoice<RLO>gpj.exe` renders as
+    # `invoiceexe.jpg`). All 12 controls are already in class-138, so presence is already
+    # witnessed and a host break already escalates -- what neither carries is that an
+    # OVERRIDE actually holds a span. Only overrides open the valve: marks are the
+    # measured flood source on legitimate Hebrew/Arabic prose, and isolates are the
+    # practice Unicode recommends. Balance is an annotation, never a trigger -- the
+    # balanced spoof reorders exactly like the unbalanced one. Phase 1 does NOT run
+    # UAX#9, so it can only claim reordering CAPABILITY (residual R5: a no-op override
+    # inside an RTL paragraph will raise a queue it does not deserve). ADDITIVE,
+    # raise-only, fail-open; host is not lifted (composition = max, attribution listed).
+    try:
+        _bd = _bidi_mod.scan_bidi(text)
+        if _bd["level"] == "queue_for_review":
+            effective_action = most_severe([effective_action, "queue_for_review"])
+    except Exception:
+        _bd = {"status": "AXIS_ERROR", "phase": 1, "findings": [], "annotations": [],
+               "marks_summary": {}, "level": "pass", "contributed": False, "note": ""}
+
     # --- INVISIBLE_DEFAULT_IGNORABLE_GUARD (increment 1, shadow, report-ONLY) ---
     # Additive: placed in its OWN field, NEVER read by single_actions /
     # relation_actions / semantic_action / effective_action. A broken class_guard
@@ -1071,6 +1092,7 @@ def analyze(text: str, cards: list, protected_targets=None) -> dict:
         "confusable_axis": _cf,  # W7 visible-confusable axis (additive, always present)
         "tag_axis": _tg,         # TAG covert-text axis (additive, always present)
         "vs_payload": _vs,       # VS covert-payload disclosure (D-VS-STEGO, may be empty)
+        "bidi_axis": _bd,        # bidi reordering axis phase 1 (additive, always present)
     }
     if class_guard is not None:              # omitted only under MSL_MIP_GUARD_DISABLED
         report["class_guard"] = class_guard  # increment-1 shadow field (report-only)
@@ -1205,6 +1227,24 @@ def print_report(report: dict) -> None:
                      if _vsw["truncated"] else ""))
             print(f"  sha256: {_vsw['payload_sha256'][:32]}...")
             print("  [scope] VS carrier only; other invisible carriers not checked")
+
+    _bd = report.get("bidi_axis") or {}
+    if _bd.get("findings") or _bd.get("marks_summary"):
+        # ANTI-RETRANSMISSION (spec B3): coordinates and classes ONLY. The report never
+        # prints the affected substring -- stripping the controls would not be enough,
+        # because the remaining RTL letters would be reordered again by the reader's own
+        # terminal, making this report a carrier of the very effect it describes.
+        print("\n--- BIDI REORDERING (WITNESS, coordinates only — not a verdict) ---")
+        for f in _bd.get("findings", []):
+            print(f"  [{f['offset']}] {f['control']} ({f['family']}, "
+                  f"class={f['bidi_class']}) holds {f['scope_chars']} chars"
+                  f"{'' if f['balanced'] else ', unbalanced'} -> {f['finding']}")
+        ms = _bd.get("marks_summary")
+        if ms:
+            print(f"  directional marks: {ms['count']} x {'+'.join(ms['types'])} "
+                  f"at {ms['first_offset']}..{ms['last_offset']} (collapsed, no signal)")
+        if _bd.get("note"):
+            print("  [scope] " + _bd["note"])
 
     print("\n" + "=" * 60)
     sem = report["semantic_action"]
