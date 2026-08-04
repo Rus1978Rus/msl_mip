@@ -23,6 +23,7 @@ RUN:
 
 from __future__ import annotations
 
+import hashlib
 import sys
 import os
 import unicodedata
@@ -39,6 +40,7 @@ import sequence_engine as _se   # F-NEW-3: reuse domain/context helpers for the 
 import input_guard as _ig_mod   # Input-Guard Mode A: DoS cost budget on the input
 import confusable_axis as _cf_mod  # W7 visible-confusable class axis (D-W7-CONFUSABLE)
 import tag_axis as _tag_mod        # TAG covert-text axis (D-TAG-COVERT-TEXT)
+import variation_registry as _vreg  # sanctioned variation sequences (D-VS-STEGO D4)
 from sequence_integrator_engine import process_sequence_output
 from o1_policy_engine import pending_for as _o1_pending_for  # P3: report-only disposition
 from o1_policy_engine import O1Context as _O1Context         # C6: caller-supplied targets
@@ -481,22 +483,50 @@ def _vs_cjk_base(ch: str) -> bool:
 
 
 def _vs_verdict(text: str, i: int) -> str:
-    """W4/VS-AXIS (D-W4-VS-AXIS D3/D6): classify a variation selector at i.
-    SINGLE_ON_BASE (one selector on a valid emoji/CJK base) = legitimate presentation
-    -> silenced (no witness, no escalation). CHAIN (>=2 adjacent selectors) = data
-    carrier; ORPHAN (leading / on a non-base) = anomalous carrier -> witness + queue.
-    First-cut base validity is APPROXIMATED (emoji planes / symbol cat / CJK ranges),
-    per D4; exact emoji-VS/IVD tables are a follow-up. CHAIN = adjacency (D6), not
-    ">=2 anywhere" (two separate emoji each carrying VS16 are two singles)."""
+    """W4/VS-AXIS (D-W4-VS-AXIS D3/D6, AMENDED by D-VS-STEGO D3): classify a variation
+    selector at i. SINGLE_ON_BASE = legitimate presentation -> silenced (no witness, no
+    escalation). CHAIN (>=2 adjacent selectors) = data carrier; ORPHAN = anomalous
+    carrier -> witness + queue. CHAIN = adjacency (D6), not ">=2 anywhere".
+
+    AMENDMENT (D-VS-STEGO D3): silence now requires the EXACT (base, selector) pair to
+    be REGISTERED in the pinned composite registry, not merely to LOOK like a valid
+    shape. The original approximation (emoji planes / symbol category / CJK ranges) was
+    explicitly a first cut ("exact emoji-VS/IVD tables are a follow-up", D-W4-VS-AXIS
+    D4) and was measured to be a silent kilobyte-scale covert channel: CJK cover with
+    one selector per character carried 13/50/200/1000/3000 bytes at pass, attn=NONE,
+    witness=0. Shape cannot decide this -- 1002 CJK+FE00 pairs ARE registered while
+    U+845B+FE00 is not, and FE0F is registered for only 371 bases (U+1F600 has none).
+    Under an UNVERIFIABLE registry the old shape approximation is kept so the emoji
+    flood D3 killed does not return, and the caller surfaces the unverifiable notice
+    (spec B3: exemptions may continue, but never silently)."""
     cp = ord(text[i])
     prev_vs = i > 0 and ord(text[i - 1]) in _VS_ALL
     next_vs = i + 1 < len(text) and ord(text[i + 1]) in _VS_ALL
     if prev_vs or next_vs:
         return "CHAIN"
     prev = text[i - 1] if i > 0 else ""
-    if cp in (0xFE0F, 0xFE0E):
-        return "SINGLE_ON_BASE" if _vs_emoji_base(prev) else "ORPHAN"
-    return "SINGLE_ON_BASE" if _vs_cjk_base(prev) else "ORPHAN"
+    if not prev:
+        return "ORPHAN"
+    registered = _vreg.is_registered(ord(prev), cp)
+    if registered:
+        return "SINGLE_ON_BASE"
+    if cp in (0xFE0F, 0xFE0E) and _vs_emoji_base(prev):
+        # PRESENTATION CARVE-OUT, measured during implementation: the emoji table only
+        # registers bases that are TEXT-default and therefore NEED a selector (371 of
+        # them). On a modern emoji-default character (U+1F600, U+1F525, ...) FE0F is
+        # REDUNDANT and unregistered -- yet platforms emit it constantly, so a strict
+        # registry rule would re-create exactly the chat-text flood D3 was written to
+        # kill (criterion (b) of the packet). The carve-out is bounded to the two
+        # presentation selectors, i.e. 1 bit per emoji, which is already the accepted,
+        # named residual BYPASS_EMOJI_PRESENTATION_BIT (and the carrier is visible to
+        # the eye: 3000 bytes would take 24000 emoji). Bytes 0..13 (FE00-FE0D) on an
+        # emoji base stay ORPHAN, so the byte-wide channel does not reopen here.
+        return "SINGLE_ON_BASE"
+    if registered is None:
+        # Registry unverifiable (spec B3): keep the legacy shape rule so the flood does
+        # not return; the caller surfaces the unverifiable notice -- never a silent pass.
+        return "SINGLE_ON_BASE" if _vs_cjk_base(prev) else "ORPHAN"
+    return "ORPHAN"
 
 
 def _vs_has_carrier(text: str) -> bool:
@@ -505,6 +535,55 @@ def _vs_has_carrier(text: str) -> bool:
         if ord(ch) in _VS_ALL and _vs_verdict(text, i) in ("CHAIN", "ORPHAN"):
             return True
     return False
+
+
+_VS_PREVIEW_CAP = 64                 # design constant (D-VS-STEGO D6), not config
+
+
+def _vs_payload_witness(text: str) -> dict:
+    """VS covert-payload disclosure (D-VS-STEGO D6, family contract D-TAG D6/B3).
+
+    Projects carrier selectors (CHAIN/ORPHAN only -- registered presentation pairs are
+    NOT payload) to bytes by the published mapping, and discloses them SAFELY: a bounded
+    hex dump, the full byte length, and a sha256 of the whole payload, so truncation
+    never hides the identity. Unlike TAG, whose alphabet is guaranteed printable ASCII,
+    a VS payload is arbitrary bytes; hex is therefore the default and the ONLY rendering.
+    A UTF-8 preview is deliberately NOT offered in this increment: decoded text can carry
+    further invisible carriers that would act inside the reader's own viewer. Only the
+    mechanical fact `utf8_valid` is reported -- content TYPING ("ciphertext", "binary",
+    "malware") is forbidden, being a claim about intent, i.e. semantics smuggled in
+    through disclosure. Honest weakness, recorded as BYPASS_EMPTY_WITNESS: for ciphertext
+    or noise this channel tells the human almost nothing."""
+    payload = bytearray()
+    spans = []
+    for i, ch in enumerate(text):
+        cp = ord(ch)
+        if cp not in _VS_ALL:
+            continue
+        if _vs_verdict(text, i) == "SINGLE_ON_BASE":
+            continue
+        payload.append(cp - 0xFE00 if cp <= 0xFE0F else 16 + cp - 0xE0100)
+        spans.append(i)
+    if not payload:
+        return {}
+    data = bytes(payload)
+    try:
+        data.decode("utf-8")
+        utf8_valid = True
+    except UnicodeDecodeError:
+        utf8_valid = False
+    head = data[:_VS_PREVIEW_CAP]
+    return {
+        "byte_length": len(data),
+        "selector_count": len(spans),
+        "first_offset": spans[0],
+        "last_offset": spans[-1],
+        "hex_preview": " ".join("%02X" % b for b in head),
+        "preview_cap": _VS_PREVIEW_CAP,
+        "truncated": len(data) > _VS_PREVIEW_CAP,
+        "utf8_valid": utf8_valid,
+        "payload_sha256": hashlib.sha256(data).hexdigest(),
+    }
 
 
 def _witness_record(ch, i, family, tag, context_note):
@@ -875,11 +954,20 @@ def analyze(text: str, cards: list, protected_targets=None) -> dict:
     # silenced (no witness) in scan_uncarded_invisibles above. ADDITIVE, raise-only,
     # fail-open. First-cut level = queue (base-rate unmeasured; a KNOWN_CARRIER decode
     # -> hold and host-chain -> hold are follow-ups per D3/D9).
+    # D-VS-STEGO: the silence predicate is now EXACT-PAIR (see _vs_verdict), which is
+    # what closes the measured CJK-cover channel; this seam additionally attaches the
+    # bounded binary disclosure for whatever carrier remains.
+    _vs = {}
     try:
         if _vs_has_carrier(text):
             effective_action = most_severe([effective_action, "queue_for_review"])
+            _vs = _vs_payload_witness(text)
+        _vs_reg = _vreg.get_registry()
+        if _vs_reg["status"] != "OK":
+            _vs["registry_status"] = _vs_reg["status"]      # B3: never a silent pass
+            _vs["registry_reason"] = _vs_reg.get("reason")
     except Exception:
-        pass
+        _vs = {}
 
     # --- W5/WHITESPACE-HOST: a whitespace-lookalike breaking a host label -> queue ---
     # (D-W5-WHITESPACE-HOST D3/D4). Non-ASCII whitespace (NBSP/NNBSP/Zl/Zp/...) is
@@ -982,6 +1070,7 @@ def analyze(text: str, cards: list, protected_targets=None) -> dict:
         "input_guard": _ig,     # Mode A cost-budget report (additive, always present)
         "confusable_axis": _cf,  # W7 visible-confusable axis (additive, always present)
         "tag_axis": _tg,         # TAG covert-text axis (additive, always present)
+        "vs_payload": _vs,       # VS covert-payload disclosure (D-VS-STEGO, may be empty)
     }
     if class_guard is not None:              # omitted only under MSL_MIP_GUARD_DISABLED
         report["class_guard"] = class_guard  # increment-1 shadow field (report-only)
@@ -1095,6 +1184,27 @@ def print_report(report: dict) -> None:
             print("  " + line)
         if _tg.get("note"):
             print("  [scope] " + _tg["note"])
+
+    _vsw = report.get("vs_payload") or {}
+    if _vsw:
+        # D-VS-STEGO D6: hex only, bounded, with the full length and a sha256 of the
+        # WHOLE payload so truncation cannot hide the identity. No UTF-8 rendering --
+        # decoded text may carry further invisible carriers that would act inside the
+        # reader's own viewer. Honest limit (BYPASS_EMPTY_WITNESS): for ciphertext or
+        # noise this tells the human almost nothing.
+        print("\n--- HIDDEN VS PAYLOAD (WITNESS, data only — not a verdict) ---")
+        if _vsw.get("registry_status"):
+            print(f"  [!] validity data {_vsw['registry_status']}: "
+                  f"{_vsw.get('registry_reason')} — exemptions applied UNVERIFIED")
+        if _vsw.get("byte_length"):
+            print(f"  {_vsw['selector_count']} carrier selectors at {_vsw['first_offset']}"
+                  f"..{_vsw['last_offset']} -> {_vsw['byte_length']} bytes"
+                  f" (valid UTF-8: {'yes' if _vsw['utf8_valid'] else 'no'})")
+            print(f"  hex: {_vsw['hex_preview']}"
+                  + (f" ... truncated, {_vsw['byte_length']} total"
+                     if _vsw["truncated"] else ""))
+            print(f"  sha256: {_vsw['payload_sha256'][:32]}...")
+            print("  [scope] VS carrier only; other invisible carriers not checked")
 
     print("\n" + "=" * 60)
     sem = report["semantic_action"]
