@@ -16,6 +16,7 @@
 | emoji-variation-sequences.txt | UCD 16.0.0 (742 пары / 371 база) | 71d93ec015011371a027ba2bc0a63155d381c6e0b94a586c1a88a49400cd6864 | https://www.unicode.org/Public/16.0.0/ucd/emoji/emoji-variation-sequences.txt | 2026-08-04 |
 | IVD_Sequences.txt | **IVD release 2022-09-13** (29437 пар / 15290 баз) — НЕ версия UCD | e6168c2ed8e0834d3eccb8a6d43aad004c97c8216e237101f1c2e8347be2b523 | https://www.unicode.org/ivd/data/2022-09-13/IVD_Sequences.txt | 2026-08-04 |
 | BidiBrackets.txt | UCD 16.0.0 (правило N0) | b8f32554c6f658821fb0ee742d21c5b1f2086b9bf13071fed04894b022f93d67 | https://www.unicode.org/Public/16.0.0/ucd/BidiBrackets.txt | 2026-08-05 |
+| DerivedJoiningType.txt | UCD 16.0.0 (Joining_Type для zero-width оси) | 6bd08b97da66b70ccfdab105a352de2984e02625239ec5695422c99b33d854f0 | https://www.unicode.org/Public/16.0.0/ucd/extracted/DerivedJoiningType.txt | 2026-08-05 |
 | conformance/BidiTest.txt | UCD 16.0.0 (770241 кейс) — ТЕСТ-артефакт | 93e5eb9d88ca89dcf895f5576486a3363762ad2aa8f2db2fa56fe60cb82b9520 | https://www.unicode.org/Public/16.0.0/ucd/BidiTest.txt | 2026-08-05 |
 | conformance/BidiCharacterTest.txt | UCD 16.0.0 (91707 кейсов) — ТЕСТ-артефакт | d04a51a90052dcd71c4e91ee5b3a9d973ee35c12406b5a99875ac8163c8f2804 | https://www.unicode.org/Public/16.0.0/ucd/BidiCharacterTest.txt | 2026-08-05 |
 
@@ -43,6 +44,16 @@ VS-ось (D-VS-STEGO D4 + спека B2): три реестра вариаци�
 Несовпадение sha256 любого из трёх файлов → PAIR_STATUS=UNVERIFIABLE: исключения продолжают
 применяться (иначе возвращается эмодзи-флуд), но факт непроверяемости ВИДИМО выводится в отчёт —
 молчаливый pass запрещён.
+
+ZW-BITS ось (D-ZW-BITS D5 + спека B3): `DerivedJoiningType.txt` взят СРАЗУ в фазу 1 — отклонение от
+рекомендации круга, обоснованное авторским вопросом «а если на персидском с неправильной орфографией?»:
+без этой таблицы нефункциональные позиции ВНУТРИ арабского письма невидимы, и ответ «поймаем» был бы
+неправдой. Лежит ПОД СУЩЕСТВУЮЩИМ пином 16.0.0 (40 КБ), не новый версионный трек.
+**Загрузчик ОБЯЗАН применять @missing-дефолт файла** (`@missing: 0000..10FFFF; Non_Joining`):
+jt(ZWNJ) в файле ОТСУТСТВУЕТ, и загрузчик без дефолтов молча провалится на самом носителе.
+`emoji-zwj-sequences.txt` НЕ взят: измерено, что категорийный фолбэк {So,Sk,Sm}+прозрачные Mn гасит
+**1468 из 1468 RGI (100%)** ⇒ таблица не нужна ради молчания легита, она сузила бы лишь
+не-RGI-байпас (остаток R6). Это поправка к панели, считавшей 1473/1474 от неверного знаменателя.
 
 BUMP-ПОЛИТИКА (B6/S6): обновление любой таблицы = ОТДЕЛЬНОЕ AUTHOR_DECISION с diff-отчётом
 (добавленные/удалённые/изменённые маппинги + изменённые skeleton), полным прогоном свода гейтов,

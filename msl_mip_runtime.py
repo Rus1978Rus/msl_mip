@@ -42,6 +42,7 @@ import confusable_axis as _cf_mod  # W7 visible-confusable class axis (D-W7-CONF
 import tag_axis as _tag_mod        # TAG covert-text axis (D-TAG-COVERT-TEXT)
 import variation_registry as _vreg  # sanctioned variation sequences (D-VS-STEGO D4)
 import bidi_axis as _bidi_mod      # bidi reordering axis, phase 1 (D-BIDI-REORDER)
+import zw_bits as _zw_mod          # zero-width bit-channel axis, phase 1 (D-ZW-BITS)
 from sequence_integrator_engine import process_sequence_output
 from o1_policy_engine import pending_for as _o1_pending_for  # P3: report-only disposition
 from o1_policy_engine import O1Context as _O1Context         # C6: caller-supplied targets
@@ -1051,6 +1052,25 @@ def analyze(text: str, cards: list, protected_targets=None) -> dict:
         _bd = {"status": "AXIS_ERROR", "phase": 1, "findings": [], "annotations": [],
                "marks_summary": {}, "level": "pass", "contributed": False, "note": ""}
 
+    # --- ZW-BITS: zero-width carriers forming a binary channel (D-ZW-BITS, phase 1) ---
+    # Third instance of the covert-channels family and the hardest: the SAME characters
+    # that could carry bits are mandatory orthography (ZWNJ in Persian, ZWJ in every
+    # emoji family), so there is no oracle of legitimacy -- only one of meaninglessness.
+    # The stream is built from carriers ALONE, visible text ignored, which is what makes
+    # the two measured evasions irrelevant by construction rather than by tuning: a block
+    # payload and one spread across 400 visible characters yield the identical stream.
+    # Alternation is never a predicate (a shaped payload switches twice and walks past
+    # any threshold), and a carrier adjacent to another carrier counts as nonfunctional
+    # -- without that rule the block payload supplies its own context and escapes.
+    # ADDITIVE, raise-only, fail-open; cards keep their own verdicts, level = max.
+    try:
+        _zw = _zw_mod.scan_zw_bits(text)
+        if _zw["level"] == "queue_for_review":
+            effective_action = most_severe([effective_action, "queue_for_review"])
+    except Exception:
+        _zw = {"status": "AXIS_ERROR", "phase": 1, "findings": [], "carrier_total": 0,
+               "level": "pass", "contributed": False, "note": ""}
+
     # --- INVISIBLE_DEFAULT_IGNORABLE_GUARD (increment 1, shadow, report-ONLY) ---
     # Additive: placed in its OWN field, NEVER read by single_actions /
     # relation_actions / semantic_action / effective_action. A broken class_guard
@@ -1093,6 +1113,7 @@ def analyze(text: str, cards: list, protected_targets=None) -> dict:
         "tag_axis": _tg,         # TAG covert-text axis (additive, always present)
         "vs_payload": _vs,       # VS covert-payload disclosure (D-VS-STEGO, may be empty)
         "bidi_axis": _bd,        # bidi reordering axis phase 1 (additive, always present)
+        "zw_bits": _zw,          # zero-width bit-channel axis (additive, always present)
     }
     if class_guard is not None:              # omitted only under MSL_MIP_GUARD_DISABLED
         report["class_guard"] = class_guard  # increment-1 shadow field (report-only)
@@ -1251,6 +1272,24 @@ def print_report(report: dict) -> None:
         if _bd.get("note"):
             print("  [scope] " + _bd["note"]
                   + f" (UAX#9 rev {_bd.get('uax9_revision', '?')})")
+
+    _zw = report.get("zw_bits") or {}
+    if _zw.get("findings"):
+        # D9/D10: ONE collapsed summary, not one line per carrier -- the measured noise
+        # was 240 witness rows carrying no verdict at all. A/B is a reporting convention
+        # and no byte decoding is claimed: on random bits a guessed decode shows text
+        # that is not there about 77% of the time, so it would be disinformation.
+        print("\n--- ZERO-WIDTH CARRIER STREAM (WITNESS, scheme NOT established) ---")
+        for f in _zw["findings"][:3]:
+            print(f"  {f['pair'][0]}/{f['pair'][1]}: {f['carrier_count']} carriers at "
+                  f"{f['first_offset']}..{f['last_offset']}, "
+                  f"{f['nonfunctional']} in positions that explain nothing")
+            print(f"  stream (A = lower codepoint, reporting convention only): "
+                  f"{f['symbol_stream']}"
+                  + (" ...truncated" if f["stream_truncated"] else ""))
+            print(f"  segment sha256: {f['segment_sha256'][:32]}...")
+        if _zw.get("note"):
+            print("  [scope] " + _zw["note"])
 
     print("\n" + "=" * 60)
     sem = report["semantic_action"]
