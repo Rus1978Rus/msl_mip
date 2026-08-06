@@ -360,6 +360,23 @@ RISK_CASES:
       STATUS: HYPOTHESIS (PHAGO dimension, TIER 1) — needs case
       accumulation; do not escalate as HIGH until confirmed
 
+  RISK_CASE_005:
+    NAME: SCHEMELESS_USERINFO_DISPLAY_SPOOF
+    INPUT: "paypal.com@evil.ru" (WITHOUT a URL scheme)
+    CONTEXT: without a scheme the host structure is AMBIGUOUS per WHATWG
+      (the parser does not yield host=evil.ru), yet the human eye anchors
+      on the brand.tld BEFORE the @.
+    RISK: MEDIUM
+    ATTACK: a display-level spoof (not confirmed by the parser); a brand
+      domain before the @ and a different domain after it — visual mimicry.
+    GUARD: AT_FORM ≠ HOST_IDENTITY. Level POSSIBLE (not REAL): without a
+      scheme the ambiguity is genuine, and it was MEASURED (2026-07-22) that
+      a hold wakes on 5 of 6 ordinary corporate addresses
+      (dept.org@corp.com) — too high a price. SUFFIX-SUPPRESSION: if the
+      left part is a suffix of the right one (mail.corp.com@corp.com), it is
+      a legitimate subdomain, NOT a signal. With a scheme it is a separate
+      RISK_CASE_001 (HIGH), where no ambiguity exists.
+
 CONFUSABLES:
   CONFUSABLE_001:
     VISIBLE_FORM: ＠
@@ -557,6 +574,9 @@ PATCH_02:
     ADJACENT_RISK_NOTE; (4) added ADVERSARIAL A5 (%40 URL-encoded @) →
     count 12→13; (5) role dates refined; (6) TIER 1 (sign priority) vs
     TIER_2 (simulation tier) clarified.
+  REVIEWERS_WAVE_1: Kimi ACCEPT, DeepSeek APPROVE, Grok APPROVE, GPT-5.5
+    APPROVE_WITH_FIXES; Copilot did not read the file (a technical access
+    problem, honestly marked UNVERIFIABLE → resent).
   VERIFIED_BY: coordinator (grep of each fix)
 
 PATCH_03:
@@ -570,9 +590,13 @@ PATCH_03:
     is FUNDAMENTALLY undecidable.
   FACT_AUDIT: Qwen/Alibaba (Q1, mechanics), Copilot (7/7 B.1-B.7:
     Tomlinson 1971, PEP 318, JSR 175, @-reply 2006, Lapi 1536, U+FF20/
-    U+FE6B, %40 RFC 3986). Cross-review Qwen↔Copilot on B.1 resolved by
-    primary source (both correct for different cases — the difference is
-    scheme presence). 0 confabulations.
+    U+FE6B, %40 RFC 3986). 0 confabulations.
+  CROSS_REVIEW_RESOLUTION: Qwen and Copilot appeared to disagree on B.1
+    (Qwen: without a scheme the host is empty; Copilot: the host follows @).
+    Resolved by the primary source, not by a vote: both are correct for
+    DIFFERENT cases — the difference is the presence of a scheme, which is
+    exactly what this PATCH_03 records. GUIDED_TRAVERSAL_RISK applied: the
+    divergence was settled by checking, not by majority.
   VERIFIED_BY: coordinator (source cross-check)
 
 PATCH_04:

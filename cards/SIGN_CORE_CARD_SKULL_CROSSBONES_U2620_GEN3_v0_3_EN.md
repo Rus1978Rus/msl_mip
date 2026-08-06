@@ -3,6 +3,14 @@ PRIVATE AUTHORED PROJECT / COMMERCIAL USE PROHIBITED
 DOCUMENT_ID: SIGN_CORE_CARD_SKULL_CROSSBONES_U2620_GEN3_v0_3_EN
 DOCUMENT_TYPE: SIGN_CORE_CARD
 
+TRANSLATION_NOTE: This is the English mirror of
+  SIGN_CORE_CARD_SKULL_CROSSBONES_U2620_GEN3_v0_3_RU. The Russian version
+  remains authoritative: where the two differ, the Russian card decides.
+  Field names, status tokens, codepoints, dates, reviewer names and
+  bibliographic references are kept identical to it; prose is translated,
+  and INPUT examples use English equivalents that preserve the same threat
+  pattern.
+
 ============================================================
 0. UNIVERSALITY
 ============================================================
@@ -28,8 +36,21 @@ STATUS_PROGRESSION_TRACKER:
     wave 2 — 2/2 deep-research fact audits)
   WORKINGLY_CLOSED: YES (2026-07-05, AUTHOR_DECISION)
   SIMULATION_GATE_TIER: TIER_3
-  SIMULATION_GATE_PASSED: PASS (2026-07-05, 12/12 after matcher patch;
-    first run honestly failed 5/14 — matcher did not cover RC2/RC3)
+  SIMULATION_GATE_PASSED: PASS (2026-07-05, 10/10 after MATCHER_PATCH_02;
+    the first run honestly failed 5/14 — the matcher did not cover RC2/RC3;
+    MATCHER_PATCH_01 closed the gap, MATCHER_PATCH_02 closed the code-review
+    fixes)
+  MATCHER_PATCH_REVIEW: PASS (Kimi/Grok/Qwen/Gemini APPROVE, GPT-5.5
+    APPROVE_WITH_FIXES — the fixes were applied in PATCH_02; one Gemini
+    review was rejected as a hallucination — it described dictionaries that
+    do not exist)
+  MATCHER_PATCH_03_DECISION: AUTHOR_DECISION 2026-07-05 — the sentence
+    window was counted as narrow polishing within the already approved
+    MATCHER_PATCH_01/02 (GPT-5.5 itself demanded the offset/window fix; the
+    sentence window is an exact refinement of that same requirement, not new
+    logic). A separate conveyor round is not required. A live run on the
+    author's machine confirmed 12/12, with the false cross-sentence trigger
+    removed.
   ARTIFACT_CONFIRMED: YES (2026-07-05, AUTHOR_DECISION)
 
 ============================================================

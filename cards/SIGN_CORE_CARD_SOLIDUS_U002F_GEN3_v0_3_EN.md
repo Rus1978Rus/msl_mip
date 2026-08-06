@@ -5,6 +5,23 @@ DOCUMENT_TYPE: SIGN_CORE_CARD
 TEMPLATE_LINE: GEN3_v0_3
 DOCUMENT_STATUS: ARTIFACT_CONFIRMED
 STATUS: ARTIFACT_CONFIRMED / NOT_LOCKED / NOT_RUNTIME / NOT_VALIDATOR / NOT_PRODUCTION
+
+RUNTIME_COMPATIBILITY (added 2026-07-13, principle Q7 — ARTIFACT_CONFIRMED is
+  bound to a TOOL VERSION; the tool changed, so the status must be re-checked,
+  not silently trusted):
+  CARD_CONTENT_STATUS: ARTIFACT_CONFIRMED
+    [NOT downgraded — the card CONTENT has not changed]
+  RUNTIME_COMPATIBILITY_STATUS: REVALIDATION_REQUIRED
+  REASON: the shared host-span context detector changed (F-NEW-2, commit
+    9188759). Observed drift on the fullwidth solidus ／ (U+FF0F, a
+    CONFUSABLE_OF this U+002F): example.com,／test and gоogle.com*／path now
+    read PATH, not HOST (2 documented D-DET-3 over-reads corrected). The ASCII
+    U+002F single-sign matcher is a SEPARATE path and is likely unaffected, but
+    "likely" is not "verified" — this card's runtime must be re-validated with
+    today's tool (BY_CODE), same as ZWSP was.
+  RESOLUTION: NOT run here (artefact re-validation is its own task). Status
+    marked honestly; the BY_CODE re-run of the solidus battery comes later.
+    See OQ-SOLIDUS-DRIFT in the ZWSP card.
 SOURCE_TEMPLATE: SIGN_CORE_CARD_TEMPLATE_GEN3_v0_3_EN
 BASED_ON_RULESET: SIGN_CORE_CARD_CONVEYOR_RULES_GEN3_v0_3_EN
 
@@ -623,6 +640,27 @@ SEQUENCE_LAYER_BOUNDARY:
       POSSIBLE_CONTEXTS: URL scheme separator ("https://"), a comment
         marker in some programming languages, a path-like pattern
       REQUIRES_SEQUENCE_INTEGRATOR: YES
+      ADJACENT_CONFUSABLE_NOTE_FF0F: the Unicode slash ／ (U+FF0F FULLWIDTH
+        SOLIDUS) is NOT caught by SC1 (which matches only the ASCII // U+002F).
+        Surfaced by SIMULATION_GATE_REVIEW 2026-07-07. This is NOT a bug in the
+        scheme patch but an adjacent confusable — a candidate for its own card
+        (the analogue of ＠/﹫ for @). It does not block the SOLIDUS patch and
+        is carried to the backlog.
+      SCHEME_CONTEXT_RULE: SOLIDUS_SCHEME_PATCH (2026-07-07, option "b",
+        AUTHOR_DECISION after design-review 6/6). When "//" immediately follows
+        ":" (i.e. it is the scheme joint "://"), the risk drops to NONE
+        (interp=url_scheme_authority_separator) as a legitimate scheme, and
+        URL_CONTEXT_FLAG is set. The flag ONLY raises scrutiny of the signs
+        below it (@, dot), NEVER lowers it (CLARIFICATION_1). A "//" WITHOUT a
+        preceding ":" stays HIGH under analysis (path traversal,
+        CLARIFICATION_2). The discriminator is a single ":" character.
+      SCHEME_PATCH_STATUS: WORKINGLY_CLOSED (AUTHOR_DECISION by Ruslan
+        Malyavsky, 2026-07-07). Full cycle: design-review 6/6 +
+        AUTHOR_DECISION -> code-review 6/6 (2 fixes: Q4 enum bug, Q1 RFC 3986
+        scheme validation) -> SIMULATION_GATE_REVIEW 6/6 (the new "simulations
+        through every AI" discipline) -> gate 28/28 both in the container and
+        on the live machine. The first edit to the sequence engine CORE to pass
+        the full cycle. Tests: tests/gate_solidus_scheme.py.
 
     SC2:
       SEQUENCE: "./" (dot-solidus)
