@@ -1115,6 +1115,28 @@ def analyze(text: str, cards: list, protected_targets=None) -> dict:
         "bidi_axis": _bd,        # bidi reordering axis phase 1 (additive, always present)
         "zw_bits": _zw,          # zero-width bit-channel axis (additive, always present)
     }
+    # SNI CARD-LAYER WITNESS AGGREGATE (D-SNI). One collapsed mechanical summary
+    # of the occurrences whose BOUNDARY_DISRUPTOR was suppressed as normative --
+    # counts by sign and basis, never one record per word boundary (a 40-word
+    # Khmer text is one line, not 39). The annotation documents the NORMALITY of
+    # the position, not the suspiciousness of the string. Present only when the
+    # exemption fired, so every existing report is bit-identical.
+    _sni_rows = [v for v in seq_out.relation_verdicts if v.get("sni_functional")]
+    if _sni_rows:
+        _by = {}
+        for _v in _sni_rows:
+            _key = ("U+%04X" % ord(_v["visible_form"]), _v["sni_functional"])
+            _by[_key] = _by.get(_key, 0) + 1
+        report["sni_card"] = {
+            "status": "OK",
+            "exempted_total": len(_sni_rows),
+            "by_sign_basis": [
+                {"sign": s, "basis": b, "count": n}
+                for (s, b), n in sorted(_by.items())],
+            "note": ("normative functional positions (pinned lb=SA / InCB); the "
+                     "annotation documents the normality of the position, not "
+                     "the suspiciousness of the string"),
+        }
     if class_guard is not None:              # omitted only under MSL_MIP_GUARD_DISABLED
         report["class_guard"] = class_guard  # increment-1 shadow field (report-only)
     # CANONICAL PROJECTION (P1): additive, report-ONLY, display-only. Never read by
@@ -1184,7 +1206,13 @@ def print_report(report: dict) -> None:
             rtype = v.get("relation_type", "")
             role = v.get("runtime_role", "")
             tag = f"[{rtype}/{role}] " if rtype or role else ""
-            print(f"  [{v['at_offset']}] {v['visible_form']} {tag}-> {v['target']} "
+            # Anti-retransmission (same contract the bidi/zw blocks obey): an
+            # invisible mask is printed as its codepoint name, never as the raw
+            # character -- otherwise copying the report re-carries the sign.
+            vf = v.get("visible_form", "")
+            shown = "U+%04X" % ord(vf) if len(vf) == 1 \
+                and not vf.isprintable() else vf
+            print(f"  [{v['at_offset']}] {shown} {tag}-> {v['target']} "
                   f"context={v['detected_context']} risk={v['risk_level']} "
                   f"protected={v['protected']}")
 
@@ -1290,6 +1318,17 @@ def print_report(report: dict) -> None:
             print(f"  segment sha256: {f['segment_sha256'][:32]}...")
         if _zw.get("note"):
             print("  [scope] " + _zw["note"])
+
+    _sni = report.get("sni_card")
+    if _sni:
+        # D-SNI: one collapsed line for the whole document -- mechanical counts
+        # only. The measured alternative was 39 queue rows on a 40-word Khmer
+        # text; per-line witness of normative positions is banned (R4 legacy).
+        parts = ", ".join("%s %s x%d" % (r["sign"], r["basis"], r["count"])
+                          for r in _sni["by_sign_basis"])
+        print("\n--- SCRIPT-NATIVE FUNCTIONAL POSITIONS (WITNESS AGGREGATE) ---")
+        print(f"  {_sni['exempted_total']} occurrence(s) on normative positions: {parts}")
+        print("  [note] " + _sni["note"])
 
     print("\n" + "=" * 60)
     sem = report["semantic_action"]

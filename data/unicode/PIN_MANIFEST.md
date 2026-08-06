@@ -19,6 +19,8 @@
 | DerivedJoiningType.txt | UCD 16.0.0 (Joining_Type для zero-width оси) | 6bd08b97da66b70ccfdab105a352de2984e02625239ec5695422c99b33d854f0 | https://www.unicode.org/Public/16.0.0/ucd/extracted/DerivedJoiningType.txt | 2026-08-05 |
 | conformance/BidiTest.txt | UCD 16.0.0 (770241 кейс) — ТЕСТ-артефакт | 93e5eb9d88ca89dcf895f5576486a3363762ad2aa8f2db2fa56fe60cb82b9520 | https://www.unicode.org/Public/16.0.0/ucd/BidiTest.txt | 2026-08-05 |
 | conformance/BidiCharacterTest.txt | UCD 16.0.0 (91707 кейсов) — ТЕСТ-артефакт | d04a51a90052dcd71c4e91ee5b3a9d973ee35c12406b5a99875ac8163c8f2804 | https://www.unicode.org/Public/16.0.0/ucd/BidiCharacterTest.txt | 2026-08-05 |
+| LineBreak.txt | UCD 16.0.0 (Line_Break=SA: 757 кодпоинтов, 9 письменностей) | e97e4259d0d20fab150b9c7b4b28abfae5cd78ca97e7f4ac6ed20d685d5f4a7c | https://www.unicode.org/Public/16.0.0/ucd/LineBreak.txt | 2026-08-06 |
+| DerivedCoreProperties.txt | UCD 16.0.0 (InCB: Linker=6, Consonant=240) | 39d35161f2954497f69e08bdb9e701493f476a3d30222de20028feda36c1dabd | https://www.unicode.org/Public/16.0.0/ucd/DerivedCoreProperties.txt | 2026-08-06 |
 
 Требуемая среда: `unicodedata.unidata_version == '16.0.0'` (assert в загрузчике).
 
@@ -54,6 +56,17 @@ jt(ZWNJ) в файле ОТСУТСТВУЕТ, и загрузчик без де
 `emoji-zwj-sequences.txt` НЕ взят: измерено, что категорийный фолбэк {So,Sk,Sm}+прозрачные Mn гасит
 **1468 из 1468 RGI (100%)** ⇒ таблица не нужна ради молчания легита, она сузила бы лишь
 не-RGI-байпас (остаток R6). Это поправка к панели, считавшей 1473/1474 от неверного знаменателя.
+
+SNI карточный слой (D-SNI-2, свод SNI_SVOD_AND_SIM 2026-08-06): `LineBreak.txt` +
+`DerivedCoreProperties.txt` — две строки ПОД СУЩЕСТВУЮЩИМ пином UCD 16.0.0 (0 новых версионных
+треков). Оракул функциональной позиции core/sni_oracle.py: ZWSP — оба значимых соседа с
+Line_Break=SA (9 письменностей: Thai/Lao/Khmer/Myanmar/Ahom/New_Tai_Lue/Tai_Le/Tai_Tham/Tai_Viet,
+757 кодпоинтов — производная МАШИННАЯ из пина, рукописная константа запрещена: список «4
+письменности» уже недополнен против норматива); ZWJ — слева InCB=Linker (6 вирам: Deva/Beng/
+Gujr/Orya/Telu/Mlym; включает малаяламский legacy-chillu «вирама+ZWJ в конце слова»). BOM и ZWNJ
+исключений НЕ имеют. Диссент D1 круга разрешён в пользу пина: производная требует запиненного
+входа. Несовпадение sha256 → SNI_UNVERIFIABLE: исключение НЕ применяется (неизвестность ≠
+амнистия), статус видим в отчёте. 0 числовых порогов.
 
 BUMP-ПОЛИТИКА (B6/S6): обновление любой таблицы = ОТДЕЛЬНОЕ AUTHOR_DECISION с diff-отчётом
 (добавленные/удалённые/изменённые маппинги + изменённые skeleton), полным прогоном свода гейтов,

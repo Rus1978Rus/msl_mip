@@ -955,6 +955,19 @@ _SCOPE_RISK = {
 }
 
 
+def _sni_functional(text, offset):
+    """Basis string when the sign at offset sits on a normative functional
+    position (core/sni_oracle: ZWSP with both significant neighbours lb=SA, ZWJ
+    after an InCB=Linker virama), else None. Fail-closed at both layers: an
+    unimportable or UNVERIFIABLE oracle grants nothing and the base card
+    behaviour stands."""
+    try:
+        import sni_oracle
+    except ImportError:
+        return None
+    return sni_oracle.functional_position(text, offset)
+
+
 def _downgrade(level: RiskLevel) -> RiskLevel:
     """A CANDIDATE edge downgrades risk by one step (D1): an
     unverified relation must not hit as hard as VERIFIED."""
@@ -1029,6 +1042,26 @@ def _assess_relation_risk(text: str, sign_statuses: list, o1_ctx=None) -> list:
             else:
                 risk = RiskLevel.NONE  # RELATION_FOUND != THREAT
 
+            # SNI FUNCTIONAL-POSITION EXEMPTION (D-SNI, SNI_SVOD_AND_SIM
+            # 2026-08-06) -- the fix lives at the SOURCE: a BOUNDARY_DISRUPTOR
+            # is not emitted for an occurrence doing its normative job, rather
+            # than emitted and cancelled above (a post-hoc lowering would erase
+            # other axes' contributions). Scope is deliberately narrow:
+            #   - BYTE_EXACT_TOKEN only. Every machine class (HOST, EMAIL, URL,
+            #     PATH, QUERY_VALUE, FRAGMENT, USERINFO, HIDDEN_BOUNDARY_PADDING)
+            #     keeps its risk untouched -- native script inside a host is an
+            #     attack surface, not orthography. FREE_TEXT is already NONE.
+            #   - BOUNDARY_DISRUPTOR only; other relation types unaffected.
+            # The oracle is fail-closed (pinned tables UNVERIFIABLE -> None), so
+            # unknown never becomes amnesty. The suppressed risk is kept in the
+            # verdict as a ledger entry -- the trail is counted, not erased.
+            sni_basis = None
+            if risk != RiskLevel.NONE and rtype == "BOUNDARY_DISRUPTOR" \
+                    and ctx == "BYTE_EXACT_TOKEN":
+                sni_basis = _sni_functional(text, offset)
+                if sni_basis is not None:
+                    risk = RiskLevel.NONE
+
             # verification_status of the edge as a modifier (D1)
             if cand.get("verification_status", "").upper() == "CANDIDATE" \
                     and risk != RiskLevel.NONE:
@@ -1073,6 +1106,12 @@ def _assess_relation_risk(text: str, sign_statuses: list, o1_ctx=None) -> list:
                 "relation_id": cand.get("relation_id", ""),
                 "tld_source_degraded": tld_degraded,  # D-DET-2
             }
+            # SNI ledger fields ONLY when the exemption fired (additive: with no
+            # exemption the verdict is bit-identical to before this round).
+            if sni_basis is not None:
+                verdict["sni_functional"] = sni_basis
+                verdict["sni_suppressed_risk"] = \
+                    _SCOPE_RISK.get(ctx, RiskLevel.MEDIUM).value
             # Audit field IFF a policy row fired (final > base). Absent otherwise,
             # so increment-0 (empty registry) adds no key -> batteries bit-identical.
             # o1_decision is None on a non-PRIMARY edge (overlay skipped, W3 fix) ->
