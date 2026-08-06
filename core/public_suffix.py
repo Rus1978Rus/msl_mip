@@ -32,6 +32,7 @@ level fired — silent degradation to cache/minimum is not allowed
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import urllib.request
@@ -51,9 +52,69 @@ FETCH_TIMEOUT_SECONDS = 3
 # (env unset) is unchanged: live fetch -> cache -> embedded, as production.
 _HERMETIC_ENV = "MSL_MIP_HERMETIC_TLD"
 
+# VENDORED SNAPSHOTS (2026-08-07). The registries now ship IN THE REPOSITORY and
+# are the DEFAULT source; the network is reached only when explicitly allowed.
+# The old default (fetch first, fall back to a ~163-entry embedded list) failed
+# badly in the environment that needs this most: an air-gapped install silently
+# ran on the embedded remnant of the registry, and — worse — reported itself as
+# NOT degraded, because the health check looked only at the entry COUNT (163 is
+# above the threshold) and threw the SOURCE string away. Whether a verdict rests
+# on 1438 official TLDs or on 163 hand-picked ones is exactly the kind of fact
+# this project refuses to hide, so the source now travels with the data.
+# Set MSL_MIP_ALLOW_NETWORK=1 to re-enable live fetching (it then takes
+# precedence over the snapshot, as before, and the cache still works).
+_ALLOW_NETWORK_ENV = "MSL_MIP_ALLOW_NETWORK"
+_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         "data", "net")
+_VENDORED_TLD_FILE = os.path.join(_DATA_DIR, "tlds-alpha-by-domain.txt")
+_VENDORED_PSL_FILE = os.path.join(_DATA_DIR, "public_suffix_list.dat")
+_VENDORED_TLD_SHA256 = \
+    "932b5f31c5ef487ff7c4e70ef7d159a2ddc41e5d827d60a5fce9320d806c7b6d"
+_VENDORED_PSL_SHA256 = \
+    "084a5674d77c1d14900b16da5fc8afee9765af2f00a638552a8c7aa18f44ae81"
+
+# Source strings that mean "this is a COMPLETE registry" (live, cached, or the
+# vendored snapshot). Anything else is a stand-in and must be reported degraded.
+FULL_REGISTRY_SOURCES = ("LIVE_FETCH", "VENDORED", "CACHE_FROM_")
+
 
 def _hermetic_tlds() -> bool:
     return os.environ.get(_HERMETIC_ENV, "").strip().lower() not in ("", "0", "false", "no", "off")
+
+
+def _network_allowed() -> bool:
+    return os.environ.get(_ALLOW_NETWORK_ENV, "").strip().lower() \
+        not in ("", "0", "false", "no", "off")
+
+
+def is_full_registry(source: str) -> bool:
+    """True when `source` denotes a complete registry rather than a stand-in.
+    Used by the sequence layer to decide the DEGRADED flag by provenance
+    instead of by entry count."""
+    return bool(source) and any(source.startswith(p) for p in FULL_REGISTRY_SOURCES)
+
+
+def _sha256_file(path: str) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _read_vendored(path: str, expected_sha: str):
+    """Vendored registry text, or None when the file is absent or its hash does
+    not match the pin. A tampered snapshot must NOT be used silently — the
+    caller falls through to the next level and the source string records it."""
+    if not os.path.isfile(path):
+        return None
+    try:
+        if _sha256_file(path) != expected_sha:
+            return None
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+    except OSError:
+        return None
 
 
 _CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "cache")
@@ -216,17 +277,25 @@ def load_single_tlds():
     returned to the caller."""
     if _hermetic_tlds():
         return EMBEDDED_TLD_FALLBACK, "EMBEDDED_HERMETIC"
-    try:
-        entries = _fetch_single_tlds_from_iana()
-        if entries:
-            _save_tld_cache(entries)
-            return entries, "LIVE_FETCH"
-    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
-        pass
+    if _network_allowed():
+        try:
+            entries = _fetch_single_tlds_from_iana()
+            if entries:
+                _save_tld_cache(entries)
+                return entries, "LIVE_FETCH"
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+            pass
+        cached_entries, cached_at = _load_tld_cache()
+        if cached_entries:
+            return cached_entries, f"CACHE_FROM_{cached_at}"
 
-    cached_entries, cached_at = _load_tld_cache()
-    if cached_entries:
-        return cached_entries, f"CACHE_FROM_{cached_at}"
+    raw = _read_vendored(_VENDORED_TLD_FILE, _VENDORED_TLD_SHA256)
+    if raw:
+        entries = frozenset(
+            line.strip().lower() for line in raw.splitlines()
+            if line.strip() and not line.startswith("#"))
+        if entries:
+            return entries, "VENDORED"
 
     return EMBEDDED_TLD_FALLBACK, "EMBEDDED_FALLBACK"
 
@@ -288,16 +357,22 @@ def load_compound_suffixes():
     the HONESTY section)."""
     if _hermetic_tlds():
         return EMBEDDED_FALLBACK, "EMBEDDED_HERMETIC"
-    try:
-        entries = _fetch_from_canonical_source()
-        if entries:
-            _save_to_cache(entries)
-            return entries, "LIVE_FETCH"
-    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
-        pass
+    if _network_allowed():
+        try:
+            entries = _fetch_from_canonical_source()
+            if entries:
+                _save_to_cache(entries)
+                return entries, "LIVE_FETCH"
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+            pass
+        cached_entries, cached_at = _load_from_cache()
+        if cached_entries:
+            return cached_entries, f"CACHE_FROM_{cached_at}"
 
-    cached_entries, cached_at = _load_from_cache()
-    if cached_entries:
-        return cached_entries, f"CACHE_FROM_{cached_at}"
+    raw = _read_vendored(_VENDORED_PSL_FILE, _VENDORED_PSL_SHA256)
+    if raw:
+        entries = _parse_compound_entries(raw)
+        if entries:
+            return entries, "VENDORED"
 
     return EMBEDDED_FALLBACK, "EMBEDDED_FALLBACK"

@@ -29,7 +29,7 @@ from functools import lru_cache
 
 from sign_core_card import SignCoreCard, RiskLevel
 from sequence_output import SequenceMatch, SequenceOutput
-from public_suffix import load_single_tlds
+from public_suffix import load_single_tlds, is_full_registry
 from o1_policy_engine import (final_level as o1_final_level,
                               audit_field as o1_audit_field,
                               derive_occurrence_role as o1_derive_role)
@@ -295,40 +295,59 @@ def _attach_source_offsets(matches: list, sign_statuses: list) -> None:
 # DEGRADED only fires on a genuinely empty/corrupt registry.
 _TLD_SET = None
 _TLD_SOURCE_DEGRADED = False
+_TLD_SOURCE = ""
 _TLD_MIN_HEALTHY = 100
 
 
 def _tlds():
     """Returns (frozenset_of_tlds, degraded_bool). Cached for the process
     lifetime — the caller must not fetch on every mask."""
-    global _TLD_SET, _TLD_SOURCE_DEGRADED
+    global _TLD_SET, _TLD_SOURCE_DEGRADED, _TLD_SOURCE
     if _TLD_SET is None:
+        source = ""
         try:
-            entries, _source = load_single_tlds()
+            entries, source = load_single_tlds()
         except Exception:
             entries = frozenset()
-        if not isinstance(entries, (set, frozenset)) or len(entries) < _TLD_MIN_HEALTHY:
-            _TLD_SET = frozenset(entries) if isinstance(entries, (set, frozenset)) else frozenset()
-            _TLD_SOURCE_DEGRADED = True
-        else:
-            _TLD_SET = frozenset(entries)
-            _TLD_SOURCE_DEGRADED = False
+        if not isinstance(entries, (set, frozenset)):
+            entries = frozenset()
+        _TLD_SET = frozenset(entries)
+        _TLD_SOURCE = source
+        # DEGRADED BY PROVENANCE, not by size (fixed 2026-08-07). The old check
+        # asked only "are there at least 100 entries?", so the 163-entry
+        # embedded remnant passed as healthy while standing in for a 1438-entry
+        # registry: an air-gapped install ran on a stand-in and reported itself
+        # fine. Now a stand-in is called a stand-in. The size floor is KEPT as a
+        # second, independent condition -- a truncated or corrupt full registry
+        # is degraded too, whatever its label claims.
+        _TLD_SOURCE_DEGRADED = (not is_full_registry(source)
+                                or len(_TLD_SET) < _TLD_MIN_HEALTHY)
     return _TLD_SET, _TLD_SOURCE_DEGRADED
+
+
+def tld_source() -> str:
+    """Provenance string of the TLD registry in use ('VENDORED', 'LIVE_FETCH',
+    'CACHE_FROM_<date>', 'EMBEDDED_FALLBACK', 'EMBEDDED_HERMETIC'). Reported so
+    a reader can see WHICH registry a verdict rests on."""
+    _tlds()
+    return _TLD_SOURCE
 
 
 def _force_tld_state_for_test(tld_set, degraded: bool) -> None:
     """Test hook only: pin the TLD registry state so a gate can exercise
     the DEGRADED path (D-DET-2) without touching the network."""
-    global _TLD_SET, _TLD_SOURCE_DEGRADED
+    global _TLD_SET, _TLD_SOURCE_DEGRADED, _TLD_SOURCE
     _TLD_SET = frozenset(tld_set)
     _TLD_SOURCE_DEGRADED = bool(degraded)
+    _TLD_SOURCE = "FORCED_FOR_TEST"
 
 
 def _reset_tld_state_for_test() -> None:
     """Test hook only: drop the cache so the next _tlds() reloads live."""
-    global _TLD_SET, _TLD_SOURCE_DEGRADED
+    global _TLD_SET, _TLD_SOURCE_DEGRADED, _TLD_SOURCE
     _TLD_SET = None
     _TLD_SOURCE_DEGRADED = False
+    _TLD_SOURCE = ""
 
 
 def _demask(s: str, mask_chars) -> str:

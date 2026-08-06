@@ -19,6 +19,11 @@ For the full philosophy, see [`MANIFEST.md`](MANIFEST.md) (available in 9 langua
 ## Quick Start
 
 **Requirements:** Python 3.7 or newer. No external dependencies — only the standard library.
+**Runs offline by default:** the IANA TLD registry and the Public Suffix List ship as vendored,
+sha256-pinned snapshots in `data/net/`, so a fresh clone analyses domains with no network access.
+Set `MSL_MIP_ALLOW_NETWORK=1` to fetch fresher registries at runtime. Whenever the system falls
+back to its built-in remnant instead of a full registry, it reports itself as **degraded** —
+provenance travels with the data rather than being inferred from the entry count.
 
 **1. Check Python is installed:**
 ```
@@ -78,6 +83,7 @@ sequence/               Sequence analysis layer
   sequence_engine.py      Cross-sign patterns (../,  //, etc.)
 cards/                  Sign definitions (the knowledge base)
 data/unicode/           Pinned Unicode tables + PIN_MANIFEST.md
+data/net/               Vendored IANA TLD + Public Suffix List snapshots
 tests/                  Gate suite — every behaviour has a guard cell
 scripts/                run_gates.py (whole suite), analyze_file.py (any file)
 templates/              Templates for extending the system
@@ -161,7 +167,7 @@ To submit a change for review, use the packet template: `templates/CONVEYOR_RUN_
 - The system works with **structure only**. It does not know "PayPal" is a brand. It knows that `com` in a non-final position of a domain chain is a structural signal of mimicry.
 - **Brand-lookalike domains with a single dot** (e.g. `paypai.com`) currently pass — that requires a separate reputation/typosquatting layer, which is future work.
 - **Nine sign cards are currently loaded.** Five are `ARTIFACT_CONFIRMED` (`.` U+002E, `/` U+002F, `💀` U+1F480, `☠` U+2620, `@` U+0040). The fullwidth solidus `／` (U+FF0F) — the **relation/mask axis**, no matcher, relations only — is loaded as `WORKING_DRAFT`. Three cards of the invisible *supervised class* (Cf ∧ Default_Ignorable) are also loaded: zero-width space (U+200B, `WORKINGLY_CLOSED`, battery 21/21), zero-width joiner (U+200D) and byte order mark (U+FEFF) as `WORKING_DRAFT`. The runtime prints a `CARD_NOT_CONVEYOR_REVIEWED` warning for every `WORKING_DRAFT` card, so a draft result is never passed off as reliable.
-- **The gate suite is the contract: 40 gates, all green** (`py -3 scripts/run_gates.py`). Every decision has guard cells for both halves — the attack it must catch and the legitimate text it must not wake on. Included are 862k official Unicode bidi conformance cases with zero mismatches.
+- **The gate suite is the contract: 41 gates, all green** (`py -3 scripts/run_gates.py`). Every decision has guard cells for both halves — the attack it must catch and the legitimate text it must not wake on. Included are 862k official Unicode bidi conformance cases with zero mismatches.
 - **Known blindness is pinned, not hidden.** A single-carrier presence/absence scheme sitting on functionally valid positions is indistinguishable from ordinary orthography *in principle* — two different histories produce the identical byte string, so no deterministic rule can separate them. That limit is named (`LIMIT-ZW-SINGLE-CARRIER-FUNCTIONAL`, `REGRESSION_CARD_ZWSP_NATIVE`), pinned by test cells, and stated in the report rather than papered over. Roughly thirty such residuals are registered across the axes; each names its own bypass.
 - **Measured, not assumed.** Field measurements on live Khmer text (Wikipedia, Tatoeba, Telegram and Facebook comments) are recorded in `conveyor_runs/SNI_FIELD_MEASURE_*`, including a controlled probe showing that Facebook strips zero-width spaces from comments while Telegram preserves them and injects bidi isolates of its own — carriers are transformed differently by every transport.
 - Sign cards are written in Russian (the project's authoritative language). Code output is in English.
@@ -224,6 +230,11 @@ MSL/MIP анализирует текст знак за знаком для вы
 ## Быстрый старт
 
 **Требования:** Python 3.7 или новее. Никаких внешних зависимостей — только стандартная библиотека.
+**Работает офлайн по умолчанию:** реестр IANA TLD и Public Suffix List лежат в репозитории как
+вендоренные снапшоты с sha256-пином (`data/net/`), поэтому свежий клон разбирает домены без сети.
+Переменная `MSL_MIP_ALLOW_NETWORK=1` включает подтягивание свежих реестров в рантайме. Если
+система откатывается на встроенный огрызок вместо полного реестра, она сообщает о себе
+**degraded** — происхождение едет вместе с данными, а не угадывается по числу записей.
 
 **1. Проверьте, установлен ли Python:**
 ```
@@ -283,6 +294,7 @@ sequence/               Слой анализа последовательнос
   sequence_engine.py      Межзнаковые паттерны (../, //) + вердикты масок (отношения)
 cards/                  Определения знаков (база знаний)
 data/unicode/           Запиненные таблицы Unicode + PIN_MANIFEST.md
+data/net/               Вендоренные снапшоты реестра IANA TLD и PSL
 tests/                  Свод гейтов — у каждого поведения есть ячейка-страж
 scripts/                run_gates.py (весь свод), analyze_file.py (любой файл)
 templates/              Шаблоны для расширения системы
@@ -366,7 +378,7 @@ templates/              Шаблоны для расширения систем�
 - Система работает **только со структурой**. Она не знает, что «PayPal» — это бренд. Она знает, что `com` в непоследней позиции доменной цепочки — структурный сигнал имитации.
 - **Домены-двойники брендов с одной точкой** (например `paypai.com`) сейчас проходят — для них нужен отдельный слой репутации/детекции typosquatting, это будущая работа.
 - **Сейчас загружены девять карточек знаков.** Пять — `ARTIFACT_CONFIRMED` (`.` U+002E, `/` U+002F, `💀` U+1F480, `☠` U+2620, `@` U+0040). Полноширинный солидус `／` (U+FF0F) — **ось «отношение»/маска**, без матчера, только отношения — загружен как `WORKING_DRAFT`. Также загружены три карточки невидимого *поднадзорного класса* (Cf ∧ Default_Ignorable): пробел нулевой ширины (U+200B, `WORKINGLY_CLOSED`, батарея 21/21), соединитель нулевой ширины (U+200D) и маркер порядка байт (U+FEFF) как `WORKING_DRAFT`. Рантайм печатает предупреждение `CARD_NOT_CONVEYOR_REVIEWED` для каждой `WORKING_DRAFT`-карточки, поэтому черновой результат никогда не выдаётся за надёжный.
-- **Свод гейтов — это контракт: 40 гейтов, все зелёные** (`py -3 scripts/run_gates.py`). У каждого решения есть ячейки-стражи на обе половины: атака, которую обязаны поймать, и легитимный текст, на котором обязаны молчать. В своде — 862 тысячи официальных конформных случаев Unicode по bidi с нулём расхождений.
+- **Свод гейтов — это контракт: 41 гейт, все зелёные** (`py -3 scripts/run_gates.py`). У каждого решения есть ячейки-стражи на обе половины: атака, которую обязаны поймать, и легитимный текст, на котором обязаны молчать. В своде — 862 тысячи официальных конформных случаев Unicode по bidi с нулём расхождений.
 - **Известная слепота запинена, а не спрятана.** Однознаковая схема «есть/нет», стоящая на функционально верных позициях, неотличима от обычной орфографии **принципиально**: две разные истории дают одну и ту же строку байтов, и никакое детерминированное правило их не разделит. Этот предел назван (`LIMIT-ZW-SINGLE-CARRIER-FUNCTIONAL`, `REGRESSION_CARD_ZWSP_NATIVE`), закреплён тестовыми ячейками и выводится в отчёт, а не заминается. Всего по осям зарегистрировано около тридцати таких остатков, и каждый называет собственный обход.
 - **Измерено, а не предположено.** Полевые замеры на живом кхмерском (Википедия, Tatoeba, комментарии Telegram и Facebook) записаны в `conveyor_runs/SNI_FIELD_MEASURE_*` — включая контрольную пробу, показавшую, что Facebook вырезает пробелы нулевой ширины из комментариев, а Telegram их сохраняет и добавляет собственные bidi-изоляты: каждый транспорт преобразует носители по-своему.
 - Карточки знаков написаны на русском (авторитетный язык проекта). Вывод программы — на английском.

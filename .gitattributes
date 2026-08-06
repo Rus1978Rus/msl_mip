@@ -1,2 +1,8 @@
+# Pinned data files are verified by sha256 at load time. Git must NOT normalise
+# their line endings on checkout: a CRLF conversion changes every byte offset and
+# the hash, so a Linux CI checkout would see a "tampered" file and disable the
+# rule that reads it. -text keeps them byte-identical on every platform.
 data/unicode/*.txt -text
 data/unicode/conformance/*.txt -text
+data/net/*.txt -text
+data/net/*.dat -text

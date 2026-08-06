@@ -1,0 +1,97 @@
+name: gates
+
+# The gate suite IS the contract of this project: every decision carries guard
+# cells for both halves -- the attack it must catch and the legitimate text it
+# must not wake on. Running it on every push makes that discipline verifiable
+# from outside instead of being a private practice on the author's machine.
+#
+# HERMETIC BY CONSTRUCTION: MSL_MIP_HERMETIC_TLD=1 forces the in-repo pinned
+# TLD/suffix fallbacks, so no job ever reaches the network for domain data.
+# A gate that depends on today's publicsuffix.org would be a flaky gate, and a
+# flaky gate teaches people to ignore red -- the exact failure this project
+# refuses everywhere else.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.9 is the oldest version GitHub still ships on ubuntu-latest; the
+        # README claims 3.7+, and the floor is re-checked by the version gate
+        # below rather than trusted. 3.14 is what the author develops on.
+        python-version: ["3.9", "3.12", "3.14"]
+    env:
+      MSL_MIP_HERMETIC_TLD: "1"
+      PYTHONIOENCODING: "utf-8"
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: No third-party dependencies (stdlib only)
+        # The README's central practical claim. Verified, not asserted: a bare
+        # interpreter with an empty site-packages must import the whole runtime.
+        run: |
+          python -c "import sys; print(sys.version)"
+          pip list --format=freeze | grep -v -E '^(pip|setuptools|wheel)=' \
+            && { echo 'Unexpected third-party packages present'; exit 1; } || true
+          python -c "
+          import sys, os
+          for p in ('core', 'single_sign', 'sequence'):
+              sys.path.insert(0, os.path.join('.', p))
+          sys.path.insert(0, '.')
+          import msl_mip_runtime  # noqa: F401
+          print('runtime imports on stdlib alone: OK')
+          "
+
+      - name: Unicode data pins verify (sha256)
+        # The axes are only as trustworthy as the tables they read. If a pinned
+        # file changed, the affected axis is supposed to disable itself VISIBLY;
+        # in CI we want that surfaced as a build failure, not as a silent
+        # degradation, so the loaders' own status is asserted here.
+        run: |
+          python -c "
+          import sys, os
+          sys.path.insert(0, 'core')
+          import unicode_tables, variation_registry, zw_bits, sni_oracle
+          bad = []
+          t = unicode_tables.get_tables()
+          if t.get('status') != 'OK':
+              bad.append('unicode_tables: %s' % t.get('status'))
+          for name, mod, fn in (('joining types', zw_bits, 'get_joining_types'),
+                                ('SNI tables', sni_oracle, 'get_sni_tables')):
+              st = getattr(mod, fn)().get('status')
+              if st != 'OK':
+                  bad.append('%s: %s' % (name, st))
+          if bad:
+              print('PIN VERIFICATION FAILED:'); [print(' ', b) for b in bad]; sys.exit(1)
+          print('all pinned tables verify by sha256')
+          "
+
+      - name: Gate suite
+        run: python scripts/run_gates.py
+
+      - name: End-to-end smoke (the README's own example)
+        # Documentation that has never been executed rots. This runs the exact
+        # command the README tells a newcomer to run and checks the verdict it
+        # promises, so a drifting example fails the build.
+        run: |
+          out=$(python msl_mip_runtime.py "paypal.com.security-check.ru/verify")
+          echo "$out"
+          echo "$out" | grep -q "HOLD_PENDING_REVIEW" \
+            || { echo "README example no longer yields HOLD_PENDING_REVIEW"; exit 1; }
