@@ -88,6 +88,9 @@ data/net/               Vendored IANA TLD + Public Suffix List snapshots
 tests/                  Gate suite — every behaviour has a guard cell
 scripts/                run_gates.py (whole suite), analyze_file.py (any file)
 templates/              Templates for extending the system
+foundation_layer/       Author decisions and specifications (the authority)
+conveyor_runs/          Review rounds: packets, legs, svods, field measurements
+docs/                   Process artefacts — see docs/README.md
 ```
 
 ---
@@ -300,6 +303,9 @@ data/net/               Вендоренные снапшоты реестра I
 tests/                  Свод гейтов — у каждого поведения есть ячейка-страж
 scripts/                run_gates.py (весь свод), analyze_file.py (любой файл)
 templates/              Шаблоны для расширения системы
+foundation_layer/       Авторские решения и спеки (слой полномочий)
+conveyor_runs/          Круги ревью: пакеты, леги, своды, полевые замеры
+docs/                   Артефакты процесса — см. docs/README.md
 ```
 
 ---
