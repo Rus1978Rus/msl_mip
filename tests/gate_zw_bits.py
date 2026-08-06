@@ -49,7 +49,7 @@ PERSIAN_OK = MIM + YEH + ZWNJ + KAF + NOON + BEH        # ZWNJ between joining l
 PERSIAN_TYPO = ALEF + ZWNJ + BEH                        # after right-joining ALEF
 HINDI = chr(0x915) + chr(0x94D) + ZWNJ + chr(0x937)     # virama conjunct
 FAMILY = chr(0x1F468) + ZWJ + chr(0x1F469) + ZWJ + chr(0x1F467)
-BITS = "".join(format(c, "08b") for c in b"exfiltrate")
+BITS = "".join(format(c, "08b") for c in b"sampledata")
 
 
 def _run(text):

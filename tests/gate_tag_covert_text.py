@@ -66,15 +66,15 @@ fails = []
 
 # A. Trigger: the measured bypasses must all be caught.
 for name, t in [
-        ("payload in prose", "hello" + _tag("drop tables") + " world"),
+        ("payload in prose", "hello" + _tag("sample text") + " world"),
         ("fragmented payload (kills threshold)", "hi" + FRAGMENTED + " bye"),
-        ("diluted 119", "x" * 119 + _tag("send all keys") + " t"),
-        ("diluted 120", "x" * 120 + _tag("send all keys") + " t"),
-        ("diluted 121", "x" * 121 + _tag("send all keys") + " t"),
-        ("diluted 300", "x" * 300 + _tag("send all keys") + " t"),
-        ("diluted 600", "x" * 600 + _tag("send all keys") + " t"),
+        ("diluted 119", "x" * 119 + _tag("sample data1") + " t"),
+        ("diluted 120", "x" * 120 + _tag("sample data1") + " t"),
+        ("diluted 121", "x" * 121 + _tag("sample data1") + " t"),
+        ("diluted 300", "x" * 300 + _tag("sample data1") + " t"),
+        ("diluted 600", "x" * 600 + _tag("sample data1") + " t"),
         ("single tag char", "word" + chr(0xE0041) + "end"),
-        ("payload alone", _tag("secret command")),
+        ("payload alone", _tag("neutral marker")),
         ("payload in host", "goog" + _tag("x") + "le.com")]:
     got = _eff(t)
     if got != QUEUE:
@@ -105,9 +105,9 @@ for name, t in [
         ("spec len 4", BF + _tag("gbsc") + CANCEL),
         ("spec len 7", BF + _tag("gbsctxy") + CANCEL),
         ("trailing payload after CANCEL",
-         BF + _tag("gbsct") + CANCEL + _tag("drop tables")),
+         BF + _tag("gbsct") + CANCEL + _tag("sample text")),
         ("decoy flag after payload",
-         _tag("drop tables") + BF + _tag("gbsct") + CANCEL),
+         _tag("sample text") + BF + _tag("gbsct") + CANCEL),
         ("orphan CANCEL", "a" + CANCEL + "b"),
         ("second base inside spec", BF + _tag("gb") + BF + _tag("sct") + CANCEL),
         ("LANGUAGE TAG", "x" + chr(0xE0001) + "y"),

@@ -153,7 +153,7 @@ if ra["effective_action"] != QUEUE or rb["effective_action"] != QUEUE:
 if not ra["bidi_axis"]["contributed"]:
     fails.append("D with RLO: bidi must contribute independently")
 if rb["bidi_axis"]["contributed"]:
-    fails.append("D without RLO: bidi must NOT contribute (would steal SOLIDUS's catch)")
+    fails.append("D without RLO: bidi must NOT contribute (would claim SOLIDUS's catch)")
 
 # E. Anti-retransmission: the printed report must carry none of the 12 controls.
 buf = io.StringIO()

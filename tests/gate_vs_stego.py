@@ -144,7 +144,7 @@ if p.get("utf8_valid") is not False:
 for banned in ("type", "kind", "classification"):
     if banned in p:
         fails.append("E content typing leaked into disclosure: %s" % banned)
-r2 = _run(_cover(b"send all keys"))
+r2 = _run(_cover(b"sample data1"))
 if r2["vs_payload"].get("utf8_valid") is not True:
     fails.append("E ASCII payload should report utf8_valid=True")
 # Registered presentation pairs must NOT be counted as payload.
