@@ -102,6 +102,39 @@ def _transparent(ch):
     return unicodedata.category(ch) == "Mn" or 0xFE00 <= ord(ch) <= 0xFE0F
 
 
+def _is_linker(ch):
+    """Conjunct linker for the join-control rule.
+
+    NORMATIVE SOURCE: InCB=Linker (UAX#29 GB9c) from the pinned
+    DerivedCoreProperties -- exactly six viramas (Devanagari, Bengali, Gujarati,
+    Oriya, Telugu, Malayalam), the same table the card layer's SNI oracle reads.
+
+    This replaced `unicodedata.combining(ch) == 9`, which was measured to be a live
+    evasion: ccc==9 holds for 69 codepoints, 63 of them NOT normative linkers
+    (Khmer COENG, Thai PHINTHU, Myanmar virama, Javanese pangkon...). A two-carrier
+    channel in Khmer cover with every carrier placed just after a COENG -- and COENG
+    appears in almost every Khmer word -- read PROVEN_FUNCTIONAL throughout, so the
+    nonfunctional count was zero and the axis stayed silent. The same channel between
+    ordinary Khmer letters fired. Measured, not reasoned.
+
+    FALLBACK: if the pinned table cannot be verified, fall back to ccc==9 -- the old,
+    FP-safe semantics. Failing the other way would judge every Devanagari conjunct
+    nonfunctional and flood an entire writing system, which is the failure mode this
+    axis exists to avoid. The degradation is surfaced in the axis status."""
+    tables = _sni_tables()
+    if tables is not None and tables["status"] == "OK":
+        return ord(ch) in tables["incb_linker"]
+    return unicodedata.combining(ch) == 9
+
+
+def _sni_tables():
+    try:
+        import sni_oracle
+    except ImportError:
+        return None
+    return sni_oracle.get_sni_tables()
+
+
 # Persian enclitics written with a half-space (nim-fasele) after a right-joining
 # letter, ISIRI 9147 / normative orthography. A CLOSED list, pinned as data next to
 # the rule that reads it: ra, ha, tar, tarin, i, am, at, ash, ist, and the plural haye.
@@ -140,8 +173,8 @@ def function_status(text, i):
     # skip: it is category Mn, so skipping "transparent" marks would step straight over
     # it and the conjunct rule would never fire (caught by the gate, not by reasoning).
     if cp in JOIN_CONTROLS:
-        if (i > 0 and unicodedata.combining(text[i - 1]) == 9) or \
-                (i + 1 < len(text) and unicodedata.combining(text[i + 1]) == 9):
+        if (i > 0 and _is_linker(text[i - 1])) or \
+                (i + 1 < len(text) and _is_linker(text[i + 1])):
             return "PROVEN_FUNCTIONAL"
     left = i - 1
     while left >= 0 and (_transparent(text[left]) or ord(text[left]) in CARRIERS):
@@ -160,8 +193,8 @@ def function_status(text, i):
         # bypass (residual R6), which is why it is not pinned here.
         return "PROVEN_FUNCTIONAL"
     if cp in JOIN_CONTROLS and lch and rch:
-        if unicodedata.combining(lch) == 9 or unicodedata.combining(rch) == 9:
-            return "PROVEN_FUNCTIONAL"          # virama conjunct, free from stdlib
+        if _is_linker(lch) or _is_linker(rch):
+            return "PROVEN_FUNCTIONAL"          # normative conjunct linker (InCB)
         lj, rj = _jt(ord(lch)), _jt(ord(rch))
         if lj in ("D", "L", "C") and rj in ("D", "R", "C"):
             return "PROVEN_FUNCTIONAL"          # real cursive joining context

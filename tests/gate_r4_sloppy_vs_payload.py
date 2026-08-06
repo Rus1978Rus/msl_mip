@@ -159,6 +159,42 @@ out2 = _printed(_run("a" + ZWNJ + "b " + LRM + " c" + ZWNJ + "d"))
 if out2.count("U+200C") != 1 or out2.count("U+200E") != 1:
     fails.append("F distinct signs merged or duplicated")
 
+# H. CROSS-ORACLE CONSISTENCY (found by auditing the seam between the two oracles this
+# project now has: the card layer's SNI oracle and this axis both judge whether a join
+# control does a job). The axis used to trust unicodedata.combining()==9, which holds
+# for 69 codepoints while only SIX are normative InCB linkers. Measured evasion: a
+# two-carrier channel in Khmer cover with every carrier placed right after a COENG --
+# a mark in nearly every Khmer word -- read PROVEN_FUNCTIONAL throughout, so the
+# nonfunctional count was zero and the axis went silent, while the SAME channel between
+# ordinary letters fired. Both halves are pinned here: the evasion must raise, and the
+# six normative conjunct scripts must stay silent.
+_BITS = "0110100101101001" * 2
+for name, base, mark, tail in [
+        ("Khmer COENG cover", 0x1780, 0x17D2, 0x1789),
+        ("Thai PHINTHU cover", 0x0E01, 0x0E3A, 0x0E20),
+        ("Myanmar virama cover", 0x1000, 0x1039, 0x1001),
+        ("Javanese pangkon cover", 0xA984, 0xA9C0, 0xA985)]:
+    t = "".join(_s(base, mark) + (ZWNJ if b == "0" else WJ) + _s(tail)
+                for b in _BITS)
+    r = _run(t)
+    if r["effective_action"] != QUEUE or not r["zw_bits"]["contributed"]:
+        fails.append("H %s: carriers after a NON-normative virama evade the axis "
+                     "(eff=%s contributed=%s)"
+                     % (name, r["effective_action"], r["zw_bits"]["contributed"]))
+for name, cons, linker, cons2 in [
+        ("Devanagari", 0x0915, 0x094D, 0x0937), ("Bengali", 0x0995, 0x09CD, 0x09AC),
+        ("Gujarati", 0x0A95, 0x0ACD, 0x0AB7), ("Oriya", 0x0B15, 0x0B4D, 0x0B37),
+        ("Telugu", 0x0C15, 0x0C4D, 0x0C37), ("Malayalam", 0x0D15, 0x0D4D, 0x0D37)]:
+    word = _s(cons, linker) + ZWNJ + _s(cons2)
+    if zw.function_status(word, word.index(ZWNJ)) != "PROVEN_FUNCTIONAL":
+        fails.append("H %s conjunct must stay PROVEN_FUNCTIONAL" % name)
+    r = _run(" ".join([word] * 30))
+    if r["effective_action"] != "pass" or r["zw_bits"]["contributed"]:
+        fails.append("H %s document of 30 conjuncts must stay silent" % name)
+# The linker predicate must read the pinned table, not the stdlib heuristic.
+if zw._is_linker(chr(0x17D2)) or not zw._is_linker(chr(0x094D)):
+    fails.append("H linker predicate is not reading InCB=Linker from the pin")
+
 # G. Double honesty in the axis note.
 r = _run("x" + (ZWNJ + WJ) * 12 + "y")
 note = (r["zw_bits"].get("note") or "") + " " + _printed(r)
@@ -180,5 +216,8 @@ print("D attacks still caught with attribution: Persian cover, block, shaped")
 print("E blindness pinned at 24/80/240 -- not firing, but carriers still counted")
 print("F witness aggregated (1 row x24) while the structure keeps all 24 occurrences")
 print("G double honesty: the scheme is stated as NOT established")
+print("H cross-oracle: carriers after Khmer/Thai/Myanmar/Javanese viramas no longer")
+print("  evade (ccc==9 held for 69 codepoints, only 6 are normative InCB linkers);")
+print("  all six conjunct scripts stay silent")
 print("\nTOTAL: CLEAN")
 sys.exit(0)
