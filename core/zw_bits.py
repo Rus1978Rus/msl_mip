@@ -102,6 +102,32 @@ def _transparent(ch):
     return unicodedata.category(ch) == "Mn" or 0xFE00 <= ord(ch) <= 0xFE0F
 
 
+# Persian enclitics written with a half-space (nim-fasele) after a right-joining
+# letter, ISIRI 9147 / normative orthography. A CLOSED list, pinned as data next to
+# the rule that reads it: ra, ha, tar, tarin, i, am, at, ash, ist, and the plural haye.
+_AFTER_R_SUFFIXES = (
+    (0x0631, 0x0627),          # ra
+    (0x0647, 0x0627),          # ha
+    (0x062A, 0x0631),          # tar / tarin
+    (0x0627, 0x06CC),          # i (ay)
+    (0x0627, 0x0645),          # am
+    (0x0627, 0x062A),          # at
+    (0x0627, 0x0634),          # ash
+    (0x0627, 0x0633, 0x062A),  # ist
+)
+
+
+def _after_r_suffix(text, right):
+    """True when the text at `right` starts one of the closed set of Persian
+    enclitic suffixes that normatively follow a half-space. Matching is on the
+    literal codepoints, so the rule cannot drift with the surrounding heuristics."""
+    for suf in _AFTER_R_SUFFIXES:
+        if all(right + k < len(text) and ord(text[right + k]) == cp
+               for k, cp in enumerate(suf)):
+            return True
+    return False
+
+
 def function_status(text, i):
     """Four-state status (D3). NONFUNCTIONAL means only 'this occurrence explains
     nothing here' -- never 'proven malicious'."""
@@ -139,6 +165,18 @@ def function_status(text, i):
         lj, rj = _jt(ord(lch)), _jt(ord(rch))
         if lj in ("D", "L", "C") and rj in ("D", "R", "C"):
             return "PROVEN_FUNCTIONAL"          # real cursive joining context
+        # AFTER-R CARVE-OUT (D-R4 F4). Measured on the live oracle, and by the panel
+        # independently (107 of 396 carriers in a correct 400-word document): a
+        # right-joining letter cannot join what follows anyway, so the rule above
+        # judged NORMATIVE Persian NONFUNCTIONAL -- the half-space before the enclitic
+        # suffixes (ra, ha, tar, tarin, i, am; ISIRI 9147 nim-fasele). The suffix set
+        # is CLOSED and its first letters are named explicitly, so the carve-out cannot
+        # quietly widen into "anything after a right-joining letter".
+        # Named micro-channel BYPASS_AFTER_R_CARVEOUT: an attacker who places carriers
+        # exactly on these positions buys silence -- every carve-out mints its own
+        # bypass, and this one is registered rather than discovered later.
+        if lj == "R" and rj in ("D", "R", "C") and _after_r_suffix(text, right):
+            return "PROVEN_FUNCTIONAL"
         return "NONFUNCTIONAL"
     if cp == 0x00AD:
         return "PLAUSIBLE_FUNCTIONAL" if (lch.isalpha() and rch.isalpha()) \

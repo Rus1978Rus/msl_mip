@@ -1219,11 +1219,31 @@ def print_report(report: dict) -> None:
     invis = report.get("uncarded_invisibles", [])
     if invis:
         # A WITNESS block, printed on its own — never inside the verdict.
+        # AGGREGATED (D-R4 F3): occurrences identical in everything but offset are
+        # ONE block with a count and an offset range. Measured before the change: a
+        # 24-carrier document printed 96 of its 112 report lines as the same four
+        # sentences repeated -- the per-line witness the round banned (the panel
+        # measured 114 lines against 1 aggregated). The report STRUCTURE is untouched:
+        # machine consumers still get every occurrence, so no verdict can shift.
         print("\n--- UNCARDED INVISIBLE SIGNS (WITNESS, not a verdict) ---")
+        groups = []
+        index = {}
         for r in invis:
+            key = (r["codepoint"], r.get("family"), r["trigger"], r["card_status"],
+                   r["finding_status"], r.get("context_note"))
+            if key not in index:
+                index[key] = len(groups)
+                groups.append([r, [r["at_offset"]]])
+            else:
+                groups[index[key]][1].append(r["at_offset"])
+        for r, offsets in groups:
             fam = f"{r.get('family', '')}/" if r.get('family') else ""
             note = f"  ({r['context_note']})" if r.get('context_note') else ""
-            print(f"  [{r['at_offset']}] {r['codepoint']} ({r['unicode_name']}) "
+            if len(offsets) == 1:
+                where = f"[{offsets[0]}]"
+            else:
+                where = (f"[x{len(offsets)} at {min(offsets)}..{max(offsets)}]")
+            print(f"  {where} {r['codepoint']} ({r['unicode_name']}) "
                   f"[{r['category']}/{fam}{r['trigger']}]{note}")
             print(f"        card: {r['card_status']}   finding: {r['finding_status']}")
             print(f"        basis: {r['finding_basis']}")
