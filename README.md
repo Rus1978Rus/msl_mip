@@ -1,5 +1,7 @@
 # MSL/MIP Sign Alphabet
 
+[![gates](https://github.com/Rus1978Rus/msl_mip/actions/workflows/gates.yml/badge.svg)](https://github.com/Rus1978Rus/msl_mip/actions/workflows/gates.yml)
+
 **A structural threat analyzer that asks not "what is this?" but "what does this sign do in this context?"**
 
 *Status: WORKING_DRAFT · Authoritative language: Russian · Author: Ruslan Malyavsky*
