@@ -14,6 +14,21 @@ Exit code 0 = every gate green; 1 = at least one gate failed (or timed out).
 
 Auto-discovers tests/*.py minus an explicit EXCLUDE list. New gate files are
 picked up automatically; non-gate helpers must be added to EXCLUDE with a reason.
+
+ENVIRONMENT NOTE (measured 2026-08-07, keep before blaming a gate). This working
+copy lives inside a OneDrive folder, so every one of its files is a cloud
+placeholder (reparse tag 0x9000e01a). Two consequences, both observed:
+  * git cannot delete .git/worktrees/main-wt -- an orphaned placeholder OneDrive
+    holds -- so a "Permission denied" line appears on essentially every git
+    command. It is noise from the filesystem, not a repository problem.
+  * a gate can stall for minutes while OneDrive syncs or rehydrates files, with
+    no fault in the gate. gate_tag_covert_text once hit the 300s timeout here
+    immediately after 340KB of new data files were written; the same gate then
+    measured 0.30-0.35s over 20 consecutive runs and has never repeated it.
+When a timeout appears, check whether files were being written or synced at that
+moment BEFORE looking for a hang in the code. The permanent fix is on the
+machine, not here: pin the folder as "Always keep on this device", or keep the
+working copy outside OneDrive.
 """
 import os
 import subprocess
@@ -33,6 +48,11 @@ EXCLUDE = {
 }
 
 TIMEOUT_S = 300
+# The slowest honest gate is the UAX#9 conformance run (862k official cases,
+# ~12s here); everything else is under a second. 30s is therefore well clear of
+# normal work and still far below the timeout -- a gate crossing it is a signal
+# to look at the machine while the suite is still green.
+SLOW_S = 30
 
 
 def discover():
@@ -60,8 +80,27 @@ def run_one(name):
         ok = p.returncode == 0
         note = last_line(p.stdout) if ok else (last_line(p.stderr) or last_line(p.stdout))
         return ok, dt, p.returncode, note
-    except subprocess.TimeoutExpired:
-        return False, TIMEOUT_S, None, "TIMEOUT (> %ds)" % TIMEOUT_S
+    except subprocess.TimeoutExpired as exc:
+        # A timeout used to report a bare "exit None", which told us nothing: we
+        # could not tell a genuinely hung gate from a stalled machine, and one
+        # such event (2026-08-07, gate_tag_covert_text, a gate measured at 0.3s
+        # over 20 consecutive runs) cost an investigation from zero. TimeoutExpired
+        # CARRIES the partial output -- printing its last line names the section
+        # the gate reached before it stopped, which is the difference between
+        # evidence and a guess. The verdict stays FAILED either way: a timeout we
+        # do not understand must not be swept into green.
+        partial = _decode(exc.stdout) or _decode(exc.stderr)
+        where = last_line(partial) if partial else "no output before the stall"
+        return False, TIMEOUT_S, None, "TIMEOUT (>%ds) last output: %s" % (
+            TIMEOUT_S, where)
+
+
+def _decode(raw):
+    if raw is None:
+        return ""
+    if isinstance(raw, bytes):
+        return raw.decode("utf-8", "replace")
+    return raw
 
 
 def main():
@@ -71,13 +110,26 @@ def main():
           % (len(gates), len(EXCLUDE)))
     print("=" * 74)
     failed = []
+    slow = []
     for name in gates:
         ok, dt, rc, note = run_one(name)
         mark = "PASS" if ok else "FAIL"
-        print("[%s] %-34s %7.2fs  %s" % (mark, name, dt, note))
+        # A gate that suddenly takes 30s where it used to take 0.3s is a warning
+        # long before it becomes a 300s timeout. Flag it while it is still cheap
+        # to notice: on this repository the usual cause is not the gate at all
+        # but the filesystem (see ENVIRONMENT NOTE in the module docstring).
+        tag = "  [SLOW]" if (ok and dt > SLOW_S) else ""
+        print("[%s] %-34s %7.2fs  %s%s" % (mark, name, dt, note, tag))
         if not ok:
             failed.append((name, rc))
+        elif dt > SLOW_S:
+            slow.append((name, dt))
     print("=" * 74)
+    if slow:
+        print("SLOW (green, but far above their usual cost -- check the machine "
+              "before the code):")
+        for name, dt in slow:
+            print("  %-34s %.2fs" % (name, dt))
     if failed:
         print("RESULT: %d/%d PASSED, %d FAILED" % (len(gates) - len(failed), len(gates), len(failed)))
         for name, rc in failed:
