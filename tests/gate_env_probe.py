@@ -91,30 +91,39 @@ if env_probe.is_cloud_placeholder(os.path.join(_BASE, "no_such_file_here.txt")):
 
 # C. It detects the real condition -- simulated at the attribute layer, which is
 # the only part that differs between a hydrated and a dehydrated file.
+# PLATFORM: the probe answers UNSUPPORTED before consulting attributes on any
+# system without the API, so this simulation is meaningful on Windows only. CI
+# caught that: the cell was written on Windows and failed on the Linux runner --
+# the first thing the build found was a portability bug in the gate itself.
+# Off-Windows the honest assertion is the silence contract, checked in B.
 _real_attrs = env_probe._attributes
-try:
-    env_probe._attributes = lambda path: 0x00400000  # RECALL_ON_DATA_ACCESS
-    hazard = env_probe.probe(_BASE)
-finally:
-    env_probe._attributes = _real_attrs
+hazard = None
+if sys.platform.startswith("win"):
+    try:
+        env_probe._attributes = lambda path: 0x00400000  # RECALL_ON_DATA_ACCESS
+        hazard = env_probe.probe(_BASE)
+    finally:
+        env_probe._attributes = _real_attrs
 
-if hazard["status"] != "CLOUD_PLACEHOLDERS_PRESENT":
-    fails.append("C dehydrated files were not detected: %s" % hazard["status"])
-if not hazard["pending"]:
-    fails.append("C hazard reported without naming a single affected file")
-msg = hazard["message"]
-if not msg:
-    fails.append("C hazard reported with no message for the human")
-else:
-    for jargon in ("placeholder", "reparse", "OneDrive", "hydrat", "attribute"):
-        if jargon.lower() in msg.lower():
-            fails.append("C message uses jargon the reader should not need: %r"
-                         % jargon)
-    if "download" not in msg.lower() or "not the analyzer" not in msg.lower():
-        fails.append("C message must say what the pause IS and what it is not: "
-                     "%r" % msg)
+if hazard is not None:
+    if hazard["status"] != "CLOUD_PLACEHOLDERS_PRESENT":
+        fails.append("C dehydrated files were not detected: %s" % hazard["status"])
+    if not hazard["pending"]:
+        fails.append("C hazard reported without naming a single affected file")
+    msg = hazard["message"]
+    if not msg:
+        fails.append("C hazard reported with no message for the human")
+    else:
+        for jargon in ("placeholder", "reparse", "OneDrive", "hydrat", "attribute"):
+            if jargon.lower() in msg.lower():
+                fails.append("C message uses jargon the reader should not need: %r"
+                             % jargon)
+        if "download" not in msg.lower() or "not the analyzer" not in msg.lower():
+            fails.append("C message must say what the pause IS and what it is not: "
+                         "%r" % msg)
 
-# D. Report-only: verdicts cannot depend on the probe.
+# D. Report-only: verdicts cannot depend on the probe. Runs everywhere -- the
+# claim is about the analysis, not about the platform.
 def _verdict(text):
     with contextlib.redirect_stdout(io.StringIO()):
         return rt.analyze(text, _CARDS)["effective_action"]

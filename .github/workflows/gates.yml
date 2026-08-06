@@ -27,10 +27,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.9 is the oldest version GitHub still ships on ubuntu-latest; the
-        # README claims 3.7+, and the floor is re-checked by the version gate
-        # below rather than trusted. 3.14 is what the author develops on.
-        python-version: ["3.9", "3.12", "3.14"]
+        # MEASURED BY THIS BUILD, not assumed. The first CI run failed on 3.9
+        # and 3.12 at the pin check, and that failure was CORRECT: the pinned
+        # tables are UCD 16.0.0 and the loaders refuse to run against a
+        # different unicodedata, which each interpreter carries built in --
+        # 3.9 ships UCD 13.0.0, 3.12 ships 15.0.0, 3.13 ships 15.1.0. Only 3.14
+        # matches the pin, so it is the only version on which the full analysis
+        # is defined today. The README's blanket "3.7 or newer" was wrong and
+        # has been corrected rather than papered over with a green matrix.
+        # A version older than the pin is not a silent half-system: the axes
+        # disable themselves visibly (CONFUSABLE_AXIS_UNVERIFIABLE), which is
+        # exactly what the pin discipline promises -- so the floor is a
+        # deliberate refusal, not a bug to work around.
+        python-version: ["3.14"]
     env:
       MSL_MIP_HERMETIC_TLD: "1"
       PYTHONIOENCODING: "utf-8"

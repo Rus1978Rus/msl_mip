@@ -20,7 +20,14 @@ For the full philosophy, see [`MANIFEST.md`](MANIFEST.md) (available in 9 langua
 
 ## Quick Start
 
-**Requirements:** Python 3.7 or newer. No external dependencies — only the standard library.
+**Requirements:** **Python 3.14** — no external dependencies, only the standard library.
+
+The version floor is not a preference: the pinned Unicode tables are UCD 16.0.0, and
+every interpreter carries its own built-in `unicodedata` (3.12 ships 15.0.0, 3.13 ships
+15.1.0). On an older interpreter the affected axes refuse to run and say so
+(`CONFUSABLE_AXIS_UNVERIFIABLE`) rather than answering from a different Unicode version
+than the one the tables were verified against. This floor was found by CI, not assumed —
+the first build failed on 3.9 and 3.12 exactly here, and the failure was correct.
 **Runs offline by default:** the IANA TLD registry and the Public Suffix List ship as vendored,
 sha256-pinned snapshots in `data/net/`, so a fresh clone analyses domains with no network access.
 Set `MSL_MIP_ALLOW_NETWORK=1` to fetch fresher registries at runtime. Whenever the system falls
@@ -235,7 +242,14 @@ MSL/MIP анализирует текст знак за знаком для вы
 
 ## Быстрый старт
 
-**Требования:** Python 3.7 или новее. Никаких внешних зависимостей — только стандартная библиотека.
+**Требования:** **Python 3.14** — никаких внешних зависимостей, только стандартная библиотека.
+
+Нижняя граница версии — не предпочтение: запиненные таблицы Unicode это UCD 16.0.0, а каждый
+интерпретатор несёт собственную встроенную `unicodedata` (в 3.12 — 15.0.0, в 3.13 — 15.1.0).
+На более старом интерпретаторе затронутые оси отказываются работать и **говорят об этом**
+(`CONFUSABLE_AXIS_UNVERIFIABLE`), вместо того чтобы отвечать по другой версии Unicode, чем та,
+против которой таблицы проверены. Границу нашёл CI, а не предположение: первая сборка упала
+на 3.9 и 3.12 ровно здесь, и это падение было правильным.
 **Работает офлайн по умолчанию:** реестр IANA TLD и Public Suffix List лежат в репозитории как
 вендоренные снапшоты с sha256-пином (`data/net/`), поэтому свежий клон разбирает домены без сети.
 Переменная `MSL_MIP_ALLOW_NETWORK=1` включает подтягивание свежих реестров в рантайме. Если
