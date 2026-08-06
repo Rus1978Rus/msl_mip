@@ -57,11 +57,19 @@ The verdict is one of: `PASS` → `QUEUE_FOR_REVIEW` → `HOLD_PENDING_REVIEW` (
 ```
 msl_mip_runtime.py      Entry point — run this
 MANIFEST.md             Conceptual manifesto (9 languages)
-core/                   Card parser and data model
+core/                   Card parser, data model, and the analysis axes
   load_card.py            Reads sign cards from disk
   sign_core_card.py       Data structures
   tree_parser.py          Indentation parser
   public_suffix.py        3-tier domain data (PSL + IANA)
+  unicode_tables.py       Pinned UCD/UTS#39 loaders (sha256-verified)
+  confusable_axis.py      Visible lookalikes (skeleton + mixed script)
+  tag_axis.py             Tag-block covert text
+  variation_registry.py   Variation-selector payloads
+  uax9.py                 Conformant UAX#9 bidi algorithm
+  bidi_axis.py            Reordering: logical vs visual order
+  zw_bits.py              Zero-width carrier streams
+  sni_oracle.py           Script-native functional positions
 single_sign/            Single-sign analysis layer
   module_engine.py        Sign dispatcher (by codepoint)
   integrator_engine.py    Verdict for one sign
@@ -69,6 +77,9 @@ single_sign/            Single-sign analysis layer
 sequence/               Sequence analysis layer
   sequence_engine.py      Cross-sign patterns (../,  //, etc.)
 cards/                  Sign definitions (the knowledge base)
+data/unicode/           Pinned Unicode tables + PIN_MANIFEST.md
+tests/                  Gate suite — every behaviour has a guard cell
+scripts/                run_gates.py (whole suite), analyze_file.py (any file)
 templates/              Templates for extending the system
 ```
 
@@ -83,6 +94,35 @@ templates/              Templates for extending the system
    The sequence layer also decides **mask (homoglyph) verdicts** (the relation axis): a sign declared as a mask of a canon (e.g. fullwidth `／` U+FF0F masking `/` U+002F) gets its risk from *context*, not from the sign itself — HIGH inside a host, MEDIUM in a URL path, NONE in free text, and only when the relation scope covers that context. A relation alone is never a threat (RELATION_FOUND != THREAT).
 
 3. **Integration** — the final graded verdict, preserving space for human judgment. The system flags; humans decide.
+
+---
+
+## The Axes (four kinds of structural threat)
+
+Beyond the three layers, the runtime carries independent **axes**. Each is additive,
+raise-only and fail-open: an axis can add a signal, never remove another one's, and a
+broken axis reports its own failure instead of silently passing. The final level is the
+maximum across contributors, and every report says *which* axis contributed.
+
+| Threat kind | Axis | What it answers |
+|---|---|---|
+| **Substitution** | `confusable_axis` | is this character a lookalike of another (mixed-script, skeleton collision)? |
+| **Concealment** | `tag_axis`, `variation_registry`, `zw_bits` | is invisible data riding in tag characters, variation selectors, or zero-width carriers? |
+| **Reordering** | `bidi_axis` + `uax9` | does the visible order differ from the stored order? (`invoice[RLO]gpj.exe` renders as `invoiceexe.jpg`) |
+| **Break** | card layer + input guard | does an invisible character break a host, a token, or a byte-exact comparison? |
+
+Two design rules run through all of them:
+
+- **Pinned data, never "latest".** Script, Line_Break, InCB, Joining_Type, confusables,
+  bidi brackets and the variation registries are frozen files verified by sha256
+  (`data/unicode/PIN_MANIFEST.md`). A hash mismatch disables the affected rule
+  *visibly* rather than changing behaviour silently.
+- **The function of the position, not the writing system.** The same invisible character
+  is normal orthography in one script and an anomaly in another. Khmer separates words
+  with a zero-width space; Persian writes a half-space before enclitics; Devanagari joins
+  conjuncts with a virama. The oracles judge whether *this occurrence* does a normative
+  job (`Line_Break=SA` neighbours, `InCB=Linker`, joining type) — and machine contexts
+  (host, e-mail, URL, path, identifier) are never softened, whatever the script.
 
 ---
 
@@ -120,7 +160,10 @@ To submit a change for review, use the packet template: `templates/CONVEYOR_RUN_
 - **WORKING_DRAFT** — this is an active research project, not production software.
 - The system works with **structure only**. It does not know "PayPal" is a brand. It knows that `com` in a non-final position of a domain chain is a structural signal of mimicry.
 - **Brand-lookalike domains with a single dot** (e.g. `paypai.com`) currently pass — that requires a separate reputation/typosquatting layer, which is future work.
-- **Nine sign cards are currently loaded.** Five are `ARTIFACT_CONFIRMED` (`.` U+002E, `/` U+002F, `💀` U+1F480, `☠` U+2620, `@` U+0040). The fullwidth solidus `／` (U+FF0F) — the **relation/mask axis**, no matcher, relations only — is loaded as `WORKING_DRAFT`. Three cards of the invisible *supervised class* (Cf ∧ Default_Ignorable) are also loaded: zero-width space (U+200B, `WORKINGLY_CLOSED`, battery 21/21), zero-width joiner (U+200D) and byte order mark (U+FEFF) as `WORKING_DRAFT`. The runtime prints a `CARD_NOT_CONVEYOR_REVIEWED` warning for every `WORKING_DRAFT` card, so a draft result is never passed off as reliable. The relation axis (mask/homoglyph verdicts) is implemented and gated (step-4 gate 12/12).
+- **Nine sign cards are currently loaded.** Five are `ARTIFACT_CONFIRMED` (`.` U+002E, `/` U+002F, `💀` U+1F480, `☠` U+2620, `@` U+0040). The fullwidth solidus `／` (U+FF0F) — the **relation/mask axis**, no matcher, relations only — is loaded as `WORKING_DRAFT`. Three cards of the invisible *supervised class* (Cf ∧ Default_Ignorable) are also loaded: zero-width space (U+200B, `WORKINGLY_CLOSED`, battery 21/21), zero-width joiner (U+200D) and byte order mark (U+FEFF) as `WORKING_DRAFT`. The runtime prints a `CARD_NOT_CONVEYOR_REVIEWED` warning for every `WORKING_DRAFT` card, so a draft result is never passed off as reliable.
+- **The gate suite is the contract: 39 gates, all green** (`py -3 scripts/run_gates.py`). Every decision has guard cells for both halves — the attack it must catch and the legitimate text it must not wake on. Included are 862k official Unicode bidi conformance cases with zero mismatches.
+- **Known blindness is pinned, not hidden.** A single-carrier presence/absence scheme sitting on functionally valid positions is indistinguishable from ordinary orthography *in principle* — two different histories produce the identical byte string, so no deterministic rule can separate them. That limit is named (`LIMIT-ZW-SINGLE-CARRIER-FUNCTIONAL`, `REGRESSION_CARD_ZWSP_NATIVE`), pinned by test cells, and stated in the report rather than papered over. Roughly thirty such residuals are registered across the axes; each names its own bypass.
+- **Measured, not assumed.** Field measurements on live Khmer text (Wikipedia, Tatoeba, Telegram and Facebook comments) are recorded in `conveyor_runs/SNI_FIELD_MEASURE_*`, including a controlled probe showing that Facebook strips zero-width spaces from comments while Telegram preserves them and injects bidi isolates of its own — carriers are transformed differently by every transport.
 - Sign cards are written in Russian (the project's authoritative language). Code output is in English.
 
 ## Standards Alignment
@@ -219,11 +262,19 @@ FINAL VERDICT: HOLD_PENDING_REVIEW
 ```
 msl_mip_runtime.py      Точка входа — запускать это
 MANIFEST.md             Концептуальный манифест (9 языков)
-core/                   Парсер карточек и модель данных
+core/                   Парсер карточек, модель данных и оси анализа
   load_card.py            Читает карточки знаков с диска
   sign_core_card.py       Структуры данных
   tree_parser.py          Парсер отступов
   public_suffix.py        3-уровневые доменные данные (PSL + IANA)
+  unicode_tables.py       Загрузчики запиненных таблиц UCD/UTS#39 (sha256)
+  confusable_axis.py      Видимые двойники (скелет + смешение письменностей)
+  tag_axis.py             Скрытый текст в TAG-блоке
+  variation_registry.py   Нагрузка в вариационных селекторах
+  uax9.py                 Конформный алгоритм UAX#9 (bidi)
+  bidi_axis.py            Переупорядочивание: логический порядок против видимого
+  zw_bits.py              Потоки носителей нулевой ширины
+  sni_oracle.py           Штатные позиции родных письменностей
 single_sign/            Слой анализа одиночных знаков
   module_engine.py        Диспетчер знаков (по кодпоинту)
   integrator_engine.py    Вердикт для одного знака
@@ -231,6 +282,9 @@ single_sign/            Слой анализа одиночных знаков
 sequence/               Слой анализа последовательностей
   sequence_engine.py      Межзнаковые паттерны (../, //) + вердикты масок (отношения)
 cards/                  Определения знаков (база знаний)
+data/unicode/           Запиненные таблицы Unicode + PIN_MANIFEST.md
+tests/                  Свод гейтов — у каждого поведения есть ячейка-страж
+scripts/                run_gates.py (весь свод), analyze_file.py (любой файл)
 templates/              Шаблоны для расширения системы
 ```
 
@@ -245,6 +299,35 @@ templates/              Шаблоны для расширения систем�
    Sequence-слой также выносит **вердикты по маскам (гомоглифам)** — ось «отношение»: знак, объявленный маской канона (например, полноширинный `／` U+FF0F, маскирующий `/` U+002F), получает риск из *контекста*, а не из самого знака — HIGH внутри host-части, MEDIUM в пути URL, NONE в свободном тексте, и только когда scope отношения покрывает этот контекст. Само отношение — никогда не угроза (RELATION_FOUND ≠ THREAT).
 
 3. **Интеграция** — финальный градуированный вердикт, сохраняющий место для человеческого суждения. Система отмечает; человек решает.
+
+---
+
+## Оси (четыре рода структурной угрозы)
+
+Помимо трёх слоёв рантайм несёт независимые **оси**. Каждая аддитивна, работает только
+на повышение и fail-open: ось может добавить сигнал, но не может погасить чужой, а
+сломанная ось сообщает о собственной поломке вместо тихого пропуска. Итоговый уровень —
+максимум по вкладчикам, и отчёт всегда называет, *какая* ось его дала.
+
+| Род угрозы | Ось | На какой вопрос отвечает |
+|---|---|---|
+| **Подмена** | `confusable_axis` | не двойник ли этот знак другого (смешение письменностей, совпадение скелетов)? |
+| **Сокрытие** | `tag_axis`, `variation_registry`, `zw_bits` | не едут ли невидимые данные в TAG-знаках, вариационных селекторах или носителях нулевой ширины? |
+| **Переупорядочивание** | `bidi_axis` + `uax9` | отличается ли видимый порядок от хранимого? (`invoice[RLO]gpj.exe` показывается как `invoiceexe.jpg`) |
+| **Разрыв** | карточный слой + input guard | не разрывает ли невидимка хост, токен или побайтовое сравнение? |
+
+Через все оси проходят два правила:
+
+- **Запиненные данные, никогда «latest».** Scripts, Line_Break, InCB, Joining_Type,
+  confusables, bidi-скобки и реестры вариаций — замороженные файлы, проверяемые по
+  sha256 (`data/unicode/PIN_MANIFEST.md`). Несовпадение хэша **видимо** выключает
+  соответствующее правило, а не меняет поведение молча.
+- **Судится функция позиции, а не письменность.** Один и тот же невидимый знак — норма
+  орфографии в одной письменности и аномалия в другой. Кхмерский разделяет слова
+  пробелом нулевой ширины, персидский ставит полупробел перед энклитиками, деванагари
+  соединяет конъюнкты вирамой. Оракулы решают, выполняет ли *данное вхождение* штатную
+  работу (соседи с `Line_Break=SA`, `InCB=Linker`, тип соединения) — а машинные контексты
+  (хост, почта, URL, путь, идентификатор) не смягчаются никогда, в любой письменности.
 
 ---
 
@@ -282,7 +365,10 @@ templates/              Шаблоны для расширения систем�
 - **WORKING_DRAFT** — это активный исследовательский проект, не production-софт.
 - Система работает **только со структурой**. Она не знает, что «PayPal» — это бренд. Она знает, что `com` в непоследней позиции доменной цепочки — структурный сигнал имитации.
 - **Домены-двойники брендов с одной точкой** (например `paypai.com`) сейчас проходят — для них нужен отдельный слой репутации/детекции typosquatting, это будущая работа.
-- **Сейчас загружены девять карточек знаков.** Пять — `ARTIFACT_CONFIRMED` (`.` U+002E, `/` U+002F, `💀` U+1F480, `☠` U+2620, `@` U+0040). Полноширинный солидус `／` (U+FF0F) — **ось «отношение»/маска**, без матчера, только отношения — загружен как `WORKING_DRAFT`. Также загружены три карточки невидимого *поднадзорного класса* (Cf ∧ Default_Ignorable): пробел нулевой ширины (U+200B, `WORKINGLY_CLOSED`, батарея 21/21), соединитель нулевой ширины (U+200D) и маркер порядка байт (U+FEFF) как `WORKING_DRAFT`. Рантайм печатает предупреждение `CARD_NOT_CONVEYOR_REVIEWED` для каждой `WORKING_DRAFT`-карточки, поэтому черновой результат никогда не выдаётся за надёжный. Ось «отношение» (вердикты по маскам/гомоглифам) реализована и закрыта gate-тестом (шаг 4: 12/12).
+- **Сейчас загружены девять карточек знаков.** Пять — `ARTIFACT_CONFIRMED` (`.` U+002E, `/` U+002F, `💀` U+1F480, `☠` U+2620, `@` U+0040). Полноширинный солидус `／` (U+FF0F) — **ось «отношение»/маска**, без матчера, только отношения — загружен как `WORKING_DRAFT`. Также загружены три карточки невидимого *поднадзорного класса* (Cf ∧ Default_Ignorable): пробел нулевой ширины (U+200B, `WORKINGLY_CLOSED`, батарея 21/21), соединитель нулевой ширины (U+200D) и маркер порядка байт (U+FEFF) как `WORKING_DRAFT`. Рантайм печатает предупреждение `CARD_NOT_CONVEYOR_REVIEWED` для каждой `WORKING_DRAFT`-карточки, поэтому черновой результат никогда не выдаётся за надёжный.
+- **Свод гейтов — это контракт: 39 гейтов, все зелёные** (`py -3 scripts/run_gates.py`). У каждого решения есть ячейки-стражи на обе половины: атака, которую обязаны поймать, и легитимный текст, на котором обязаны молчать. В своде — 862 тысячи официальных конформных случаев Unicode по bidi с нулём расхождений.
+- **Известная слепота запинена, а не спрятана.** Однознаковая схема «есть/нет», стоящая на функционально верных позициях, неотличима от обычной орфографии **принципиально**: две разные истории дают одну и ту же строку байтов, и никакое детерминированное правило их не разделит. Этот предел назван (`LIMIT-ZW-SINGLE-CARRIER-FUNCTIONAL`, `REGRESSION_CARD_ZWSP_NATIVE`), закреплён тестовыми ячейками и выводится в отчёт, а не заминается. Всего по осям зарегистрировано около тридцати таких остатков, и каждый называет собственный обход.
+- **Измерено, а не предположено.** Полевые замеры на живом кхмерском (Википедия, Tatoeba, комментарии Telegram и Facebook) записаны в `conveyor_runs/SNI_FIELD_MEASURE_*` — включая контрольную пробу, показавшую, что Facebook вырезает пробелы нулевой ширины из комментариев, а Telegram их сохраняет и добавляет собственные bidi-изоляты: каждый транспорт преобразует носители по-своему.
 - Карточки знаков написаны на русском (авторитетный язык проекта). Вывод программы — на английском.
 
 ## Соответствие стандартам

@@ -4,7 +4,7 @@ DOCUMENT_ID: ZW_SVOD_AND_SIM_2026-08-05
 DOCUMENT_TYPE: COORDINATOR_SVOD + ADVERSARIAL_SIM
 IN_RESPONSE_TO: CONVEYOR_PACKET_ZW_BITS_2026-08-05
 DATE: 2026-08-05
-STATUS: DELIVERED_TO_AUTHOR — PENDING_AUTHOR_DECISION
+STATUS: ЗАКРЫТ — решение принято, код приземлён (f49aca0), свод гейтов зелёный
 RULE: design-adversarial-sim (свод НЕОБХОДИМ, но НЕ достаточен; замер бьёт голос)
 
 ============================================================
@@ -152,6 +152,6 @@ B8 Реестр остатка с числами; запрет формулир�
   корректной орфографией, и тогда оно дорого; либо нагрузка обязана жить в одном знаке и на
   функциональных позициях — именованный остаток, обслуживаемый витнесс-сводкой без вердикта.
 
-FORK_STATUS: PENDING_AUTHOR_DECISION (F1-F6 + B1-B8). Код заблокирован.
+FORK_STATUS: RESOLVED -> foundation_layer/AUTHOR_DECISION_20260805_D-ZW-BITS.md (развилки F1-F6 + B1-B8). Код приземлён: f49aca0.
 
 END

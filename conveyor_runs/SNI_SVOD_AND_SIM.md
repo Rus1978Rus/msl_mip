@@ -2,7 +2,9 @@
 ПАКЕТ: CONVEYOR_PACKET_SCRIPT_NATIVE_INVISIBLES_2026-08-06
 СОСТАВ: 4 внешних семейства (Grok / Qwen / Gemini / GPT-5.6) + панель Кими (4 стойки + RESEARCH)
 ДАТА СВОДА: 2026-08-06
-СТАТУС КОДА: ЗАБЛОКИРОВАН до AUTHOR_DECISION + delta-манифест поверх живых батарей + SNI-LIVE-RERUN
+СТАТУС КОДА: ЗАКРЫТ — решение foundation_layer/AUTHOR_DECISION_20260806_D-SNI.md принято
+  2026-08-06, код приземлён (064d184), delta-census 0 сдвинутых ячеек, свод гейтов зелёный.
+  D-SNI-5 (COENG+ZWJ) закрыт замером SNI-M4: 0 на 15 945 COENG — carve-out отклонён.
 
 ## §1. ВЕРДИКТ КРУГА
 

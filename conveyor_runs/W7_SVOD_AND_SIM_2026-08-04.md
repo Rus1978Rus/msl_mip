@@ -5,7 +5,7 @@ DOCUMENT_TYPE: COORDINATOR_SVOD + ADVERSARIAL_SIM
 IN_RESPONSE_TO: CONVEYOR_PACKET_W7_CONFUSABLE_2026-07-26
 DATE: 2026-08-04
 PROJECT: MSL/MIP
-STATUS: DELIVERED_TO_AUTHOR — PENDING_AUTHOR_DECISION
+STATUS: ЗАКРЫТ — решение принято, код приземлён (426df2a), свод гейтов зелёный
 RULE: design-adversarial-sim (свод НЕОБХОДИМ, но НЕ достаточен; замер на живом ядре бьёт голос)
 
 ============================================================

@@ -4,7 +4,7 @@ DOCUMENT_ID: R4_SVOD_AND_SIM_2026-08-06
 DOCUMENT_TYPE: COORDINATOR_SVOD + ADVERSARIAL_SIM
 IN_RESPONSE_TO: CONVEYOR_PACKET_R4_SLOPPY_VS_PAYLOAD_2026-08-06
 DATE: 2026-08-06
-STATUS: DELIVERED_TO_AUTHOR — PENDING_AUTHOR_DECISION
+STATUS: ЗАКРЫТ — решение принято, код приземлён (e373a2d), свод гейтов зелёный
 RULE: design-adversarial-sim (свод НЕОБХОДИМ, но НЕ достаточен; замер бьёт голос)
 
 ============================================================
@@ -154,6 +154,6 @@ B7 Прогон всех новых ячеек на ЖИВОМ гейте до �
 Правило на будущее: прежде чем обобщать «легит молчит», проверять выборку на полноту
 морфологических классов, а не только на количество примеров.
 
-FORK_STATUS: PENDING_AUTHOR_DECISION (F1-F5 + B1-B7). Код заблокирован.
+FORK_STATUS: RESOLVED -> foundation_layer/AUTHOR_DECISION_20260806_D-R4.md (развилки F1-F5 + B1-B7). Код приземлён: e373a2d.
 
 END

@@ -5,7 +5,7 @@ DOCUMENT_TYPE: COORDINATOR_SVOD + ADVERSARIAL_SIM
 IN_RESPONSE_TO: CONVEYOR_PACKET_VS_STEGO_2026-08-04
 DATE: 2026-08-04
 PROJECT: MSL/MIP
-STATUS: DELIVERED_TO_AUTHOR — PENDING_AUTHOR_DECISION
+STATUS: ЗАКРЫТ — решение принято, код приземлён (fc1776f), свод гейтов зелёный
 RULE: design-adversarial-sim (свод НЕОБХОДИМ, но НЕ достаточен; замер бьёт голос)
 
 ============================================================
@@ -182,6 +182,6 @@ ADJACENT_MONGOLIAN_FVS        U+180B-180D/180F — Variation_Selectors ВНЕ д
   ФОРМУЛИРОВКУ ЦЕЛИ, переформулировка принята (§4). Граница «легит-типографика <-> носитель» при
   знак-в-знак совпадении — C6-корень; дизайн даёт сигнал на АНОМАЛИЮ, не на факт носителя.
 
-FORK_STATUS: PENDING_AUTHOR_DECISION (F1-F5 + снятие B1-B8 спекой). Код заблокирован.
+FORK_STATUS: RESOLVED -> foundation_layer/AUTHOR_DECISION_20260804_D-VS-STEGO.md (развилки F1-F5 + снятие B1-B8 спекой). Код приземлён: fc1776f.
 
 END

@@ -5,7 +5,7 @@ DOCUMENT_TYPE: COORDINATOR_SVOD + ADVERSARIAL_SIM
 IN_RESPONSE_TO: CONVEYOR_PACKET_BIDI_2026-08-04
 DATE: 2026-08-04
 PROJECT: MSL/MIP
-STATUS: DELIVERED_TO_AUTHOR — PENDING_AUTHOR_DECISION
+STATUS: ЗАКРЫТ — решение принято, код приземлён (287e239 + b633f70), свод гейтов зелёный
 RULE: design-adversarial-sim (свод НЕОБХОДИМ, но НЕ достаточен; замер бьёт голос)
 
 ============================================================
@@ -149,6 +149,6 @@ B8 РЕЕСТР ОСТАТКА (9 маркеров панели) + запрет 
   ЗАПИНЕННОМУ UAX#9» — объективный факт строки относительно стандарта; расхождения конкретных
   рендереров — именованный остаток (BYPASS_CONSUMER_RENDERER).
 
-FORK_STATUS: PENDING_AUTHOR_DECISION (F1-F5 + B1-B8). Код заблокирован.
+FORK_STATUS: RESOLVED -> foundation_layer/AUTHOR_DECISION_20260804_D-BIDI-REORDER.md (развилки F1-F5 + B1-B8). Код приземлён: 287e239 + b633f70.
 
 END

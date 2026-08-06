@@ -5,7 +5,7 @@ DOCUMENT_TYPE: COORDINATOR_SVOD + ADVERSARIAL_SIM
 IN_RESPONSE_TO: CONVEYOR_PACKET_W_TAG_2026-08-04
 DATE: 2026-08-04
 PROJECT: MSL/MIP
-STATUS: DELIVERED_TO_AUTHOR — PENDING_AUTHOR_DECISION
+STATUS: ЗАКРЫТ — решение принято, код приземлён (f71d9a0), свод гейтов зелёный
 RULE: design-adversarial-sim (свод НЕОБХОДИМ, но НЕ достаточен; замер бьёт голос)
 
 ============================================================
@@ -155,6 +155,6 @@ B8 ЗАПРЕТ формулировки «сокрытие закрыто»; о
   TAG — единственный носитель с тривиальной биекцией в читаемый ASCII, где раскрытие максимально
   информативно.
 
-FORK_STATUS: PENDING_AUTHOR_DECISION (F1-F7 + снятие B1-B8 спекой). Код заблокирован.
+FORK_STATUS: RESOLVED -> foundation_layer/AUTHOR_DECISION_20260804_D-TAG-COVERT-TEXT.md (развилки F1-F7 + снятие B1-B8 спекой). Код приземлён: f71d9a0.
 
 END
