@@ -103,12 +103,32 @@ def _decode(raw):
     return raw
 
 
+def preflight():
+    """Name an environment hazard BEFORE it turns into an unexplained timeout.
+    Costs a few syscalls (attributes only, no file contents) and never fails the
+    run: it explains a stall, it does not judge one."""
+    sys.path.insert(0, os.path.join(REPO, "core"))
+    try:
+        import env_probe
+    except ImportError:
+        return
+    state = env_probe.status(REPO)
+    if state["status"] == "CLOUD_PLACEHOLDERS_PRESENT":
+        print("[!] " + state["message"])
+        print("    Affected: " + ", ".join(state["pending"][:5])
+              + (" ..." if len(state["pending"]) > 5 else ""))
+        print("    A gate that stalls in this state is waiting on the download,")
+        print("    not hanging. Check this line first when a timeout appears.")
+        print("=" * 74)
+
+
 def main():
     gates = discover()
     print("=" * 74)
     print("GATE RUNNER -- %d gate script(s) from tests/ (excluded: %d)"
           % (len(gates), len(EXCLUDE)))
     print("=" * 74)
+    preflight()
     failed = []
     slow = []
     for name in gates:

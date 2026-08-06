@@ -43,6 +43,7 @@ import tag_axis as _tag_mod        # TAG covert-text axis (D-TAG-COVERT-TEXT)
 import variation_registry as _vreg  # sanctioned variation sequences (D-VS-STEGO D4)
 import bidi_axis as _bidi_mod      # bidi reordering axis, phase 1 (D-BIDI-REORDER)
 import zw_bits as _zw_mod          # zero-width bit-channel axis, phase 1 (D-ZW-BITS)
+import env_probe as _env_probe     # report-only: are the data files on this disk?
 from sequence_integrator_engine import process_sequence_output
 from o1_policy_engine import pending_for as _o1_pending_for  # P3: report-only disposition
 from o1_policy_engine import O1Context as _O1Context         # C6: caller-supplied targets
@@ -1381,7 +1382,23 @@ def print_report(report: dict) -> None:
     print("=" * 60)
 
 
+def environment_status():
+    """Report-only check of whether this installation's data files are really on
+    disk (see core/env_probe). Exposed so an embedding application can surface
+    the condition in its own interface instead of freezing without explanation.
+    Never consulted by any decision path."""
+    return _env_probe.status()
+
+
 def main():
+    # Said BEFORE the first data file is touched: if a sync service is holding
+    # them online, the pause the user is about to experience is a download, and
+    # they should be told that in one sentence rather than left guessing. The
+    # probe reads attributes only, so it cannot itself trigger the download.
+    _env = environment_status()
+    if _env["status"] == "CLOUD_PLACEHOLDERS_PRESENT":
+        print("[!] " + _env["message"])
+
     cards = load_all_cards()
     if not cards:
         print("[ERROR] No cards loaded — analysis impossible.")
